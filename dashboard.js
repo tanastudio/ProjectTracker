@@ -794,6 +794,18 @@ function closeStatusModal() {
     statusModal.setAttribute("aria-hidden", "true");
 }
 
+function openStatusModalFromChart(chart, event) {
+    if (!chart || typeof chart.getElementsAtEventForMode !== "function") return;
+    const points = chart.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
+    if (!Array.isArray(points) || points.length === 0) return;
+
+    const point = points[0];
+    const label = chart.data?.labels?.[point.index];
+    if (!label) return;
+
+    openStatusModal(String(label));
+}
+
 async function notifyViaEdge(payload) {
     try {
         await supabase.functions.invoke("ticket-notify", { body: payload });
@@ -1202,6 +1214,81 @@ function setAutoRefresh(seconds) {
     timer = setInterval(refresh, seconds * 1000);
 }
 
+function formatPercent(value, total) {
+    if (!total) return "0%";
+    return `${Math.round((Number(value || 0) / total) * 100)}%`;
+}
+
+function getDatasetTotal(values) {
+    return (Array.isArray(values) ? values : []).reduce((sum, value) => sum + Number(value || 0), 0);
+}
+
+function ensureChartPercentagePlugin() {
+    if (window.__dashboardPercentPluginReady || typeof Chart === "undefined") return;
+
+    Chart.register({
+        id: "dashboardPercentLabels",
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            if (!ctx) return;
+
+            ctx.save();
+            ctx.font = "600 11px system-ui";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            if (chart.config.type === "pie") {
+                const dataset = chart.data.datasets?.[0];
+                const meta = chart.getDatasetMeta(0);
+                const total = getDatasetTotal(dataset?.data);
+                if (!dataset || !meta || !total) {
+                    ctx.restore();
+                    return;
+                }
+
+                meta.data.forEach((arc, index) => {
+                    const value = Number(dataset.data[index] || 0);
+                    if (!value) return;
+
+                    const angle = (arc.startAngle + arc.endAngle) / 2;
+                    const radius = arc.innerRadius + (arc.outerRadius - arc.innerRadius) * 0.62;
+                    const x = arc.x + Math.cos(angle) * radius;
+                    const y = arc.y + Math.sin(angle) * radius;
+
+                    ctx.fillStyle = "#1f2937";
+                    ctx.fillText(formatPercent(value, total), x, y);
+                });
+            }
+
+            if (chart.config.type === "bar" && chart.options?.indexAxis === "y") {
+                const labels = chart.data.labels || [];
+                const totalsByRow = labels.map((_, rowIndex) =>
+                    chart.data.datasets.reduce((sum, dataset) => sum + Number(dataset?.data?.[rowIndex] || 0), 0)
+                );
+
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    meta.data.forEach((bar, rowIndex) => {
+                        const value = Number(dataset?.data?.[rowIndex] || 0);
+                        const total = totalsByRow[rowIndex];
+                        if (!value || !total) return;
+
+                        const width = Math.abs(bar.base - bar.x);
+                        if (width < 34) return;
+
+                        ctx.fillStyle = "#1f2937";
+                        ctx.fillText(formatPercent(value, total), (bar.base + bar.x) / 2, bar.y);
+                    });
+                });
+            }
+
+            ctx.restore();
+        },
+    });
+
+    window.__dashboardPercentPluginReady = true;
+}
+
 function initCharts() {
     // Ensure canvases exist
     const pieCanvas = document.getElementById("overallPie");
@@ -1216,6 +1303,8 @@ function initCharts() {
         return;
     }
 
+    ensureChartPercentagePlugin();
+
     // Pie (Overall Status)
     window.__overallPieChart = new Chart(pieCanvas.getContext("2d"), {
         type: "pie",
@@ -1226,6 +1315,10 @@ function initCharts() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick(event, elements, chart) {
+                if (!elements?.length) return;
+                openStatusModalFromChart(chart, event);
+            },
             plugins: {
                 legend: {
                     position: "bottom",
@@ -1234,6 +1327,16 @@ function initCharts() {
                         boxHeight: 12,
                         padding: 10,
                         font: { size: 11.5 },
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const dataset = context.dataset?.data || [];
+                            const total = getDatasetTotal(dataset);
+                            const value = Number(context.raw || 0);
+                            return `${context.label}: ${value} (${formatPercent(value, total)})`;
+                        },
                     },
                 },
             },
@@ -1256,7 +1359,22 @@ function initCharts() {
             responsive: true,
             maintainAspectRatio: false,
             indexAxis: "y",
-            plugins: { legend: { position: "bottom" } },
+            plugins: {
+                legend: { position: "bottom" },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const rowIndex = context.dataIndex;
+                            const total = context.chart.data.datasets.reduce(
+                                (sum, dataset) => sum + Number(dataset?.data?.[rowIndex] || 0),
+                                0
+                            );
+                            const value = Number(context.raw || 0);
+                            return `${context.dataset.label}: ${value} (${formatPercent(value, total)})`;
+                        },
+                    },
+                },
+            },
             scales: {
                 x: { stacked: true, beginAtZero: true },
                 y: { stacked: true },

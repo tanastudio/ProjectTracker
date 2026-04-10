@@ -24,13 +24,13 @@
   </style>
 
   <style>
-    .wrap { max-width: 860px; margin: 0 auto; }
+    .wrap { max-width: 920px; margin: 0 auto; }
 
     /* Tabs */
-    .tabs { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid rgba(15,23,42,.10); }
+    .tabs { display: flex; gap: 2px; margin-bottom: 14px; border-bottom: 1px solid rgba(15,23,42,.10); }
     .tab-btn {
-      padding: 10px 20px; border: none; background: none; cursor: pointer;
-      font-size: 14px; font-weight: 700; color: #64748b; font-family: inherit;
+      padding: 9px 16px; border: none; background: none; cursor: pointer;
+      font-size: 13px; font-weight: 800; color: #64748b; font-family: inherit;
       border-bottom: 2px solid transparent; margin-bottom: -1px;
       transition: color .15s, border-color .15s;
     }
@@ -38,75 +38,76 @@
     .tab-btn:hover:not(.active) { color: #0f172a; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .tab-panel.active { display: grid; gap: 12px; }
 
     /* Card */
     .card {
       background: rgba(255,255,255,.88); border: 1px solid rgba(15,23,42,.12);
-      border-radius: 18px; padding: 24px; box-shadow: 0 12px 30px rgba(2,6,23,.10);
-      margin-bottom: 16px;
+      border-radius: 16px; padding: 18px; box-shadow: 0 10px 24px rgba(2,6,23,.08);
+      margin-bottom: 0;
     }
-    .card-title { font-size: 18px; font-weight: 900; letter-spacing: -.01em; margin: 0 0 4px; }
-    .card-desc { font-size: 13px; color: #64748b; margin: 0 0 20px; }
+    .card-title { font-size: 17px; font-weight: 900; letter-spacing: -.01em; margin: 0 0 4px; line-height: 1.2; }
+    .card-desc { font-size: 12px; color: #64748b; margin: 0 0 14px; line-height: 1.5; }
 
     /* Form */
-    .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
     .form-group label { font-size: 12px; font-weight: 800; color: #64748b; }
     .form-input, .form-select, .form-textarea {
-      width: 100%; padding: 0 14px; height: 46px; border-radius: 12px;
-      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 14px;
+      width: 100%; padding: 0 12px; height: 40px; border-radius: 10px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 13px;
       outline: none; font-family: inherit; transition: border-color .15s;
     }
     .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #3b82f6; }
-    .form-textarea { height: 80px; padding: 10px 14px; resize: vertical; }
-    .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-textarea { min-height: 72px; height: 72px; padding: 9px 12px; resize: vertical; }
+    .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     /* Buttons */
-    .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 20px; }
+    .btn-row { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
     .btn-primary {
-      min-height: 44px; padding: 0 22px; border-radius: 12px; border: none;
-      background: #3b82f6; color: #fff; font-size: 14px; font-weight: 800;
+      min-height: 38px; padding: 0 16px; border-radius: 10px; border: none;
+      background: #3b82f6; color: #fff; font-size: 13px; font-weight: 800;
       cursor: pointer; transition: background .15s; font-family: inherit;
     }
     .btn-primary:hover { background: #2563eb; }
     .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
     .btn-ghost {
-      min-height: 44px; padding: 0 18px; border-radius: 12px;
-      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 14px;
+      min-height: 38px; padding: 0 14px; border-radius: 10px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 13px;
       font-weight: 700; color: #374151; cursor: pointer; transition: background .15s; font-family: inherit;
     }
     .btn-ghost:hover { background: #f8fafc; }
     .btn-danger-sm {
-      min-height: 32px; padding: 0 12px; border-radius: 8px; border: none;
+      min-height: 30px; padding: 0 10px; border-radius: 8px; border: none;
       background: rgba(239,68,68,.10); color: #dc2626; font-size: 12px;
       font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
     }
     .btn-danger-sm:hover { background: rgba(239,68,68,.20); }
 
     /* Hint */
-    .hint { border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+    .hint { border-radius: 10px; padding: 9px 12px; font-size: 12px; margin-bottom: 10px; display: none; }
     .hint-error { display: block; background: rgba(239,68,68,.08); color: #dc2626; border: 1px solid rgba(239,68,68,.2); }
     .hint-ok    { display: block; background: rgba(34,197,94,.08);  color: #16a34a; border: 1px solid rgba(34,197,94,.2); }
 
-    .section-title { font-size: 13px; font-weight: 800; color: #374151; margin: 16px 0 8px; }
+    .section-title { font-size: 12px; font-weight: 800; color: #374151; margin: 14px 0 6px; }
     .muted { color: #64748b; font-size: 13px; }
     .small { font-size: 12px; }
 
     /* Fields list */
-    .field-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .field-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .field-row {
       display: grid; grid-template-columns: 24px 1fr auto auto;
-      gap: 12px; align-items: center; background: rgba(248,250,252,.8);
-      border: 1px solid rgba(15,23,42,.08); border-radius: 12px; padding: 12px 14px;
+      gap: 10px; align-items: center; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 10px; padding: 10px 12px;
     }
-    .field-row.fixed-row { opacity: .6; }
+    .field-row.fixed-row:not(.fixed-row-partial) { opacity: .6; }
     .field-row.drag-over { border-color: #3b82f6; background: rgba(239,246,255,.5); }
     .drag-handle { cursor: grab; color: #94a3b8; font-size: 17px; user-select: none; line-height: 1; }
     .field-row.fixed-row .drag-handle { cursor: default; opacity: 0; pointer-events: none; }
     .field-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .field-name-wrap { display: flex; align-items: center; gap: 6px; }
-    .field-name { font-size: 14px; font-weight: 700; }
+    .field-name { font-size: 13px; font-weight: 700; }
     .field-key {
-      font-size: 11px; font-family: monospace; color: #64748b;
+      font-size: 10px; font-family: monospace; color: #64748b;
       background: rgba(15,23,42,.06); border-radius: 5px; padding: 2px 6px;
       width: fit-content;
     }
@@ -121,7 +122,7 @@
     }
     .btn-rename-save:hover { background: rgba(34,197,94,.1); }
     .field-name-input {
-      font-size: 14px; font-weight: 700; border: 1.5px solid #3b82f6; border-radius: 7px;
+      font-size: 13px; font-weight: 700; border: 1.5px solid #3b82f6; border-radius: 7px;
       padding: 2px 8px; outline: none; font-family: inherit; min-width: 0; width: 180px;
     }
 
@@ -143,26 +144,45 @@
     .toggle input:disabled + .toggle-slider { opacity: .5; cursor: default; }
 
     /* Members */
+    .member-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .member-filters {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .filter-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 999px;
+      border: 1px solid rgba(15,23,42,.10); background: #fff;
+      font-size: 12px; font-weight: 700; color: #334155;
+      cursor: pointer; user-select: none;
+    }
+    .filter-chip input {
+      margin: 0;
+      accent-color: #3b82f6;
+    }
+    .member-summary { font-size: 12px; color: #64748b; }
     .member-list { display: flex; flex-direction: column; gap: 6px; }
     .member-row {
       display: flex; align-items: center; gap: 12px;
-      padding: 12px 14px; background: rgba(248,250,252,.8);
-      border: 1px solid rgba(15,23,42,.08); border-radius: 12px;
+      padding: 10px 12px; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 10px;
     }
     .member-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .member-name { font-size: 14px; font-weight: 700; }
+    .member-name { font-size: 13px; font-weight: 700; }
     .member-meta { font-size: 12px; color: #64748b; }
     .member-role-select {
-      height: 34px; padding: 0 10px; border-radius: 8px;
+      height: 32px; padding: 0 10px; border-radius: 8px;
       border: 1px solid rgba(15,23,42,.12); font-size: 12px;
       background: #fff; font-family: inherit;
     }
 
-    .add-member-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: center; margin-top: 12px; }
+    .add-member-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: center; margin-top: 10px; }
     .add-member-select {
-      width: 100%; height: 44px; padding: 0 12px; border-radius: 12px;
+      width: 100%; height: 40px; padding: 0 12px; border-radius: 10px;
       border: 1px solid rgba(15,23,42,.12); background: #fff;
-      font-size: 14px; font-family: inherit;
+      font-size: 13px; font-family: inherit;
     }
 
     .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; border: 1px solid rgba(15,23,42,.10); }
@@ -172,27 +192,27 @@
     .pill-candidate{ background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 
     /* Candidates tab */
-    .candidate-list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+    .candidate-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
     .candidate-row {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 14px; background: rgba(248,250,252,.8);
-      border: 1px solid rgba(15,23,42,.08); border-radius: 12px;
+      padding: 9px 12px; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 10px;
     }
     .candidate-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .candidate-name  { font-size: 14px; font-weight: 700; }
+    .candidate-name  { font-size: 13px; font-weight: 700; }
     .candidate-email { font-size: 12px; color: #64748b; }
 
     .upload-zone {
       border: 2px dashed rgba(15,23,42,.15); border-radius: 14px;
-      padding: 24px; text-align: center; cursor: pointer;
+      padding: 18px; text-align: center; cursor: pointer;
       background: rgba(248,250,252,.5); transition: border-color .15s, background .15s;
     }
     .upload-zone:hover, .upload-zone.drag-over { border-color: #3b82f6; background: rgba(239,246,255,.6); }
     .upload-hint { font-size: 13px; color: #64748b; margin-top: 4px; }
 
-    .csv-preview { overflow-x: auto; margin-top: 12px; }
+    .csv-preview { overflow-x: auto; margin-top: 10px; }
     .csv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .csv-table th, .csv-table td { padding: 8px 10px; border: 1px solid rgba(15,23,42,.08); text-align: left; }
+    .csv-table th, .csv-table td { padding: 7px 9px; border: 1px solid rgba(15,23,42,.08); text-align: left; }
     .csv-table th { background: rgba(15,23,42,.04); font-weight: 700; font-size: 12px; }
     .csv-table tr:nth-child(even) td { background: rgba(248,250,252,.8); }
     .csv-error-row td { background: rgba(239,68,68,.06) !important; color: #dc2626; }
@@ -201,17 +221,28 @@
     .progress-bar-inner { height: 100%; background: #3b82f6; border-radius: 3px; transition: width .3s; }
 
     /* Options checklist */
-    .options-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding: 12px; background: rgba(248,250,252,.8); border: 1px solid rgba(15,23,42,.08); border-radius: 10px; }
-    .option-item { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; padding: 4px 0; }
+    .options-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; padding: 10px; background: rgba(248,250,252,.8); border: 1px solid rgba(15,23,42,.08); border-radius: 10px; }
+    .option-item { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; padding: 3px 0; }
     .option-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #3b82f6; flex-shrink: 0; }
     .option-item span { flex: 1; }
     .remove-opt { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px; line-height: 1; padding: 0 2px; }
     .remove-opt:hover { color: #dc2626; }
     .add-option-row { display: flex; gap: 8px; }
-    .add-option-input { flex: 1; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(15,23,42,.12); font-size: 14px; font-family: inherit; outline: none; }
+    .add-option-input { flex: 1; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(15,23,42,.12); font-size: 13px; font-family: inherit; outline: none; }
     .add-option-input:focus { border-color: #3b82f6; }
-    .add-option-add-btn { min-height: 40px; padding: 0 16px; border-radius: 10px; border: none; background: #e2e8f0; color: #374151; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .add-option-add-btn { min-height: 36px; padding: 0 14px; border-radius: 10px; border: none; background: #e2e8f0; color: #374151; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
     .add-option-add-btn:hover { background: #cbd5e1; }
+
+    @media (max-width: 720px) {
+      .form-row2,
+      .add-member-row { grid-template-columns: 1fr; }
+      .member-row,
+      .candidate-row,
+      .field-row { align-items: flex-start; }
+      .field-row { grid-template-columns: 18px 1fr; }
+      .member-role-select,
+      .btn-danger-sm { width: 100%; }
+    }
   </style>
 </head>
 
@@ -425,6 +456,16 @@
           <div class="card-title">Members</div>
           <div class="card-desc">Manage who has access to this project. Role controls edit permissions. Candidates are managed separately via CSV upload.</div>
 
+          <div class="member-toolbar">
+            <div class="member-filters" id="memberFilters">
+              <label class="filter-chip"><input type="checkbox" data-member-filter="admin" checked>admin</label>
+              <label class="filter-chip"><input type="checkbox" data-member-filter="internal" checked>internal</label>
+              <label class="filter-chip"><input type="checkbox" data-member-filter="client" checked>client</label>
+              <label class="filter-chip"><input type="checkbox" data-member-filter="candidate">candidate</label>
+            </div>
+            <div class="member-summary" id="memberSummary">Loading members...</div>
+          </div>
+
           <div class="member-list" id="memberList">
             <div class="muted">Loading members...</div>
           </div>
@@ -434,7 +475,7 @@
             <select class="add-member-select" id="addMemberSelect">
               <option value="">Select a user to add...</option>
             </select>
-            <select class="form-select" id="addMemberRole" style="height:44px;">
+            <select class="form-select" id="addMemberRole">
               <option value="viewer">viewer</option>
               <option value="editor">editor</option>
             </select>
@@ -628,8 +669,13 @@ function renderFields() {
     const role = String(f.field_role || "").toLowerCase();
     const isFixed = FIXED_ROLES.has(role);
     const canToggleDashboard = !isFixed || DASHBOARD_TOGGLE_ALLOWED_ROLES.has(role);
+    const rowClass = [
+      "field-row",
+      isFixed ? "fixed-row" : "",
+      isFixed && canToggleDashboard ? "fixed-row-partial" : "",
+    ].filter(Boolean).join(" ");
     return `
-      <div class="field-row ${isFixed ? "fixed-row" : ""}" data-field-id="${escapeHtml(f.id)}" draggable="${isFixed ? "false" : "true"}">
+      <div class="${rowClass}" data-field-id="${escapeHtml(f.id)}" draggable="${isFixed ? "false" : "true"}">
         <span class="drag-handle" aria-hidden="true">⠿</span>
         <div class="field-info">
           <div class="field-name-wrap">
@@ -889,6 +935,30 @@ el("addFieldBtn").addEventListener("click", async () => {
 let members     = []; // { user_id, role }
 let allProfiles = []; // { id, display_name, role } — admin/internal/client only
 
+function getActiveMemberFilters() {
+  return new Set(
+    [...document.querySelectorAll("[data-member-filter]:checked")]
+      .map(input => String(input.getAttribute("data-member-filter") || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function getFilteredMembers() {
+  const filters = getActiveMemberFilters();
+  return members.filter((m) => {
+    const profileRole = String(m?.profile?.role || "").trim().toLowerCase();
+    return filters.has(profileRole);
+  });
+}
+
+function updateMemberSummary(filteredMembers) {
+  const summary = el("memberSummary");
+  if (!summary) return;
+  const visible = Array.isArray(filteredMembers) ? filteredMembers.length : 0;
+  const total = members.length;
+  summary.textContent = total === visible ? `${total} member${total !== 1 ? "s" : ""}` : `Showing ${visible} of ${total} members`;
+}
+
 async function loadMembers() {
   const { data, error } = await supabase
     .from("project_members")
@@ -925,11 +995,21 @@ function renderMembers() {
   const list = el("memberList");
   if (members.length === 0) {
     list.innerHTML = "<div class='muted'>No members yet.</div>";
+    updateMemberSummary([]);
     refreshAddMemberSelect();
     return;
   }
 
-  list.innerHTML = members.map(m => {
+  const filteredMembers = getFilteredMembers();
+  updateMemberSummary(filteredMembers);
+
+  if (filteredMembers.length === 0) {
+    list.innerHTML = "<div class='muted'>No members match the selected filters.</div>";
+    refreshAddMemberSelect();
+    return;
+  }
+
+  list.innerHTML = filteredMembers.map(m => {
     const p    = m.profile || {};
     const name = p.display_name || m.user_id;
     const role = p.role || "";
@@ -977,6 +1057,13 @@ function renderMembers() {
 
   refreshAddMemberSelect();
 }
+
+document.querySelectorAll("[data-member-filter]").forEach((input) => {
+  input.addEventListener("change", () => {
+    renderMembers();
+    clearHint();
+  });
+});
 
 function refreshAddMemberSelect() {
   const sel      = el("addMemberSelect");
