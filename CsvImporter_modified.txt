@@ -1,0 +1,213 @@
+// Assets/Editor/AdventureLevelCsvImporter.cs
+#if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEngine;
+
+public static class AdventureLevelCsvImporter
+{
+    private const string LevelsFolder = "Assets/Resources/Adventure/Levels/05 US";
+    private const string USAItemsFolder = "Assets/Resources/Adventure/Items/TravelUSA";
+
+    [MenuItem("Tools/Adventure/Import US Levels From CSV")]
+    public static void ImportEgLevelsFromCsv()
+    {
+        var selectedTheme = Selection.activeObject as TravelThemeDefinition;
+        if (selectedTheme == null)
+        {
+            EditorUtility.DisplayDialog("Import", "Please select TravelThemeDefinition first", "OK");
+            return;
+        }
+        var csvPath = EditorUtility.OpenFilePanel("Select CSV (UTF-8)", Application.dataPath, "csv");
+        if (string.IsNullOrEmpty(csvPath)) return;
+        var itemLookup = BuildItemLookup(USAItemsFolder);
+        var lines = File.ReadAllLines(csvPath);
+        if (lines.Length < 2) { EditorUtility.DisplayDialog("Import", "CSV is empty", "OK"); return; }
+        var header = SplitCsvLine(lines[0]);
+        int Col(string name) => Array.FindIndex(header, h => string.Equals(h?.Trim(), name, StringComparison.OrdinalIgnoreCase));
+        int cLevel = Col("Level");
+        if (cLevel < 0) { EditorUtility.DisplayDialog("Import", "CSV needs 'Level' column", "OK"); return; }
+        int cG1Item = Col("Goal1_Item"); int cG1Amt = Col("Goal1_Amount"); int cG1W = Col("Goal1_Weight");
+        int cG2Item = Col("Goal2_Item"); int cG2Amt = Col("Goal2_Amount"); int cG2W = Col("Goal2_Weight");
+        int cG3Item = Col("Goal3_Item"); int cG3Amt = Col("Goal3_Amount"); int cG3W = Col("Goal3_Weight");
+        int cG4Item = Col("Goal4_Item"); int cG4Amt = Col("Goal4_Amount"); int cG4W = Col("Goal4_Weight");
+        var levelGuids = AssetDatabase.FindAssets("t:AdventureLevelDefinition", new[] { LevelsFolder });
+        var levelAssetByNumber = new Dictionary<int, AdventureLevelDefinition>();
+        foreach (var guid in levelGuids)
+        {
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            var asset = AssetDatabase.LoadAssetAtPath<AdventureLevelDefinition>(path);
+            if (asset == null) continue;
+            if (TryParseLevelNumberFromName(asset.name, out int n)) levelAssetByNumber[n] = asset;
+        }
+        int updated = 0, missingAssets = 0, missingItems = 0;
+        for (int i = 1; i < lines.Length; i++)
+        {
+            var row = SplitCsvLine(lines[i]);
+            if (row.Length != header.Length) continue;
+            if (!int.TryParse(row[cLevel], out int levelNum)) continue;
+            if (!levelAssetByNumber.TryGetValue(levelNum, out var levelAsset) || levelAsset == null) { missingAssets++; continue; }
+            Undo.RecordObject(levelAsset, "Import Adventure Level CSV");
+            levelAsset.theme = selectedTheme;
+            levelAsset.levelId = $"us_{levelNum:000}";
+            levelAsset.displayName = $"US - {levelNum:000}";
+            levelAsset.itemGoals.Clear();
+            AddGoal(levelAsset, row, cG1Item, cG1Amt, cG1W, itemLookup, ref missingItems);
+            AddGoal(levelAsset, row, cG2Item, cG2Amt, cG2W, itemLookup, ref missingItems);
+            AddGoal(levelAsset, row, cG3Item, cG3Amt, cG3W, itemLookup, ref missingItems);
+            AddGoal(levelAsset, row, cG4Item, cG4Amt, cG4W, itemLookup, ref missingItems);
+            EditorUtility.SetDirty(levelAsset);
+            updated++;
+        }
+        AssetDatabase.SaveAssets();
+        EditorUtility.DisplayDialog("Import Complete", $"Updated: {updated}\nMissing Assets: {missingAssets}\nMissing Items: {missingItems}", "OK");
+    }
+
+    // ===== NAMESPACE BATCH ADDER =====
+    public static void Execute()
+    {
+        string assetsPath = Application.dataPath;
+        var entries = new List<(string file, string ns)>
+        {
+            ($"{assetsPath}/Scripts/Utility/SaveKeys.cs",              "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/GameEvent.cs",             "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/GameBootstrapper.cs",       "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/BinaryDataStream.cs",       "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/AudioManager.cs",           "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/AutoDestroy.cs",            "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/BoardIntroSlideIn.cs",      "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/BoosterJellyAnimator.cs",   "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/CameraShake.cs",            "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/ChapterPageSizer.cs",       "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/CoinTextBinder.cs",         "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/ComboGraphicHolder.cs",     "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/ComboWordsGraphic.cs",      "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/DebugCurrencyCheats.cs",    "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/FitBoardOrthoCamera.cs",    "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/FloatingScoreText.cs",      "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/GridCellAutoFitter.cs",     "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/LevelButtonView.cs",        "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/LineIndicator.cs",          "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/MainMenuController.cs",     "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/ProgressionDebugTools.cs",  "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/AdsInitializer.cs",         "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/RewardedAdsManager.cs",     "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Utility/UIShake.cs",                "PuzzleGame.Utility"),
+            ($"{assetsPath}/Scripts/Shape/HitAreaProxy.cs",             "PuzzleGame.Shape"),
+            ($"{assetsPath}/Scripts/Shape/Shape.cs",                    "PuzzleGame.Shape"),
+            ($"{assetsPath}/Scripts/Shape/ShapeData.cs",                "PuzzleGame.Shape"),
+            ($"{assetsPath}/Scripts/Shape/ShapeSquare.cs",              "PuzzleGame.Shape"),
+            ($"{assetsPath}/Scripts/Shape/ShapeSquareColliders.cs",     "PuzzleGame.Shape"),
+            ($"{assetsPath}/Scripts/Shape/ShapeStorage.cs",             "PuzzleGame.Shape"),
+            ($"{assetsPath}/Scripts/Game/Grid/Board.cs",                "PuzzleGame.Game.Grid"),
+            ($"{assetsPath}/Scripts/Game/Grid/BoardBlockType.cs",        "PuzzleGame.Game.Grid"),
+            ($"{assetsPath}/Scripts/Game/Grid/GridSquare.cs",            "PuzzleGame.Game.Grid"),
+            ($"{assetsPath}/Scripts/Game/Core/AdventureSelection.cs",   "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/Board.BoostersAndUI.cs",  "PuzzleGame.Game.Grid"),
+            ($"{assetsPath}/Scripts/Game/Core/CurrencyWallet.cs",       "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/FadeManager.cs",          "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/GameContext.cs",           "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/GameMode.cs",             "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/GameOverClssicModePopupUI.cs","PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/GameSceneController.cs",  "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/HelperButtonUI.cs",       "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/PlayerProgression.cs",    "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/PopupSquashStretch.cs",   "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/PopupWindowJellyDrop.cs", "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/Scores.cs",               "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Core/ShopPanelController.cs",  "PuzzleGame.Game"),
+            ($"{assetsPath}/Scripts/Game/Adventure/AdventureEnums.cs",           "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/AdventureGoal.cs",             "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/AdventureLevelDefinition.cs",  "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/AdventureMapController.cs",    "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/ThemeCatalog.cs",              "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/ThemeChapterSnapper.cs",       "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/TravelItemDefinition.cs",      "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/TravelThemeDefinition.cs",     "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/Runtime/AdventureNextLevelHelper.cs",   "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/Runtime/AdventureSessionController.cs", "PuzzleGame.Adventure"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/AdventureEndPopupUI.cs",           "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/AdventureGoalsUI.cs",               "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/AdventureHUDLevelText.cs",          "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/AdventureItemCollectFX.cs",         "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/AdventureItemCollectFXController.cs","PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/AdventurePopupButtonActions.cs",    "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/AdventureWinPopupUI.cs",            "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/ItemFlyFXUI.cs",                    "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/LockedPopupUI.cs",                  "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/ThemeButtonsIntro.cs",              "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/ThemeButtonView.cs",                "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/ThemePanelSlider.cs",               "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Game/Adventure/UI/ThemeSelectController.cs",          "PuzzleGame.Adventure.UI"),
+            ($"{assetsPath}/Scripts/Editor/AdventureLevelPainterWindow.cs", "PuzzleGame.Editor"),
+            ($"{assetsPath}/Scripts/Editor/ShapeDataDrawer.cs",              "PuzzleGame.Editor"),
+            ($"{assetsPath}/Editor/AutoWireLevelButtons.cs",            "PuzzleGame.Editor"),
+            ($"{assetsPath}/Editor/LevelButtonsPrefabRebuilder.cs",     "PuzzleGame.Editor"),
+            ($"{assetsPath}/Editor/SelectEUButtonImages.cs",            "PuzzleGame.Editor"),
+        };
+
+        int modified = 0, skipped = 0;
+        var log = new StringBuilder();
+
+        foreach (var (filePath, namespaceName) in entries)
+        {
+            if (!File.Exists(filePath)) { log.AppendLine($"[MISSING] {filePath}"); skipped++; continue; }
+            string original = File.ReadAllText(filePath, Encoding.UTF8);
+            if (Regex.IsMatch(original, $@"namespace\s+{Regex.Escape(namespaceName)}")) { log.AppendLine($"[EXISTS] {Path.GetFileName(filePath)}"); skipped++; continue; }
+            if (Regex.IsMatch(original, @"^\s*namespace\s+\w", RegexOptions.Multiline)) { log.AppendLine($"[HAS-NS] {Path.GetFileName(filePath)}"); skipped++; continue; }
+            string wrapped = WrapWithNamespace(original, namespaceName);
+            File.WriteAllText(filePath, wrapped, Encoding.UTF8);
+            log.AppendLine($"[OK] {Path.GetFileName(filePath)} => {namespaceName}");
+            modified++;
+        }
+
+        log.AppendLine($"\nDone: {modified} modified, {skipped} skipped.");
+        Debug.Log("[NamespaceAdder]\n" + log.ToString());
+        AssetDatabase.Refresh();
+    }
+
+    private static string WrapWithNamespace(string source, string namespaceName)
+    {
+        var lines = source.Split('\n');
+        int splitAt = 0;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string t = lines[i].TrimStart();
+            bool isHeader = t.StartsWith("using ") || t.StartsWith("#if ") || t.StartsWith("#elif ") ||
+                            t.StartsWith("#else") || t.StartsWith("#endif") || t.StartsWith("//") ||
+                            t.StartsWith("[assembly") || string.IsNullOrWhiteSpace(t);
+            if (!isHeader) { splitAt = i; break; }
+        }
+        var header = new StringBuilder();
+        for (int i = 0; i < splitAt; i++) { header.Append(lines[i]); header.Append("\n"); }
+        var body = new StringBuilder();
+        for (int i = splitAt; i < lines.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(lines[i])) body.AppendLine();
+            else body.AppendLine("    " + lines[i].TrimEnd('\r'));
+        }
+        return header.ToString() + $"\nnamespace {namespaceName}\n{{\n" + body.ToString() + "}\n";
+    }
+
+    // ===== ORIGINAL HELPERS (kept intact) =====
+    private static void AddGoal(AdventureLevelDefinition levelAsset, string[] row, int cItem, int cAmt, int cWeight,
+        Dictionary<string, TravelItemDefinition> itemLookup, ref int missingItems)
+    {
+        if (cItem < 0) return;
+        string itemName = GetCell(row, cItem);
+        if (string.IsNullOrEmpty(itemName)) return;
+        if (!itemLookup.TryGetValue(itemName, out var itemDef) || itemDef == null) { missingItems++; return; }
+        int amt = TryGetInt(row, cAmt, 10); int w = TryGetInt(row, cWeight, 10);
+        levelAsset.itemGoals.Add(new AdventureItemGoal { item = itemDef, targetCount = amt, spawnWeight = w });
+    }
+    private static string GetCell(string[] row, int col) { if (col < 0 || col >= row.Length) return ""; var v = (row[col] ?? "").Trim(); return string.Equals(v, "N/A", StringComparison.OrdinalIgnoreCase) ? "" : v; }
+    private static int TryGetInt(string[] row, int col, int fallback) { if (col < 0 || col >= row.Length) return fallback; var s = (row[col] ?? "").Trim(); if (string.Equals(s, "N/A", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(s)) return fallback; return int.TryParse(s, out int x) ? x : fallback; }
+    private static Dictionary<string, TravelItemDefinition> BuildItemLookup(string folder) { var dict = new Dictionary<string, TravelItemDefinition>(StringComparer.OrdinalIgnoreCase); foreach (var g in AssetDatabase.FindAssets("t:TravelItemDefinition", new[] { folder })) { var path = AssetDatabase.GUIDToAssetPath(g); var asset = AssetDatabase.LoadAssetAtPath<TravelItemDefinition>(path); if (asset != null) dict[asset.name.Trim()] = asset; } return dict; }
+    private static bool TryParseLevelNumberFromName(string assetName, out int levelNumber) { levelNumber = 0; var m = Regex.Match(assetName, @"US_(\d+)", RegexOptions.IgnoreCase); if (!m.Success) return false; return int.TryParse(m.Groups[1].Value, out levelNumber); }
+    private static string[] SplitCsvLine(string line) { var result = new List<string>(); bool inQuotes = false; var cur = ""; for (int i = 0; i < line.Length; i++) { char ch = line[i]; if (ch == '\"') { inQuotes = !inQuotes; continue; } if (ch == ',' && !inQuotes) { result.Add(cur); cur = ""; continue; } cur += ch; } result.Add(cur); return result.ToArray(); }
+}
+#endif

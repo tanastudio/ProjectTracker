@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"/>
+  <meta name="referrer" content="strict-origin-when-cross-origin"/>
+  <title>Project Settings</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="sidebar.css"/>
+
+  <script>
+    (function () {
+      const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+      document.documentElement.setAttribute("data-user-role", cachedRole);
+    })();
+  </script>
+
+  <style>
+    #navUpdateStatus, #navAdmin { display: none; }
+    html[data-user-role="internal"] #navUpdateStatus,
+    html[data-user-role="admin"]    #navUpdateStatus { display: flex; }
+    html[data-user-role="admin"] #navAdmin { display: flex; }
+  </style>
+
+  <style>
+    .wrap { max-width: 860px; margin: 0 auto; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid rgba(15,23,42,.10); }
+    .tab-btn {
+      padding: 10px 20px; border: none; background: none; cursor: pointer;
+      font-size: 14px; font-weight: 700; color: #64748b; font-family: inherit;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+    .tab-btn:hover:not(.active) { color: #0f172a; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Card */
+    .card {
+      background: rgba(255,255,255,.88); border: 1px solid rgba(15,23,42,.12);
+      border-radius: 18px; padding: 24px; box-shadow: 0 12px 30px rgba(2,6,23,.10);
+      margin-bottom: 16px;
+    }
+    .card-title { font-size: 18px; font-weight: 900; letter-spacing: -.01em; margin: 0 0 4px; }
+    .card-desc { font-size: 13px; color: #64748b; margin: 0 0 20px; }
+
+    /* Form */
+    .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .form-group label { font-size: 12px; font-weight: 800; color: #64748b; }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 0 14px; height: 46px; border-radius: 12px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 14px;
+      outline: none; font-family: inherit; transition: border-color .15s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #3b82f6; }
+    .form-textarea { height: 80px; padding: 10px 14px; resize: vertical; }
+    .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 20px; }
+    .btn-primary {
+      min-height: 44px; padding: 0 22px; border-radius: 12px; border: none;
+      background: #3b82f6; color: #fff; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: background .15s; font-family: inherit;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-ghost {
+      min-height: 44px; padding: 0 18px; border-radius: 12px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 14px;
+      font-weight: 700; color: #374151; cursor: pointer; transition: background .15s; font-family: inherit;
+    }
+    .btn-ghost:hover { background: #f8fafc; }
+    .btn-danger-sm {
+      min-height: 32px; padding: 0 12px; border-radius: 8px; border: none;
+      background: rgba(239,68,68,.10); color: #dc2626; font-size: 12px;
+      font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    .btn-danger-sm:hover { background: rgba(239,68,68,.20); }
+
+    /* Hint */
+    .hint { border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+    .hint-error { display: block; background: rgba(239,68,68,.08); color: #dc2626; border: 1px solid rgba(239,68,68,.2); }
+    .hint-ok    { display: block; background: rgba(34,197,94,.08);  color: #16a34a; border: 1px solid rgba(34,197,94,.2); }
+
+    .section-title { font-size: 13px; font-weight: 800; color: #374151; margin: 16px 0 8px; }
+    .muted { color: #64748b; font-size: 13px; }
+    .small { font-size: 12px; }
+
+    /* Fields list */
+    .field-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .field-row {
+      display: grid; grid-template-columns: 24px 1fr auto auto;
+      gap: 12px; align-items: center; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 12px; padding: 12px 14px;
+    }
+    .field-row.fixed-row { opacity: .6; }
+    .field-row.drag-over { border-color: #3b82f6; background: rgba(239,246,255,.5); }
+    .drag-handle { cursor: grab; color: #94a3b8; font-size: 17px; user-select: none; line-height: 1; }
+    .field-row.fixed-row .drag-handle { cursor: default; opacity: 0; pointer-events: none; }
+    .field-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .field-name-wrap { display: flex; align-items: center; gap: 6px; }
+    .field-name { font-size: 14px; font-weight: 700; }
+    .field-key {
+      font-size: 11px; font-family: monospace; color: #64748b;
+      background: rgba(15,23,42,.06); border-radius: 5px; padding: 2px 6px;
+      width: fit-content;
+    }
+    .btn-rename {
+      background: none; border: none; color: #94a3b8; cursor: pointer;
+      padding: 3px; border-radius: 5px; line-height: 1; flex-shrink: 0;
+    }
+    .btn-rename:hover { color: #3b82f6; background: rgba(59,130,246,.08); }
+    .btn-rename-save {
+      background: none; border: none; color: #16a34a; cursor: pointer;
+      padding: 3px; border-radius: 5px; line-height: 1; font-size: 16px; font-weight: 900; flex-shrink: 0;
+    }
+    .btn-rename-save:hover { background: rgba(34,197,94,.1); }
+    .field-name-input {
+      font-size: 14px; font-weight: 700; border: 1.5px solid #3b82f6; border-radius: 7px;
+      padding: 2px 8px; outline: none; font-family: inherit; min-width: 0; width: 180px;
+    }
+
+    /* Toggle */
+    .toggle-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .toggle-label { font-size: 10px; color: #94a3b8; font-weight: 700; white-space: nowrap; }
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: #d1d5db; border-radius: 999px;
+      cursor: pointer; transition: background .2s;
+    }
+    .toggle-slider:before {
+      content: ""; position: absolute; width: 14px; height: 14px;
+      border-radius: 50%; background: #fff; left: 3px; top: 3px; transition: transform .2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #3b82f6; }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+    .toggle input:disabled + .toggle-slider { opacity: .5; cursor: default; }
+
+    /* Members */
+    .member-list { display: flex; flex-direction: column; gap: 6px; }
+    .member-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 12px;
+    }
+    .member-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .member-name { font-size: 14px; font-weight: 700; }
+    .member-meta { font-size: 12px; color: #64748b; }
+    .member-role-select {
+      height: 34px; padding: 0 10px; border-radius: 8px;
+      border: 1px solid rgba(15,23,42,.12); font-size: 12px;
+      background: #fff; font-family: inherit;
+    }
+
+    .add-member-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: center; margin-top: 12px; }
+    .add-member-select {
+      width: 100%; height: 44px; padding: 0 12px; border-radius: 12px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff;
+      font-size: 14px; font-family: inherit;
+    }
+
+    .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; border: 1px solid rgba(15,23,42,.10); }
+    .pill-client   { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .pill-internal { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+    .pill-admin    { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
+    .pill-candidate{ background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+
+    /* Candidates tab */
+    .candidate-list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+    .candidate-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 12px;
+    }
+    .candidate-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .candidate-name  { font-size: 14px; font-weight: 700; }
+    .candidate-email { font-size: 12px; color: #64748b; }
+
+    .upload-zone {
+      border: 2px dashed rgba(15,23,42,.15); border-radius: 14px;
+      padding: 24px; text-align: center; cursor: pointer;
+      background: rgba(248,250,252,.5); transition: border-color .15s, background .15s;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: #3b82f6; background: rgba(239,246,255,.6); }
+    .upload-hint { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+    .csv-preview { overflow-x: auto; margin-top: 12px; }
+    .csv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .csv-table th, .csv-table td { padding: 8px 10px; border: 1px solid rgba(15,23,42,.08); text-align: left; }
+    .csv-table th { background: rgba(15,23,42,.04); font-weight: 700; font-size: 12px; }
+    .csv-table tr:nth-child(even) td { background: rgba(248,250,252,.8); }
+    .csv-error-row td { background: rgba(239,68,68,.06) !important; color: #dc2626; }
+
+    .progress-bar { height: 6px; border-radius: 3px; background: rgba(15,23,42,.08); overflow: hidden; margin: 10px 0 4px; }
+    .progress-bar-inner { height: 100%; background: #3b82f6; border-radius: 3px; transition: width .3s; }
+
+    /* Options checklist */
+    .options-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding: 12px; background: rgba(248,250,252,.8); border: 1px solid rgba(15,23,42,.08); border-radius: 10px; }
+    .option-item { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; padding: 4px 0; }
+    .option-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #3b82f6; flex-shrink: 0; }
+    .option-item span { flex: 1; }
+    .remove-opt { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px; line-height: 1; padding: 0 2px; }
+    .remove-opt:hover { color: #dc2626; }
+    .add-option-row { display: flex; gap: 8px; }
+    .add-option-input { flex: 1; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(15,23,42,.12); font-size: 14px; font-family: inherit; outline: none; }
+    .add-option-input:focus { border-color: #3b82f6; }
+    .add-option-add-btn { min-height: 40px; padding: 0 16px; border-radius: 10px; border: none; background: #e2e8f0; color: #374151; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .add-option-add-btn:hover { background: #cbd5e1; }
+  </style>
+</head>
+
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-sticky">
+      <div class="brand">
+        <div class="brand-title">Mentis Project Hub</div>
+      </div>
+      <nav class="nav">
+        <a class="nav-link" id="navProjects" href="./projects.html">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+            <path d="m4 12 8 4 8-4"></path>
+            <path d="m4 17 8 4 8-4"></path>
+          </svg>
+          <span>Projects</span>
+        </a>
+        <a class="nav-link" id="navDashboard" href="#">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+          <span>Dashboard</span>
+        </a>
+        <a class="nav-link" id="navTickets" href="#">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Tickets</span>
+        </a>
+        <a class="nav-link" id="navUpdateStatus" href="#">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+          </svg>
+          <span>Update Status</span>
+        </a>
+        <a class="nav-link active" id="navAdmin" href="./admin.html">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+            <path d="M9 12l2 2 4-4"></path>
+          </svg>
+          <span>Admin</span>
+        </a>
+
+        <a class="nav-link" id="navAdminAccess" href="./admin-access.html">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Access</span>
+        </a>
+      </nav>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="userChip">Loading...</div>
+      <button class="nav-link logout-link" type="button" id="logoutBtn">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <path d="M16 17l5-5-5-5"></path>
+          <path d="M21 12H9"></path>
+        </svg>
+        <span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="hero">
+      <div class="hero-inner">
+        <div>
+          <h1 class="page-title" id="pageHeading">Project Settings</h1>
+          <p class="page-desc" id="pageDesc">Loading project...</p>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-outline" id="backBtn" type="button">← Back to Admin</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div id="hint" class="hint"></div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="general">General</button>
+        <button class="tab-btn" data-tab="fields">Fields</button>
+        <button class="tab-btn" data-tab="members">Members</button>
+        <button class="tab-btn" data-tab="candidates">Candidates</button>
+      </div>
+
+      <!-- Tab: General -->
+      <div class="tab-panel active" id="tab-general">
+        <div class="card">
+          <div class="card-title">Project Information</div>
+          <div class="card-desc">Update the project name, description, and timeline.</div>
+
+          <div class="form-row2">
+            <div class="form-group" style="flex:2;">
+              <label>Project Name *</label>
+              <input class="form-input" id="projName" type="text" maxlength="120" placeholder="Project name"/>
+            </div>
+            <div class="form-group">
+              <label>Code Prefix <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>
+              <input class="form-input" id="projCodePrefix" type="text" maxlength="10" placeholder="e.g. LA" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea class="form-textarea" id="projDesc" placeholder="Optional description"></textarea>
+          </div>
+          <div class="form-row2">
+            <div class="form-group">
+              <label>Start Date</label>
+              <input class="form-input" id="projStart" type="date"/>
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input class="form-input" id="projEnd" type="date"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="projStatus">
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" id="saveGeneralBtn">Save Changes</button>
+          </div>
+
+          <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(239,68,68,.15);">
+            <div style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:6px;">Danger Zone</div>
+            <p class="muted small" style="margin:0 0 12px;">Archiving hides this project from the project list. It can be restored by changing the status back to Active.</p>
+            <button class="btn-ghost" id="archiveBtn" style="border-color:rgba(239,68,68,.3); color:#dc2626;">Archive Project</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Fields -->
+      <div class="tab-panel" id="tab-fields">
+        <div class="card">
+          <div class="card-title">Fields</div>
+          <div class="card-desc">Drag to reorder process steps. Dashboard controls column visibility there, while Active controls whether a field is used in the workflow. System fields cannot be moved; email visibility on Dashboard can be toggled.</div>
+
+          <div class="field-list" id="fieldList">
+            <div class="muted">Loading fields...</div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" id="saveFieldsBtn">Save Field Settings</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Add New Field</div>
+          <div class="card-desc">Create a custom field for this project. Select-type fields appear as step columns in the candidate form.</div>
+
+          <div class="form-row2">
+            <div class="form-group">
+              <label>Label *</label>
+              <input class="form-input" id="newFieldLabel" type="text" maxlength="80" placeholder="e.g. Interview Stage"/>
+            </div>
+            <div class="form-group">
+              <label>Key <span class="muted" style="font-weight:400;">(auto-generated)</span></label>
+              <input class="form-input" id="newFieldKey" type="text" maxlength="60" placeholder="e.g. interview_stage" style="font-family:monospace;"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Type *</label>
+            <select class="form-select" id="newFieldType">
+              <option value="select">select — dropdown with options</option>
+              <option value="text">text — free text</option>
+              <option value="date">date — date picker</option>
+            </select>
+          </div>
+          <div class="form-group" id="newFieldOptionsGroup">
+            <label>Options</label>
+            <div class="options-list" id="optionsList">
+              <label class="option-item"><input type="checkbox" value="Not Started" checked/><span>Not Started</span></label>
+              <label class="option-item"><input type="checkbox" value="In Progress" checked/><span>In Progress</span></label>
+              <label class="option-item"><input type="checkbox" value="Completed" checked/><span>Completed</span></label>
+              <label class="option-item"><input type="checkbox" value="Issue" checked/><span>Issue</span></label>
+            </div>
+            <div class="add-option-row">
+              <input class="add-option-input" type="text" id="customOptionInput" placeholder="Add custom option..." maxlength="60"/>
+              <button class="add-option-add-btn" type="button" id="addCustomOptBtn">+ Add</button>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" id="addFieldBtn">Add Field</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Members -->
+      <div class="tab-panel" id="tab-members">
+        <div class="card">
+          <div class="card-title">Members</div>
+          <div class="card-desc">Manage who has access to this project. Role controls edit permissions. Candidates are managed separately via CSV upload.</div>
+
+          <div class="member-list" id="memberList">
+            <div class="muted">Loading members...</div>
+          </div>
+
+          <div class="section-title" style="margin-top:20px;">Add Member</div>
+          <div class="add-member-row">
+            <select class="add-member-select" id="addMemberSelect">
+              <option value="">Select a user to add...</option>
+            </select>
+            <select class="form-select" id="addMemberRole" style="height:44px;">
+              <option value="viewer">viewer</option>
+              <option value="editor">editor</option>
+            </select>
+            <button class="btn-primary" id="addMemberBtn">Add</button>
+          </div>
+          <p class="muted small" style="margin-top:6px;">viewer = read-only · editor = can update status</p>
+        </div>
+      </div>
+
+      <!-- Tab: Candidates -->
+      <div class="tab-panel" id="tab-candidates">
+        <div class="card">
+          <div class="card-title">Current Candidates</div>
+          <div class="card-desc">Candidates linked to this project. Each candidate has a user account for the assessment portal.</div>
+          <div class="candidate-list" id="candidateList">
+            <div class="muted">Loading candidates...</div>
+          </div>
+          <p class="muted small" id="candidateCount" style="margin-top:8px;"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Import More Candidates</div>
+          <div class="card-desc">Upload a CSV with <code>name</code> and <code>email</code> columns. Existing accounts are reused; new ones are created automatically.</div>
+
+          <div class="upload-zone" id="uploadZone">
+            <div style="font-size:24px; margin-bottom:6px;">📄</div>
+            <div style="font-size:14px; font-weight:700; margin-bottom:2px;">Drop CSV here or click to browse</div>
+            <div class="upload-hint">Required columns: name, email</div>
+            <input type="file" id="csvInput" accept=".csv" style="display:none"/>
+          </div>
+
+          <div id="csvPreviewWrap" style="display:none; margin-top:12px;">
+            <div class="section-title" id="csvSummary"></div>
+            <div class="csv-preview">
+              <table class="csv-table" id="csvTable"></table>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" id="importBtn" style="display:none;">Import Candidates</button>
+          </div>
+
+          <div id="importProgress" style="display:none; margin-top:10px;">
+            <div class="progress-bar"><div class="progress-bar-inner" id="progressBar" style="width:0%"></div></div>
+            <div class="muted small" id="progressMsg">Starting...</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /wrap -->
+  </main>
+</div>
+
+<script type="module">
+import { supabase } from "./supabaseClient.js";
+
+const el = (id) => document.getElementById(id);
+
+/* ── helpers ── */
+function showHint(text, isErr = false) {
+  const h = el("hint");
+  h.className = "hint " + (isErr ? "hint-error" : "hint-ok");
+  h.textContent = text;
+  h.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function clearHint() { const h = el("hint"); h.className = "hint"; h.textContent = ""; }
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ── auth guard ── */
+async function requireAdmin() {
+  const { data } = await supabase.auth.getSession();
+  const session = data?.session;
+  if (!session) { window.location.replace("./index.html"); return null; }
+  supabase.auth.onAuthStateChange((_e, s) => { if (!s) window.location.replace("./index.html"); });
+  const { data: prof } = await supabase.from("profiles").select("role, display_name").eq("id", session.user.id).maybeSingle();
+  if (prof?.role !== "admin") { window.location.replace("./projects.html"); return null; }
+  sessionStorage.setItem("user_role", "admin");
+  document.documentElement.setAttribute("data-user-role", "admin");
+  const chip = el("userChip");
+  if (chip) chip.textContent = `${prof?.display_name || session.user.email || session.user.id} (admin)`;
+  return session;
+}
+const session = await requireAdmin();
+if (!session) throw new Error("no access");
+
+el("logoutBtn").addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  sessionStorage.removeItem("selected_project_id");
+  window.location.replace("./index.html");
+});
+
+/* ── project id from URL or session ── */
+const params = new URLSearchParams(location.search);
+const PROJECT_ID = params.get("project") || sessionStorage.getItem("selected_project_id") || "";
+if (!PROJECT_ID) { window.location.replace("./projects.html"); throw new Error("no project"); }
+sessionStorage.setItem("selected_project_id", PROJECT_ID);
+
+/* ── nav ── */
+function goProjectPage(page) {
+  window.location.href = `./${page}?project=${encodeURIComponent(PROJECT_ID)}`;
+}
+el("navDashboard")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("dashboard.html"); });
+el("navTickets")?.addEventListener("click",      (e) => { e.preventDefault(); goProjectPage("tickets.html"); });
+el("navUpdateStatus")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("form.html"); });
+el("backBtn").addEventListener("click", () => { window.location.href = "./admin.html"; });
+
+/* ── tabs ── */
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    el("tab-" + btn.dataset.tab).classList.add("active");
+    clearHint();
+  });
+});
+
+/* ═══════════════════
+   GENERAL TAB
+═══════════════════ */
+async function loadProject() {
+  const { data, error } = await supabase.from("projects").select("*").eq("id", PROJECT_ID).single();
+  if (error || !data) { showHint("Failed to load project.", true); return; }
+  el("pageHeading").textContent = data.name + " — Settings";
+  el("pageDesc").textContent = "Project ID: " + PROJECT_ID;
+  el("projName").value       = data.name         || "";
+  el("projDesc").value       = data.description  || "";
+  el("projStart").value      = data.start_date   || "";
+  el("projEnd").value        = data.end_date     || "";
+  el("projStatus").value     = data.status       || "active";
+  el("projCodePrefix").value = data.code_prefix  || "";
+}
+
+el("archiveBtn").addEventListener("click", async () => {
+  if (!confirm("Archive this project? It will be hidden from the project list. You can restore it later by setting the status back to Active.")) return;
+  el("archiveBtn").disabled    = true;
+  el("archiveBtn").textContent = "Archiving...";
+  const { error } = await supabase.from("projects").update({ status: "archived" }).eq("id", PROJECT_ID);
+  el("archiveBtn").disabled    = false;
+  el("archiveBtn").textContent = "Archive Project";
+  if (error) { showHint("Error: " + error.message, true); return; }
+  window.location.href = "./projects.html";
+});
+
+el("saveGeneralBtn").addEventListener("click", async () => {
+  const name = el("projName").value.trim();
+  if (!name) { showHint("Project name is required.", true); return; }
+  el("saveGeneralBtn").disabled    = true;
+  el("saveGeneralBtn").textContent = "Saving...";
+  const { error } = await supabase.from("projects").update({
+    name,
+    description:  el("projDesc").value.trim() || null,
+    status:       el("projStatus").value,
+    start_date:   el("projStart").value || null,
+    end_date:     el("projEnd").value   || null,
+    code_prefix:  el("projCodePrefix").value.trim() || null,
+  }).eq("id", PROJECT_ID);
+  el("saveGeneralBtn").disabled    = false;
+  el("saveGeneralBtn").textContent = "Save Changes";
+  if (error) { showHint("Error: " + error.message, true); return; }
+  el("pageHeading").textContent = name + " — Settings";
+  showHint("Project info updated.", false);
+});
+
+/* ═══════════════════
+   FIELDS TAB
+═══════════════════ */
+const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
+const DASHBOARD_TOGGLE_ALLOWED_ROLES = new Set(["email"]);
+let fields = [];
+
+async function loadFields() {
+  const { data, error } = await supabase
+    .from("fields")
+    .select("id, key, label, type, sort_order, field_role, is_active, show_in_dashboard")
+    .eq("project_id", PROJECT_ID)
+    .order("sort_order");
+  if (error) { showHint("Failed to load fields.", true); return; }
+  fields = data || [];
+  renderFields();
+}
+
+function renderFields() {
+  const list = el("fieldList");
+  if (fields.length === 0) { list.innerHTML = "<div class='muted'>No fields found.</div>"; return; }
+
+  list.innerHTML = fields.map((f) => {
+    const role = String(f.field_role || "").toLowerCase();
+    const isFixed = FIXED_ROLES.has(role);
+    const canToggleDashboard = !isFixed || DASHBOARD_TOGGLE_ALLOWED_ROLES.has(role);
+    return `
+      <div class="field-row ${isFixed ? "fixed-row" : ""}" data-field-id="${escapeHtml(f.id)}" draggable="${isFixed ? "false" : "true"}">
+        <span class="drag-handle" aria-hidden="true">⠿</span>
+        <div class="field-info">
+          <div class="field-name-wrap">
+            <span class="field-name">${escapeHtml(f.label)}</span>
+            ${!isFixed ? `<button class="btn-rename" data-rename-id="${escapeHtml(f.id)}" title="Rename label">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+              </svg>
+            </button>` : ""}
+          </div>
+          <span class="field-key">${escapeHtml(f.key)}</span>
+        </div>
+        <div class="toggle-wrap" title="Show in Dashboard">
+          <label class="toggle">
+            <input type="checkbox" data-toggle-dash="${escapeHtml(f.id)}"
+              ${f.show_in_dashboard !== false ? "checked" : ""}
+              ${canToggleDashboard ? "" : "disabled"}/>
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Dashboard</span>
+        </div>
+        <div class="toggle-wrap" title="Active">
+          <label class="toggle">
+            <input type="checkbox" data-toggle-active="${escapeHtml(f.id)}"
+              ${f.is_active !== false ? "checked" : ""}
+              ${isFixed ? "disabled" : ""}/>
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Active</span>
+        </div>
+      </div>`;
+  }).join("");
+
+  initFieldDrag(list);
+
+  list.querySelectorAll("[data-rename-id]").forEach(btn => {
+    btn.addEventListener("click", () => startRename(btn));
+  });
+}
+
+function startRename(btn) {
+  const row = btn.closest(".field-row");
+  const fieldId = row.dataset.fieldId;
+  const f = fields.find(x => x.id === fieldId);
+  if (!f) return;
+
+  const nameSpan = row.querySelector(".field-name");
+  const originalLabel = f.label;
+
+  const input = document.createElement("input");
+  input.className = "field-name-input";
+  input.value = originalLabel;
+  input.maxLength = 80;
+  nameSpan.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "btn-rename-save";
+  saveBtn.title = "Save";
+  saveBtn.textContent = "✓";
+  btn.replaceWith(saveBtn);
+
+  async function doSave() {
+    const newLabel = input.value.trim();
+    if (!newLabel) { input.focus(); return; }
+    if (newLabel === originalLabel) { cancelEdit(); return; }
+    saveBtn.disabled = true;
+    const { error } = await supabase.from("fields").update({ label: newLabel }).eq("id", fieldId);
+    if (error) { showHint("Failed to rename: " + error.message, true); saveBtn.disabled = false; return; }
+    showHint(`Renamed to "${newLabel}".`, false);
+    await loadFields();
+  }
+
+  function cancelEdit() { renderFields(); }
+
+  saveBtn.addEventListener("click", doSave);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); doSave(); }
+    if (e.key === "Escape") { cancelEdit(); }
+  });
+}
+
+function initFieldDrag(list) {
+  let dragging = null;
+
+  // dragstart / dragend only on draggable rows
+  list.querySelectorAll(".field-row[draggable='true']").forEach(row => {
+    row.addEventListener("dragstart", e => {
+      dragging = row;
+      row.style.opacity = ".4";
+      e.dataTransfer.effectAllowed = "move";
+    });
+    row.addEventListener("dragend", () => {
+      if (dragging) dragging.style.opacity = "";
+      list.querySelectorAll(".field-row").forEach(r => r.classList.remove("drag-over"));
+      dragging = null;
+    });
+  });
+
+  // dragover / drop on ALL rows so drag doesn't get stuck on fixed rows
+  list.querySelectorAll(".field-row").forEach(row => {
+    row.addEventListener("dragover", e => {
+      e.preventDefault();
+      if (!dragging || dragging === row) return;
+      if (row.classList.contains("fixed-row")) return;
+      list.querySelectorAll(".field-row").forEach(r => r.classList.remove("drag-over"));
+      const mid = row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2;
+      if (e.clientY < mid) list.insertBefore(dragging, row);
+      else list.insertBefore(dragging, row.nextSibling);
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", e => { e.preventDefault(); row.classList.remove("drag-over"); });
+  });
+}
+
+el("saveFieldsBtn").addEventListener("click", async () => {
+  const rows = el("fieldList").querySelectorAll(".field-row");
+  const updates = [];
+  let sortOrder = 20;
+
+  rows.forEach((row, idx) => {
+    const id = row.dataset.fieldId;
+    const f  = fields.find(x => x.id === id);
+    if (!f) return;
+    const dashToggle   = row.querySelector("[data-toggle-dash]");
+    const activeToggle = row.querySelector("[data-toggle-active]");
+    updates.push({
+      id,
+      sort_order:        (idx + 1) * 10,
+      show_in_dashboard: dashToggle   ? dashToggle.checked   : (f.show_in_dashboard !== false),
+      is_active:         activeToggle ? activeToggle.checked : (f.is_active !== false),
+    });
+  });
+
+  el("saveFieldsBtn").disabled    = true;
+  el("saveFieldsBtn").textContent = "Saving...";
+
+  const results = await Promise.all(updates.map(u =>
+    supabase.from("fields").update({
+      sort_order:        u.sort_order,
+      show_in_dashboard: u.show_in_dashboard,
+      is_active:         u.is_active,
+    }).eq("id", u.id)
+  ));
+
+  el("saveFieldsBtn").disabled    = false;
+  el("saveFieldsBtn").textContent = "Save Field Settings";
+
+  const errs = results.filter(r => r.error);
+  if (errs.length) { showHint(`${errs.length} field(s) failed to save.`, true); return; }
+  showHint("Field settings saved.", false);
+  await loadFields();
+});
+
+/* ═══════════════════
+   ADD FIELD
+═══════════════════ */
+function labelToKey(label) {
+  return label.trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60);
+}
+
+el("newFieldLabel").addEventListener("input", () => {
+  el("newFieldKey").value = labelToKey(el("newFieldLabel").value);
+});
+
+el("newFieldType").addEventListener("change", () => {
+  el("newFieldOptionsGroup").style.display = el("newFieldType").value === "select" ? "" : "none";
+});
+
+function addCustomOption() {
+  const val = el("customOptionInput").value.trim();
+  if (!val) return;
+  const item = document.createElement("label");
+  item.className = "option-item custom-opt-item";
+  item.innerHTML = `<input type="checkbox" value="${escapeHtml(val)}" checked/><span>${escapeHtml(val)}</span><button type="button" class="remove-opt" title="Remove">×</button>`;
+  item.querySelector(".remove-opt").addEventListener("click", (e) => { e.preventDefault(); item.remove(); });
+  el("optionsList").appendChild(item);
+  el("customOptionInput").value = "";
+}
+el("addCustomOptBtn").addEventListener("click", addCustomOption);
+el("customOptionInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCustomOption(); } });
+
+el("addFieldBtn").addEventListener("click", async () => {
+  const label = el("newFieldLabel").value.trim();
+  const key   = el("newFieldKey").value.trim();
+  const type  = el("newFieldType").value;
+
+  if (!label) { showHint("Label is required.", true); return; }
+  if (!key)   { showHint("Key is required.", true); return; }
+  if (!/^[a-z][a-z0-9_]*$/.test(key)) { showHint("Key must start with a letter and contain only lowercase letters, numbers, and underscores.", true); return; }
+  if (fields.some(f => f.key === key)) { showHint(`Key "${key}" is already used by another field.`, true); return; }
+
+  let options = null;
+  if (type === "select") {
+    options = [...el("optionsList").querySelectorAll("input[type='checkbox']:checked")]
+      .map(cb => cb.value.trim()).filter(Boolean);
+    if (options.length < 1) { showHint("Select at least one option for a select field.", true); return; }
+  }
+
+  const maxSort = fields.reduce((m, f) => Math.max(m, f.sort_order || 0), 0);
+
+  // Warn if project already has records
+  const { count: recordCount } = await supabase
+    .from("records")
+    .select("*", { count: "exact", head: true })
+    .eq("project_id", PROJECT_ID);
+  if (recordCount > 0) {
+    const ok = confirm(
+      `Warning: This project already has ${recordCount} candidate(s).\n\n` +
+      `Adding a new field now means all existing candidates will have an empty value for "${label}" until filled in manually.\n\n` +
+      `Continue?`
+    );
+    if (!ok) return;
+  }
+
+  el("addFieldBtn").disabled    = true;
+  el("addFieldBtn").textContent = "Adding...";
+
+  const { error } = await supabase.from("fields").insert({
+    project_id:       PROJECT_ID,
+    key,
+    label,
+    type,
+    options,
+    sort_order:       maxSort + 10,
+    field_role:       "step",
+    is_active:        true,
+    show_in_dashboard: true,
+  });
+
+  el("addFieldBtn").disabled    = false;
+  el("addFieldBtn").textContent = "Add Field";
+
+  if (error) { showHint("Error: " + error.message, true); return; }
+
+  // Reset form
+  el("newFieldLabel").value = "";
+  el("newFieldKey").value   = "";
+  el("newFieldType").value  = "select";
+  el("newFieldOptionsGroup").style.display = "";
+  el("optionsList").querySelectorAll(".custom-opt-item").forEach(item => item.remove());
+  el("optionsList").querySelectorAll("input[type='checkbox']").forEach(cb => { cb.checked = true; });
+  el("customOptionInput").value = "";
+
+  showHint(`Field "${label}" added.`, false);
+  await loadFields();
+});
+
+/* ═══════════════════
+   MEMBERS TAB
+═══════════════════ */
+let members     = []; // { user_id, role }
+let allProfiles = []; // { id, display_name, role } — admin/internal/client only
+
+async function loadMembers() {
+  const { data, error } = await supabase
+    .from("project_members")
+    .select("user_id, role")
+    .eq("project_id", PROJECT_ID);
+  if (error) { showHint("Failed to load members.", true); return; }
+  members = data || [];
+
+  // Load profile info for each member
+  if (members.length > 0) {
+    const ids = members.map(m => m.user_id);
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, display_name, role")
+      .in("id", ids);
+    const profMap = Object.fromEntries((profs || []).map(p => [p.id, p]));
+    members = members.map(m => ({ ...m, profile: profMap[m.user_id] || null }));
+  }
+
+  renderMembers();
+}
+
+async function loadAllProfiles() {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, display_name, role")
+    .in("role", ["admin", "internal", "client"])
+    .order("role");
+  allProfiles = data || [];
+  refreshAddMemberSelect();
+}
+
+function renderMembers() {
+  const list = el("memberList");
+  if (members.length === 0) {
+    list.innerHTML = "<div class='muted'>No members yet.</div>";
+    refreshAddMemberSelect();
+    return;
+  }
+
+  list.innerHTML = members.map(m => {
+    const p    = m.profile || {};
+    const name = p.display_name || m.user_id;
+    const role = p.role || "";
+    return `
+      <div class="member-row" data-uid="${escapeHtml(m.user_id)}">
+        <div class="member-info">
+          <span class="member-name">${escapeHtml(name)}</span>
+          <span class="member-meta"><span class="pill pill-${escapeHtml(role)}">${escapeHtml(role || "—")}</span></span>
+        </div>
+        <select class="member-role-select" data-role-uid="${escapeHtml(m.user_id)}">
+          <option value="viewer" ${m.role === "viewer" ? "selected" : ""}>viewer</option>
+          <option value="editor" ${m.role === "editor" ? "selected" : ""}>editor</option>
+        </select>
+        <button class="btn-danger-sm" data-remove-uid="${escapeHtml(m.user_id)}">Remove</button>
+      </div>`;
+  }).join("");
+
+  list.querySelectorAll("[data-role-uid]").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const uid = sel.dataset.roleUid;
+      const { error } = await supabase.from("project_members")
+        .update({ role: sel.value })
+        .match({ user_id: uid, project_id: PROJECT_ID });
+      if (error) {
+        showHint("Failed to update role.", true);
+        sel.value = members.find(m => m.user_id === uid)?.role || "viewer";
+      } else {
+        members.find(m => m.user_id === uid).role = sel.value;
+        showHint("Role updated.", false);
+      }
+    });
+  });
+
+  list.querySelectorAll("[data-remove-uid]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const uid = btn.dataset.removeUid;
+      if (!confirm("Remove this member from the project?")) return;
+      const { error } = await supabase.from("project_members")
+        .delete().match({ user_id: uid, project_id: PROJECT_ID });
+      if (error) { showHint("Failed to remove member.", true); return; }
+      showHint("Member removed.", false);
+      await loadMembers();
+    });
+  });
+
+  refreshAddMemberSelect();
+}
+
+function refreshAddMemberSelect() {
+  const sel      = el("addMemberSelect");
+  const existing = new Set(members.map(m => m.user_id));
+  const available = allProfiles.filter(p => !existing.has(p.id));
+  sel.innerHTML = available.length
+    ? `<option value="">Select a user to add...</option>` +
+      available.map(p =>
+        `<option value="${escapeHtml(p.id)}">${escapeHtml(p.display_name || p.id)} (${escapeHtml(p.role)})</option>`
+      ).join("")
+    : `<option value="">All eligible users already added</option>`;
+}
+
+el("addMemberBtn").addEventListener("click", async () => {
+  const uid = el("addMemberSelect").value;
+  if (!uid) { showHint("Select a user to add.", true); return; }
+  const role = el("addMemberRole").value;
+  const { error } = await supabase.from("project_members")
+    .upsert({ user_id: uid, project_id: PROJECT_ID, role }, { onConflict: "user_id,project_id" });
+  if (error) { showHint("Failed to add member: " + error.message, true); return; }
+  showHint("Member added.", false);
+  await loadMembers();
+});
+
+/* ═══════════════════
+   CANDIDATES TAB
+═══════════════════ */
+const EDGE_URL = "http://127.0.0.1:54321/functions/v1/admin-create-user";
+let csvRows = [];
+let candidatesLoaded = false;
+
+async function loadCandidates() {
+  const list = el("candidateList");
+  list.innerHTML = "<div class='muted'>Loading...</div>";
+
+  const { data: memberData } = await supabase
+    .from("project_members")
+    .select("user_id")
+    .eq("project_id", PROJECT_ID);
+
+  const ids = (memberData || []).map(m => m.user_id);
+  if (ids.length === 0) {
+    list.innerHTML = "<div class='muted'>No candidates yet.</div>";
+    el("candidateCount").textContent = "";
+    candidatesLoaded = true;
+    return;
+  }
+
+  const { data: profs, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, role")
+    .in("id", ids)
+    .eq("role", "candidate");
+
+  if (error) { list.innerHTML = "<div class='muted'>Failed to load candidates.</div>"; return; }
+
+  const candidates = profs || [];
+  el("candidateCount").textContent = `${candidates.length} candidate${candidates.length !== 1 ? "s" : ""} in this project`;
+
+  if (candidates.length === 0) {
+    list.innerHTML = "<div class='muted'>No candidates yet.</div>";
+    candidatesLoaded = true;
+    return;
+  }
+
+  list.innerHTML = candidates.map(c => `
+    <div class="candidate-row">
+      <div class="candidate-info">
+        <span class="candidate-name">${escapeHtml(c.display_name || c.id)}</span>
+      </div>
+      <span class="pill pill-candidate">candidate</span>
+    </div>`).join("");
+
+  candidatesLoaded = true;
+}
+
+// Load candidates when tab is opened
+document.querySelector('[data-tab="candidates"]').addEventListener("click", () => {
+  if (!candidatesLoaded) loadCandidates();
+});
+
+/* CSV handling */
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) { showHint("CSV must have a header row and at least one data row.", true); return; }
+
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
+  const nameIdx  = headers.indexOf("name");
+  const emailIdx = headers.indexOf("email");
+
+  if (nameIdx === -1 || emailIdx === -1) {
+    showHint(`CSV must have "name" and "email" columns. Found: ${headers.join(", ")}`, true);
+    return;
+  }
+
+  csvRows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols  = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+    const name  = cols[nameIdx]  || "";
+    const email = (cols[emailIdx] || "").toLowerCase();
+    csvRows.push({ name, email, hasError: !name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) });
+  }
+
+  const validCount = csvRows.filter(r => !r.hasError).length;
+  el("csvSummary").textContent = `${csvRows.length} rows — ${validCount} valid, ${csvRows.length - validCount} with errors`;
+  el("csvPreviewWrap").style.display = "block";
+
+  el("csvTable").innerHTML = `
+    <thead><tr><th>#</th><th>Name</th><th>Email</th></tr></thead>
+    <tbody>${csvRows.slice(0, 20).map((r, i) => `
+      <tr class="${r.hasError ? "csv-error-row" : ""}">
+        <td>${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.email)}</td>
+      </tr>`).join("")}
+      ${csvRows.length > 20 ? `<tr><td colspan="3" class="muted">... and ${csvRows.length - 20} more rows</td></tr>` : ""}
+    </tbody>`;
+
+  el("importBtn").style.display = validCount > 0 ? "" : "none";
+  clearHint();
+  if (csvRows.some(r => r.hasError)) showHint("Some rows have invalid name/email and will be skipped.", false);
+}
+
+function handleCsvFile(file) {
+  if (!file || !file.name.endsWith(".csv")) { showHint("Please upload a .csv file.", true); return; }
+  const reader = new FileReader();
+  reader.onload = e => parseCsv(e.target.result);
+  reader.readAsText(file);
+}
+
+const uploadZone = el("uploadZone");
+uploadZone.addEventListener("click", () => el("csvInput").click());
+uploadZone.addEventListener("dragover",  e => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+uploadZone.addEventListener("drop", e => {
+  e.preventDefault();
+  uploadZone.classList.remove("drag-over");
+  handleCsvFile(e.dataTransfer.files[0]);
+});
+el("csvInput").addEventListener("change", e => handleCsvFile(e.target.files[0]));
+
+/* Import */
+el("importBtn").addEventListener("click", async () => {
+  const validRows = csvRows.filter(r => !r.hasError);
+  if (validRows.length === 0) return;
+
+  el("importBtn").disabled = true;
+  el("importProgress").style.display = "block";
+
+  const setProgress = (pct, msg) => {
+    el("progressBar").style.width = pct + "%";
+    el("progressMsg").textContent  = msg;
+  };
+
+  const token = session.access_token;
+  let done = 0, skipped = 0;
+
+  for (const row of validRows) {
+    try {
+      const resp = await fetch(EDGE_URL, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body:    JSON.stringify({ email: row.email, display_name: row.name, project_id: PROJECT_ID }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        console.warn("Failed to import:", row.email, err);
+        skipped++;
+      }
+    } catch (e) {
+      console.warn("Failed to import:", row.email, e);
+      skipped++;
+    }
+    done++;
+    setProgress(Math.round((done / validRows.length) * 100), `Imported ${done}/${validRows.length}...`);
+  }
+
+  el("importBtn").disabled = false;
+  el("importProgress").style.display = "none";
+  csvRows = [];
+  el("csvPreviewWrap").style.display = "none";
+  el("importBtn").style.display = "none";
+
+  const successCount = validRows.length - skipped;
+  showHint(`Done — ${successCount} imported, ${skipped} skipped (already exist or error).`, false);
+  candidatesLoaded = false;
+  await loadCandidates();
+});
+
+/* ── init ── */
+await Promise.all([loadProject(), loadFields(), loadMembers(), loadAllProfiles()]);
+</script>
+</body>
+</html>

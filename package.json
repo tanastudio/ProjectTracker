@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "scripts": {
+    "dev": "serve . -p 3000",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4",
+    "supabase": "^2.78.1",
+    "vitest": "^2.1.9"
+  }
+}

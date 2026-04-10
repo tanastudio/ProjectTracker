@@ -1,0 +1,1970 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>My Status</title>
+    <link rel="stylesheet" href="styles.css" />
+
+    <style>
+        :root {
+            --bg-1: #f7fbff;
+            --bg-2: #eef6ff;
+            --card: rgba(255,255,255,.92);
+            --text: #16324f;
+            --muted: #6c84a0;
+            --border: rgba(80,110,150,.10);
+            --shadow: 0 18px 50px rgba(72, 104, 145, .10);
+            --radius-xl: 24px;
+            --radius-lg: 18px;
+            --radius-md: 14px;
+            --brand: #76a9fa;
+            --brand-2: #8ec5ff;
+            --brand-soft: rgba(118,169,250,.18);
+            --success: #52b788;
+            --success-soft: rgba(82,183,136,.16);
+            --progress: #f2b880;
+            --progress-soft: rgba(242,184,128,.18);
+            --issue: #ee8f8f;
+            --issue-soft: rgba(238,143,143,.16);
+            --idle: #94a3b8;
+            --idle-soft: rgba(148,163,184,.18);
+            --stat-completed-bg: linear-gradient(180deg, rgb(105, 255, 185), rgb(175, 255, 218));
+            --stat-progress-bg: linear-gradient(180deg, rgb(255, 236, 140), rgb(255, 242, 176));
+            --stat-remaining-bg: linear-gradient(180deg, rgb(255, 148, 156), rgb(255, 197, 197));
+            --stat-overall-bg: linear-gradient(180deg, rgb(113, 201, 255), rgb(181, 220, 255));
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background: linear-gradient(180deg, #f3f8ff 0%, #edf5ff 45%, #fafdff 100%);
+        }
+
+        body {
+            padding: 32px 16px 56px;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        .hero-card {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(180deg, #74a7f2 0%, #8bbaf7 52%, #b8d7fb 100%);
+            color: #16324f;
+            border-radius: 28px;
+            padding: 28px;
+            box-shadow: 0 18px 44px rgba(118,169,250,.18);
+            margin-bottom: 20px;
+        }
+
+            .hero-card::before,
+            .hero-card::after {
+                content: none;
+            }
+
+        .hero-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-copy {
+            max-width: 100%;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgb(37, 77, 169);
+            border: 1px solid rgba(255,255,255,.30);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            color: #ffffff;
+        }
+
+        .hero-title {
+            margin: 0;
+            font-size: clamp(20px, 4vw, 32px);
+            line-height: 1;
+            font-weight: 600;
+            letter-spacing: -.02em;
+            color: #16324f;
+            max-width: 100%;
+            text-shadow: none;
+        }
+
+        .hero-subtitle {
+            margin: 12px 0 0;
+            max-width: 100%;
+            font-weight: 400;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #24476b;
+        }
+
+        .logout-btn {
+            appearance: none;
+            border: 1px solid rgba(255,255,255,.24);
+            background: rgba(37, 77, 169);
+            color: #ffffff;
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: transform .18s ease, background .18s ease, border-color .18s ease;
+            white-space: nowrap;
+        }
+
+            .logout-btn:hover {
+                transform: translateY(-1px);
+                background: rgba(255,255,255,.22);
+                border-color: rgba(255,255,255,.30);
+            }
+
+        .hero-stats {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        .stat-card {
+            border-radius: 18px;
+            padding: 18px 20px;
+            min-height: 72px;
+            border: 1px solid rgba(255,255,255,.26);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 10px 24px rgba(54, 84, 120, .10);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+        }
+
+        .stat-row {
+            width: 100%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .hero-stats .stat-card:nth-child(1) {
+            background: var(--stat-completed-bg);
+        }
+
+        .hero-stats .stat-card:nth-child(2) {
+            background: var(--stat-progress-bg);
+        }
+
+        .hero-stats .stat-card:nth-child(3) {
+            background: var(--stat-remaining-bg);
+        }
+
+        .hero-stats .stat-card:nth-child(4) {
+            background: var(--stat-overall-bg);
+        }
+
+        .stat-label {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.2;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            font-weight: 800;
+            color: rgba(22, 50, 79, .88);
+        }
+
+        .stat-value {
+            margin: 0;
+            font-size: 34px;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            color: #16324f;
+        }
+
+        .stat-sub {
+            margin-top: 8px;
+            font-size: 13px;
+            color: rgba(255,255,255,.92);
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 22px 22px 16px;
+            border-bottom: 1px solid rgba(80,110,150,.08);
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -.02em;
+            color: #14213d;
+        }
+
+        .panel-desc {
+            margin: 8px 0 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--muted);
+            max-width: 100%;
+        }
+
+        .open-ticket-btn {
+            appearance: none;
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            background: linear-gradient(180deg, #2867bc 100%, #f3f8ff 100%);
+            color: #ffffff;
+            min-width: 140px;
+            padding: 10px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.1;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.10);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+            .open-ticket-btn:hover {
+                transform: translateY(-1px);
+                border-color: rgba(59, 130, 246, 0.28);
+                box-shadow: 0 12px 24px rgba(59, 130, 246, 0.16);
+                background: linear-gradient(180deg, #548eda 100%, #f3f8f7 100%);
+            }
+
+            .open-ticket-btn:active {
+                transform: translateY(0);
+                box-shadow: 0 6px 14px rgba(59, 130, 246, 0.10);
+            }
+
+        .progress-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 140px;
+            padding: 10px 10px;
+            border-radius: 999px;
+            background: rgb(205, 216, 255);
+            color: #1a4186;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .progress-wrap {
+            padding: 0 22px 18px;
+        }
+
+        .progress-track {
+            position: relative;
+            width: 100%;
+            height: 14px;
+            border-radius: 999px;
+            background: #dbe8f8;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #7dafff 0%, #5f9cf7 100%);
+            transition: width .35s ease;
+        }
+
+        .progress-caption {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .summary-box {
+            margin: 0 12px 10px;
+            padding: 12px 12px;
+            border-radius: 12px;
+            background: #edf2f8;
+            border: 1px solid rgba(118,169,250,.12);
+        }
+
+        .summary-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 6px;
+            color: #17365d;
+        }
+
+        .summary-text {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--muted);
+        }
+
+        .summary-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .task-list {
+            padding: 10px 22px 22px;
+            display: grid;
+            gap: 6px;
+        }
+
+        .task-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px;
+            background: #edf2f8;
+            border: 1px solid rgba(80,110,150,.08);
+            border-radius: 10px;
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+
+            .task-row:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 12px 28px rgba(85, 117, 160, .08);
+                border-color: rgba(118,169,250,.18);
+            }
+
+        .task-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .task-index {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 800;
+            flex-shrink: 0;
+            background: #f2f7fd;
+            color: #4f6f95;
+            border: 1px solid rgba(80,110,150,.08);
+        }
+
+        .task-copy {
+            min-width: 0;
+        }
+
+        .task-name {
+            margin: 0;
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: -.01em;
+            color: #17365d;
+        }
+
+        .task-note {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .status-pill {
+            padding: 10px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 800;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .status-not-started {
+            color: #6b7f95;
+            background: var(--idle-soft);
+            border-color: rgba(148,163,184,.18);
+        }
+
+        .status-in-progress {
+            color: #bf7b2d;
+            background: var(--progress-soft);
+            border-color: rgba(242,184,128,.22);
+        }
+
+        .status-completed {
+            color: #3f9a70;
+            background: var(--success-soft);
+            border-color: rgba(82,183,136,.22);
+        }
+
+        .status-issue {
+            color: #d46a6a;
+            background: var(--issue-soft);
+            border-color: rgba(238,143,143,.22);
+        }
+
+        .loading-text,
+        .error-text {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .loading-text {
+            color: var(--muted);
+        }
+
+        .error-text {
+            color: #c65b5b;
+        }
+
+        .hidden-debug {
+            display: none;
+        }
+
+        /* ── Tickets section ─────────────────────────────── */
+        .tickets-section {
+            margin-bottom: 20px;
+        }
+
+        .ticket-item {
+            border-bottom: 1px solid rgba(80,110,150,.08);
+        }
+
+        .ticket-item:last-child {
+            border-bottom: none;
+        }
+
+        .ticket-summary {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 22px;
+            cursor: pointer;
+            transition: background .15s ease;
+            user-select: none;
+        }
+
+        .ticket-summary:hover {
+            background: rgba(118,169,250,.05);
+        }
+
+        .ticket-chevron {
+            font-size: 10px;
+            color: #94a3b8;
+            transition: transform .15s ease;
+            flex-shrink: 0;
+        }
+
+        .ticket-toggle-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        .ticket-item.is-expanded .ticket-chevron {
+            transform: rotate(90deg);
+        }
+
+        .ticket-summary-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .ticket-subject {
+            font-size: 15px;
+            font-weight: 600;
+            color: #17365d;
+            margin: 0 0 2px;
+        }
+
+        .ticket-meta {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .ticket-status-pill {
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .tpill-open {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+
+        .tpill-done {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .ticket-body {
+            display: none;
+            padding: 0 22px 18px;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .ticket-item.is-expanded .ticket-body {
+            display: flex;
+        }
+
+        .ticket-original-msg {
+            background: #edf2f8;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #334155;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .ticket-section-label {
+            font-size: 11px;
+            font-weight: 900;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: 8px;
+        }
+
+        .ticket-reply-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .t-reply-item {
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .t-reply-staff {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+
+        .t-reply-candidate {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+        }
+
+        .t-reply-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+
+        .t-reply-name {
+            font-weight: 700;
+            font-size: 12px;
+            color: #0f172a;
+        }
+
+        .t-reply-role {
+            font-size: 11px;
+            color: #64748b;
+            background: rgba(15,23,42,.06);
+            padding: 1px 6px;
+            border-radius: 999px;
+        }
+
+        .t-reply-time {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-left: auto;
+        }
+
+        .t-reply-body {
+            color: #1e293b;
+            white-space: pre-wrap;
+        }
+
+        .t-reply-empty {
+            font-style: italic;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .ticket-reply-form {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ticket-reply-input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid rgba(80,110,150,.16);
+            border-radius: 12px;
+            padding: 10px 12px;
+            font: inherit;
+            font-size: 13px;
+            min-height: 80px;
+            resize: vertical;
+            outline: none;
+            background: #fff;
+        }
+
+        .ticket-reply-submit {
+            align-self: flex-end;
+            appearance: none;
+            background: linear-gradient(180deg, #2867bc, #3b82f6);
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .ticket-reply-submit:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
+        .ticket-empty {
+            padding: 28px 22px;
+            color: var(--muted);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        /* ── Modal ──────────────────────────────────────── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(16,36,64,.45);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 16px;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal-card {
+            background: #fff;
+            border-radius: 20px;
+            padding: 28px;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 24px 60px rgba(16,36,64,.18);
+        }
+
+        .modal-title {
+            margin: 0 0 20px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #14213d;
+        }
+
+        .modal-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .modal-input,
+        .modal-textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid rgba(80,110,150,.16);
+            border-radius: 12px;
+            padding: 10px 12px;
+            font: inherit;
+            font-size: 14px;
+            outline: none;
+            margin-bottom: 16px;
+            background: #f8fafc;
+        }
+
+        .modal-textarea {
+            min-height: 110px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .modal-msg {
+            font-size: 13px;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        .modal-msg.show { display: block; }
+        .modal-msg.error { color: #c65b5b; }
+        .modal-msg.ok { color: #3f9a70; }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-cancel {
+            appearance: none;
+            background: #f1f5f9;
+            color: #475569;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .modal-submit {
+            appearance: none;
+            background: linear-gradient(180deg, #2867bc, #3b82f6);
+            color: #fff;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .modal-submit:disabled { opacity: .6; cursor: not-allowed; }
+
+        @media (max-width: 860px) {
+            .hero-top,
+            .panel-head,
+            .task-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .hero-stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .logout-btn,
+            .progress-badge,
+            .status-pill {
+                align-self: flex-start;
+            }
+        }
+
+        /* ── Admin Preview Banner ─────────────────────────── */
+        .admin-preview-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 14px;
+            padding: 10px 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .admin-preview-bar.hidden {
+            display: none;
+        }
+
+        .admin-preview-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .admin-preview-badge {
+            background: #f59e0b;
+            color: #1c1917;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 999px;
+            letter-spacing: .04em;
+            white-space: nowrap;
+        }
+
+        .admin-preview-text {
+            color: #94a3b8;
+        }
+
+        .admin-preview-name {
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .admin-preview-back {
+            appearance: none;
+            background: rgba(255,255,255,.10);
+            color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,.15);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .15s ease;
+        }
+
+        .admin-preview-back:hover {
+            background: rgba(255,255,255,.18);
+        }
+
+        /* Compact layout tuning */
+        body {
+            padding: 20px 14px 36px;
+        }
+
+        .wrap {
+            max-width: 920px;
+        }
+
+        .hero-card {
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 14px;
+        }
+
+        .hero-top {
+            gap: 12px;
+        }
+
+        .eyebrow {
+            gap: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+
+        .hero-title {
+            font-size: clamp(18px, 3.2vw, 27px);
+            line-height: 1.05;
+        }
+
+        .hero-subtitle {
+            margin-top: 8px;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .logout-btn {
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+
+        .hero-stats {
+            margin-top: 14px;
+            gap: 8px;
+        }
+
+        .stat-card {
+            border-radius: 14px;
+            padding: 12px 14px;
+            min-height: 60px;
+        }
+
+        .stat-row {
+            gap: 10px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+        }
+
+        .stat-value {
+            font-size: 26px;
+        }
+
+        .stat-sub {
+            margin-top: 4px;
+            font-size: 11px;
+        }
+
+        .panel {
+            border-radius: 18px;
+        }
+
+        .panel-head {
+            gap: 12px;
+            padding: 14px 16px 10px;
+        }
+
+        .panel-title {
+            font-size: 18px;
+        }
+
+        .panel-desc {
+            margin-top: 4px;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .open-ticket-btn,
+        .progress-badge {
+            min-width: 124px;
+            padding: 8px 10px;
+            font-size: 13px;
+        }
+
+        .progress-wrap {
+            padding: 0 16px 12px;
+        }
+
+        .progress-track {
+            height: 11px;
+        }
+
+        .progress-caption {
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .summary-box {
+            margin: 0 10px 8px;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .summary-title {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .summary-text {
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .task-list {
+            padding: 8px 16px 14px;
+            gap: 5px;
+        }
+
+        .task-row {
+            gap: 10px;
+            padding: 6px;
+            border-radius: 9px;
+        }
+
+        .task-left {
+            gap: 10px;
+        }
+
+        .task-index {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .task-name {
+            font-size: 15px;
+        }
+
+        .task-note {
+            margin-top: 4px;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .status-pill {
+            padding: 8px 11px;
+            font-size: 12px;
+        }
+
+        .tickets-section {
+            margin-bottom: 14px;
+        }
+
+        .ticket-summary {
+            gap: 10px;
+            padding: 10px 16px;
+        }
+
+        .ticket-subject {
+            font-size: 14px;
+            margin-bottom: 1px;
+        }
+
+        .ticket-meta {
+            font-size: 11px;
+        }
+
+        .ticket-status-pill {
+            padding: 4px 9px;
+            font-size: 11px;
+        }
+
+        .ticket-body {
+            padding: 0 16px 12px;
+            gap: 10px;
+        }
+
+        .ticket-original-msg {
+            padding: 10px 11px;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .ticket-section-label {
+            margin-bottom: 6px;
+        }
+
+        .ticket-reply-thread {
+            gap: 6px;
+            max-height: 210px;
+        }
+
+        .t-reply-item {
+            border-radius: 9px;
+            padding: 7px 9px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .t-reply-name {
+            font-size: 11px;
+        }
+
+        .ticket-reply-form {
+            gap: 6px;
+        }
+
+        .ticket-reply-input {
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 12px;
+            min-height: 68px;
+        }
+
+        .ticket-reply-submit {
+            padding: 6px 14px;
+            border-radius: 9px;
+            font-size: 12px;
+        }
+
+        .ticket-empty {
+            padding: 16px 16px;
+            font-size: 12px;
+        }
+
+        .modal-overlay {
+            padding: 12px;
+        }
+
+        .modal-card {
+            border-radius: 16px;
+            padding: 18px;
+            max-width: 500px;
+        }
+
+        .modal-title {
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+
+        .modal-input,
+        .modal-textarea {
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .modal-textarea {
+            min-height: 90px;
+            line-height: 1.4;
+        }
+
+        .modal-actions {
+            gap: 8px;
+        }
+
+        .modal-cancel,
+        .modal-submit {
+            padding: 8px 14px;
+            font-size: 13px;
+            border-radius: 9px;
+        }
+
+        .admin-preview-bar {
+            gap: 10px;
+            border-radius: 12px;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 560px) {
+            body {
+                padding-top: 20px;
+            }
+
+            .hero-card {
+                padding: 22px 18px;
+                border-radius: 24px;
+            }
+
+            .hero-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .panel-head,
+            .progress-wrap,
+            .task-list,
+            .summary-box {
+                padding-left: 16px;
+                padding-right: 16px;
+                margin-left: 0;
+                margin-right: 0;
+            }
+
+            .task-row {
+                padding: 16px;
+            }
+
+            .task-name {
+                font-size: 16px;
+            }
+        }
+
+    </style>
+
+</head>
+<body>
+    <!-- Admin Preview Banner -->
+    <div id="adminPreviewBar" class="admin-preview-bar hidden">
+        <div class="admin-preview-bar-left">
+            <span class="admin-preview-badge">ADMIN PREVIEW</span>
+            <span class="admin-preview-text">Viewing as candidate: <span id="adminPreviewName" class="admin-preview-name">—</span></span>
+        </div>
+        <button id="adminPreviewBackBtn" class="admin-preview-back" type="button">&#8592; Back to Admin</button>
+    </div>
+
+    <div class="wrap">
+
+        <section class="hero-card">
+            <div class="hero-top">
+                <div class="hero-copy">
+                    <div class="eyebrow" id="heroUserEmail">candidate@example.com</div>
+                    <h1 class="hero-title">Complete your steps and keep your application moving</h1>
+                    <p class="hero-subtitle">
+                        Stay on track by finishing each task below. The more steps you complete, the faster your process moves forward.
+                    </p>
+                </div>
+
+                <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
+            </div>
+
+            <div class="hero-stats">
+                <div class="stat-card">
+                    <div class="stat-row">
+                        <div class="stat-label">Completed</div>
+                        <div class="stat-value" id="statCompleted">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-row">
+                        <div class="stat-label">In Progress</div>
+                        <div class="stat-value" id="statInProgress">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-row">
+                        <div class="stat-label">Remaining</div>
+                        <div class="stat-value" id="statRemaining">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-row">
+                        <div class="stat-label">Overall Progress</div>
+                        <div class="stat-value" id="statPercent">0%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- My Tickets Section -->
+        <section class="panel tickets-section" id="ticketsSection" style="display:none;margin-bottom:20px;">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title">My Support Tickets</h2>
+                    <p class="panel-desc">Track your requests and replies from the team.</p>
+                </div>
+            </div>
+            <div id="ticketsList">
+                <p class="loading-text" style="padding:22px;">Loading...</p>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title" id="summary">Loading...</h2>
+                </div>
+
+                <div class="summary-actions">
+                    <div class="progress-badge" id="progressBadge">0% Complete</div>
+                    <button type="button" class="open-ticket-btn">Request Support</button>
+                </div>
+            </div>
+
+            <div class="progress-wrap">
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-caption">
+                    <span id="progressCaptionLeft">Getting started</span>
+                    <span id="progressCaptionRight">0 of 0 tasks completed</span>
+                </div>
+            </div>
+
+            <div class="summary-box">
+                <p class="summary-title">Focus next</p>
+                <p class="summary-text" id="encouragementText">
+                    We are preparing your checklist.
+                </p>
+            </div>
+
+            <div id="debug" class="hidden-debug"></div>
+            <div class="task-list" id="steps">
+                <p class="loading-text">Loading your status...</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- New Ticket Modal -->
+    <div class="modal-overlay hidden" id="ticketModal">
+        <div class="modal-card">
+            <h3 class="modal-title">Request Support</h3>
+            <p id="modalSubtitle" style="margin:-8px 0 18px;font-size:13px;color:#64748b;font-weight:600;"></p>
+            <label class="modal-label">Subject</label>
+            <div id="modalSubjectDisplay" style="background:#f1f5f9;border:1px solid rgba(80,110,150,.14);border-radius:12px;padding:10px 12px;font-size:14px;color:#334155;margin-bottom:16px;"></div>
+            <label class="modal-label" for="ticketMessage">Message</label>
+            <textarea class="modal-textarea" id="ticketMessage" placeholder="Provide more details about your request..."></textarea>
+            <div class="modal-msg" id="modalMsg"></div>
+            <div class="modal-actions">
+                <button class="modal-cancel" id="cancelTicketBtn" type="button">Cancel</button>
+                <button class="modal-submit" id="submitTicketBtn" type="button">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { supabase } from "./supabaseClient.js";
+        import { escapeHtml } from "./js/sanitize.js";
+
+
+        const STEP_STATUS = ["Not Started", "In Progress", "Completed", "Issue"];
+        const el = (id) => document.getElementById(id);
+
+        function normalizeStatus(v) {
+            const s = String(v || "").trim();
+            if (!s) return "Not Started";
+            return STEP_STATUS.includes(s) ? s : "Not Started";
+        }
+
+        function pickValueCell(rv) {
+            if (!rv || typeof rv !== "object") return "";
+            if (rv.value !== undefined && rv.value !== null) return rv.value;
+            if (rv.value_select !== undefined && rv.value_select !== null) return rv.value_select;
+            if (rv.value_text !== undefined && rv.value_text !== null) return rv.value_text;
+            return "";
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case "Completed":
+                    return "status-completed";
+                case "In Progress":
+                    return "status-in-progress";
+                case "Issue":
+                    return "status-issue";
+                default:
+                    return "status-not-started";
+            }
+        }
+
+        function getTaskNote(status) {
+            switch (status) {
+                case "Completed":
+                    return "This step is done. You are moving forward well.";
+                case "In Progress":
+                    return "This step has started. Finish it to increase your progress.";
+                case "Issue":
+                    return "This step needs attention before the process can move forward smoothly.";
+                default:
+                    return "This step has not started yet. Completing it will move your application ahead.";
+            }
+        }
+
+        function getEncouragement(completed, inProgress, issues, total) {
+            if (issues > 0) {
+                return "You have tasks that need attention. Resolve those first so your progress can continue without delays.";
+            }
+
+            if (completed === total && total > 0) {
+                return "Excellent. All tasks are complete. Your application is fully up to date.";
+            }
+
+            if (completed === 0 && inProgress === 0) {
+                return "You have not started yet. Begin with the first available task to build momentum.";
+            }
+
+            if (completed >= Math.ceil(total / 2)) {
+                return "Good progress so far. Finish the remaining tasks to keep your application moving quickly.";
+            }
+
+            if (inProgress > 0) {
+                return "You already have active tasks in motion. Completing those next will give you the fastest progress boost.";
+            }
+
+            return "A few focused actions will move this forward. Start with the next incomplete task.";
+        }
+
+        function getProgressCaption(percent, completed, total) {
+            if (total === 0) return "No tasks available yet.";
+            if (percent === 100) return "Everything completed.";
+            if (percent >= 75) return "Almost there.";
+            if (percent >= 40) return "Good momentum.";
+            if (percent > 0) return "A solid start.";
+            return "Getting started.";
+        }
+
+        async function requireSession() {
+            const { data } = await supabase.auth.getSession();
+            const session = data?.session;
+
+            if (!session) {
+                window.location.replace("./index.html");
+                return null;
+            }
+
+            supabase.auth.onAuthStateChange((_evt, s) => {
+                if (!s) window.location.replace("./index.html");
+            });
+
+            return session;
+        }
+
+        function renderStats(steps) {
+            const total = steps.length;
+            const completed = steps.filter((s) => s.status === "Completed").length;
+            const inProgress = steps.filter((s) => s.status === "In Progress").length;
+            const issues = steps.filter((s) => s.status === "Issue").length;
+            const remaining = total - completed;
+            const percent = total ? Math.round((completed / total) * 100) : 0;
+
+            el("statCompleted").textContent = String(completed);
+            el("statInProgress").textContent = String(inProgress);
+            el("statRemaining").textContent = String(remaining);
+            el("statPercent").textContent = `${percent}%`;
+
+            el("progressBadge").textContent = `${percent}% Complete`;
+            el("progressFill").style.width = `${percent}%`;
+            el("progressCaptionLeft").textContent = getProgressCaption(percent, completed, total);
+            el("progressCaptionRight").textContent = `${completed} of ${total} tasks completed`;
+            el("encouragementText").textContent = getEncouragement(completed, inProgress, issues, total);
+        }
+
+        function renderSteps(steps) {
+            const stepsEl = el("steps");
+            stepsEl.innerHTML = "";
+
+            steps.forEach((step, index) => {
+                const row = document.createElement("div");
+                row.className = "task-row";
+
+                const taskLeft = document.createElement("div");
+                taskLeft.className = "task-left";
+
+                const taskIndex = document.createElement("div");
+                taskIndex.className = "task-index";
+                taskIndex.textContent = index + 1;
+
+                const taskCopy = document.createElement("div");
+                taskCopy.className = "task-copy";
+
+                const taskName = document.createElement("p");
+                taskName.className = "task-name";
+                taskName.textContent = step.label;
+
+                const taskNote = document.createElement("p");
+                taskNote.className = "task-note";
+                taskNote.textContent = getTaskNote(step.status);
+
+                taskCopy.appendChild(taskName);
+                taskCopy.appendChild(taskNote);
+                taskLeft.appendChild(taskIndex);
+                taskLeft.appendChild(taskCopy);
+
+                const statusPill = document.createElement("div");
+                statusPill.className = `status-pill ${getStatusClass(step.status)}`;
+                statusPill.textContent = step.status;
+
+                row.appendChild(taskLeft);
+                row.appendChild(statusPill);
+                stepsEl.appendChild(row);
+            });
+        }
+
+        const PREVIEW_RECORD_SAFE_PAT = /^[A-Za-z0-9_-]{1,120}$/;
+
+        function failAccess(title, message, redirectUrl) {
+            el("summary").textContent = title;
+            el("steps").innerHTML = `<p class="error-text">${message}</p>`;
+            if (redirectUrl) {
+                setTimeout(() => window.location.replace(redirectUrl), 1200);
+            }
+        }
+
+        const session = await requireSession();
+        if (!session) throw new Error("No session");
+
+
+
+        el("logoutBtn").addEventListener("click", async () => {
+            await supabase.auth.signOut();
+            window.location.replace("./index.html");
+        });
+
+        const { data: profile, error: pErr } = await supabase
+            .from("profiles")
+            .select("role, candidate_record_id, display_name")
+            .eq("id", session.user.id)
+            .maybeSingle();
+
+        const heroDisplayName =
+            profile?.display_name ||
+            session.user.email ||
+            session.user.id;
+
+        el("heroUserEmail").textContent = heroDisplayName;
+
+        if (pErr) {
+            el("summary").textContent = "Cannot load profile";
+            const errP = document.createElement("p");
+            errP.className = "error-text";
+            errP.textContent = pErr.message;
+            el("steps").replaceChildren(errP);
+            throw pErr;
+        }
+
+        if (!profile) {
+            el("summary").textContent = "Profile not found";
+            el("steps").innerHTML = `<p class="error-text">No profile found for this user.</p>`;
+            throw new Error("profile is null");
+        }
+
+        const previewRecordIdRaw = String(new URL(window.location.href).searchParams.get("preview_record") || "").trim();
+        const previewRecordIdFromSession = String(sessionStorage.getItem("admin_preview_record_id") || "").trim();
+        const isPreviewRequested = previewRecordIdRaw.length > 0;
+
+        let isAdminPreview = false;
+        let recordToLoad = null;
+
+        if (isPreviewRequested) {
+            if (profile.role !== "admin") {
+                failAccess(
+                    "Access denied",
+                    "Only admins can open candidate preview links.",
+                    profile.role === "candidate" ? "./candidate-status.html" : "./dashboard.html"
+                );
+                throw new Error("Non-admin preview blocked");
+            }
+
+            if (!PREVIEW_RECORD_SAFE_PAT.test(previewRecordIdRaw)) {
+                failAccess(
+                    "Invalid preview link",
+                    "The preview record ID is invalid. Please reopen the candidate from the admin page.",
+                    "./admin.html"
+                );
+                throw new Error("Invalid preview_record");
+            }
+
+            isAdminPreview = true;
+            recordToLoad = previewRecordIdRaw;
+        } else {
+            if (profile.role === "admin") {
+                if (PREVIEW_RECORD_SAFE_PAT.test(previewRecordIdFromSession)) {
+                    isAdminPreview = true;
+                    recordToLoad = previewRecordIdFromSession;
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("preview_record", previewRecordIdFromSession);
+                    history.replaceState(null, "", url.toString());
+                } else {
+                    failAccess(
+                        "Preview record required",
+                        "Open a candidate from the admin page to preview their status.",
+                        "./admin.html"
+                    );
+                    throw new Error("Admin preview missing preview_record");
+                }
+            } else {
+                if (profile.role !== "candidate") {
+                    window.location.replace("./dashboard.html");
+                    throw new Error("Not a candidate");
+                }
+
+                if (!profile.candidate_record_id) {
+                    el("summary").textContent = "Candidate record not linked";
+                    el("steps").innerHTML = `<p class="error-text">Your account is not linked to a candidate record yet. Please contact admin.</p>`;
+                    throw new Error("candidate_record_id is null");
+                }
+
+                recordToLoad = profile.candidate_record_id;
+            }
+        }
+
+        const { data: rec, error: rErr } = await supabase
+            .from("records")
+            .select("id, code, title, project_id, projects(name)")
+            .eq("id", recordToLoad)
+            .maybeSingle();
+
+        if (rErr) {
+            el("summary").textContent = "Cannot load your record";
+            const errP = document.createElement("p");
+            errP.className = "error-text";
+            errP.textContent = rErr.message;
+            el("steps").replaceChildren(errP);
+            throw rErr;
+        }
+
+        if (!rec) {
+            el("summary").textContent = "Record not found";
+            el("steps").innerHTML = `<p class="error-text">Cannot load your record.</p>`;
+            throw new Error("record is null");
+        }
+
+        // ── Admin preview mode setup ──────────────────────────
+        if (isAdminPreview) {
+            const bar = el("adminPreviewBar");
+            bar.classList.remove("hidden");
+            el("adminPreviewName").textContent = `${rec.title || ""}${rec.code ? " (" + rec.code + ")" : ""}`;
+            el("heroUserEmail").textContent = rec.title || rec.code || "Candidate";
+            // Hide ticket submit button — admin shouldn't send tickets on candidate's behalf
+            document.querySelector(".open-ticket-btn")?.style.setProperty("display", "none");
+            // Wire back button
+            const pid = rec.project_id;
+            el("adminPreviewBackBtn").addEventListener("click", () => {
+                sessionStorage.removeItem("admin_preview_record_id");
+                const url = pid ? `./admin.html?project=${encodeURIComponent(pid)}` : "./admin.html";
+                window.location.href = url;
+            });
+        } else {
+            sessionStorage.removeItem("admin_preview_record_id");
+        }
+
+        const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
+
+        const { data: fieldsRaw, error: fErr } = await supabase
+            .from("fields")
+            .select("id, key, label, sort_order, field_role")
+            .eq("project_id", rec.project_id)
+            .eq("type", "select")
+            .neq("is_active", false)
+            .order("sort_order");
+
+        const fields = (fieldsRaw || []).filter(f => !FIXED_ROLES.has(f.field_role));
+
+        if (fErr) {
+            el("summary").textContent = "Cannot load fields";
+            const errP = document.createElement("p");
+            errP.className = "error-text";
+            errP.textContent = fErr.message;
+            el("steps").replaceChildren(errP);
+            throw fErr;
+        }
+
+        const fieldsById = new Map((fields || []).map((f) => [f.id, f]));
+
+        const { data: rvs, error: vErr } = await supabase
+            .from("record_values")
+            .select("*")
+            .eq("record_id", rec.id);
+
+        if (vErr) {
+            el("summary").textContent = "Cannot load status values";
+            const errP = document.createElement("p");
+            errP.className = "error-text";
+            errP.textContent = vErr.message;
+            el("steps").replaceChildren(errP);
+            throw vErr;
+        }
+
+        const vals = {};
+        for (const rv of (rvs || [])) {
+            const f = fieldsById.get(rv.field_id);
+            if (!f) continue;
+            vals[f.key] = pickValueCell(rv);
+        }
+
+        el("summary").textContent = `${rec.code || ""} - ${rec.title || ""}`;
+
+        const renderedSteps = (fields || []).map((f) => ({
+            label: f.label,
+            status: normalizeStatus(vals[f.key] || ""),
+        }));
+
+        renderSteps(renderedSteps);
+        renderStats(renderedSteps);
+
+        // ── Ticket system ────────────────────────────────────────────────────
+
+        let TICKETS = [];
+        const REPLIES_BY_TICKET = new Map();
+        const DISPLAY_NAME = profile.display_name || session.user.email || session.user.id;
+        const SESSION_JWT  = session.access_token;
+
+        function formatDate(v) {
+            if (!v) return "-";
+            const d = new Date(v);
+            return isNaN(d) ? String(v) : d.toLocaleString();
+        }
+
+        function escapeHtmlT(s) {
+            return String(s ?? "")
+                .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+        }
+
+        function buildRepliesHtml(ticketId) {
+            const replies = REPLIES_BY_TICKET.get(String(ticketId)) || [];
+            if (replies.length === 0) {
+                return `<div class="t-reply-empty">No replies yet.</div>`;
+            }
+            return replies.map((r) => {
+                const isStaff = r.author_role === "admin" || r.author_role === "internal";
+                const cls = isStaff ? "t-reply-staff" : "t-reply-candidate";
+                const name = escapeHtmlT(r.author_name || r.author_id || "Unknown");
+                return `
+                  <div class="t-reply-item ${cls}">
+                    <div class="t-reply-meta">
+                      <span class="t-reply-name">${name}</span>
+                      <span class="t-reply-role">${escapeHtmlT(r.author_role || "")}</span>
+                      <span class="t-reply-time">${escapeHtmlT(formatDate(r.created_at))}</span>
+                    </div>
+                    <div class="t-reply-body">${escapeHtmlT(r.message)}</div>
+                  </div>`;
+            }).join("");
+        }
+
+        async function notifyViaEdge(payload) {
+            try {
+                await supabase.functions.invoke("ticket-notify", { body: payload });
+            } catch (e) {
+                console.warn("Email notification failed (non-fatal):", e);
+            }
+        }
+
+        function renderTickets() {
+            const section = el("ticketsSection");
+            const list    = el("ticketsList");
+            section.style.display = "";
+
+            if (TICKETS.length === 0) {
+                list.innerHTML = `<div class="ticket-empty">No support tickets yet. Use "Request Support" to open one.</div>`;
+                return;
+            }
+
+            list.innerHTML = "";
+            for (const t of TICKETS) {
+                const status   = String(t.status || "open").toLowerCase();
+                const isDone   = status === "done";
+                const pillCls  = isDone ? "tpill-done" : "tpill-open";
+                const pillText = isDone ? "Done" : "Open";
+
+                const item = document.createElement("div");
+                item.className = "ticket-item";
+                item.dataset.id = String(t.id);
+
+                item.innerHTML = `
+                  <div class="ticket-summary">
+                    <span class="ticket-chevron">▶</span>
+                    <div class="ticket-summary-main">
+                      <p class="ticket-subject">${escapeHtmlT(t.subject)}</p>
+                      <p class="ticket-meta">${escapeHtmlT(formatDate(t.created_at))}</p>
+                    </div>
+                    <span class="ticket-status-pill ${pillCls} ticket-toggle-label">${pillText}</span>
+                  </div>
+                  <div class="ticket-body">
+                    ${t.message ? `<div>
+                      <div class="ticket-section-label">Your Message</div>
+                      <div class="ticket-original-msg">${escapeHtmlT(t.message)}</div>
+                    </div>` : ""}
+                    <div>
+                      <div class="ticket-section-label">Replies</div>
+                      <div class="ticket-reply-thread">${buildRepliesHtml(t.id)}</div>
+                    </div>
+                    <div class="ticket-reply-form">
+                      <textarea class="ticket-reply-input" placeholder="Write a reply..."></textarea>
+                      <button class="ticket-reply-submit" type="button">Reply</button>
+                    </div>
+                  </div>`;
+
+                // Toggle expand
+                const toggleLabel = item.querySelector(".ticket-toggle-label");
+                const baseText = pillText;
+                item.querySelector(".ticket-summary").addEventListener("click", () => {
+                    const expanded = item.classList.toggle("is-expanded");
+                    toggleLabel.textContent = expanded ? "Close" : baseText;
+                });
+
+                // Reply submit
+                const replyBtn = item.querySelector(".ticket-reply-submit");
+                const replyInput = item.querySelector(".ticket-reply-input");
+                replyBtn.addEventListener("click", async () => {
+                    const msg = String(replyInput.value || "").trim();
+                    if (!msg) return;
+                    replyBtn.disabled = true;
+                    replyBtn.textContent = "Sending...";
+                    try {
+                        const { data: reply, error } = await supabase
+                            .from("ticket_replies")
+                            .insert({
+                                ticket_id:   t.id,
+                                author_id:   session.user.id,
+                                author_role: "candidate",
+                                author_name: DISPLAY_NAME,
+                                message:     msg,
+                            })
+                            .select().single();
+                        if (error) throw new Error(error.message);
+
+                        if (!REPLIES_BY_TICKET.has(String(t.id))) REPLIES_BY_TICKET.set(String(t.id), []);
+                        REPLIES_BY_TICKET.get(String(t.id)).push(reply);
+                        replyInput.value = "";
+
+                        // Re-render keeping expanded state
+                        const expandedIds = new Set(
+                            [...document.querySelectorAll(".ticket-item.is-expanded")].map(el => el.dataset.id)
+                        );
+                        renderTickets();
+                        for (const id of expandedIds) {
+                            const el = document.querySelector(`.ticket-item[data-id="${id}"]`);
+                            if (el) {
+                                el.classList.add("is-expanded");
+                                const lbl = el.querySelector(".ticket-toggle-label");
+                                if (lbl) lbl.textContent = "Close";
+                            }
+                        }
+
+                        // Scroll reply thread of this ticket to bottom
+                        const _item = document.querySelector(`.ticket-item[data-id="${t.id}"]`);
+                        const _thread = _item?.querySelector(".ticket-reply-thread");
+                        if (_thread) _thread.scrollTop = _thread.scrollHeight;
+
+                        await notifyViaEdge({
+                            ticketId:      String(t.id),
+                            eventType:     "reply",
+                            authorId:      session.user.id,
+                            authorName:    DISPLAY_NAME,
+                            authorRole:    "candidate",
+                            message:       msg,
+                            ticketSubject: t.subject || "",
+                            candidateName: rec.title || "",
+                            projectName:   projectName,
+                            projectId:     rec.project_id || "",
+                        });
+                    } catch (e) {
+                        alert("Failed to send reply: " + e.message);
+                    } finally {
+                        replyBtn.disabled = false;
+                        replyBtn.textContent = "Reply";
+                    }
+                });
+
+                list.appendChild(item);
+            }
+        }
+
+        async function loadTickets() {
+            const { data: tickets, error } = await supabase
+                .from("requests")
+                .select("id, subject, message, status, priority, created_at")
+                .eq("record_id", rec.id)
+                .order("created_at", { ascending: false });
+
+            if (error) { console.error("loadTickets:", error); return; }
+            TICKETS = tickets || [];
+
+            // Load replies
+            REPLIES_BY_TICKET.clear();
+            const ids = TICKETS.map(t => t.id);
+            if (ids.length > 0) {
+                const { data: replies } = await supabase
+                    .from("ticket_replies")
+                    .select("id, ticket_id, author_id, author_name, author_role, message, created_at")
+                    .in("ticket_id", ids)
+                    .order("created_at", { ascending: true });
+                for (const r of (replies || [])) {
+                    const key = String(r.ticket_id);
+                    if (!REPLIES_BY_TICKET.has(key)) REPLIES_BY_TICKET.set(key, []);
+                    REPLIES_BY_TICKET.get(key).push(r);
+                }
+            }
+
+            renderTickets();
+        }
+
+        // Auto-generate subject from record + project
+        const projectName = rec.projects?.name || rec.project_id;
+        const AUTO_SUBJECT = `[${projectName}] Request for ${rec.code}`;
+
+        const supportBtn = document.querySelector(".open-ticket-btn");
+
+        // Wire "Request Support" button
+        supportBtn?.addEventListener("click", () => {
+            if (isAdminPreview) return;
+            el("ticketMessage").value = "";
+            el("modalMsg").className = "modal-msg";
+            el("modalMsg").textContent = "";
+            el("modalSubtitle").textContent = `${rec.code} — ${rec.title}`;
+            el("modalSubjectDisplay").textContent = AUTO_SUBJECT;
+            el("ticketModal").classList.remove("hidden");
+        });
+
+        el("cancelTicketBtn").addEventListener("click", () => {
+            el("ticketModal").classList.add("hidden");
+        });
+
+        el("ticketModal").addEventListener("click", (e) => {
+            if (e.target === el("ticketModal")) el("ticketModal").classList.add("hidden");
+        });
+
+        el("submitTicketBtn").addEventListener("click", async () => {
+            if (isAdminPreview) {
+                el("ticketModal").classList.add("hidden");
+                return;
+            }
+            const subject = AUTO_SUBJECT;
+            const message = String(el("ticketMessage").value || "").trim();
+            const msgEl   = el("modalMsg");
+
+            if (!message) {
+                msgEl.className = "modal-msg show error";
+                msgEl.textContent = "Please enter a message.";
+                return;
+            }
+
+            const btn = el("submitTicketBtn");
+            btn.disabled = true;
+            btn.textContent = "Submitting...";
+
+            try {
+                const { data: ticket, error } = await supabase
+                    .from("requests")
+                    .insert({
+                        project_id:     rec.project_id,
+                        record_id:      rec.id,
+                        code:           rec.code,
+                        candidate_name: rec.title,
+                        subject,
+                        message,
+                        created_by:     session.user.id,
+                        status:         "open",
+                        priority:       "normal",
+                    })
+                    .select().single();
+
+                if (error) throw new Error(error.message);
+
+                msgEl.className = "modal-msg show ok";
+                msgEl.textContent = "Ticket submitted successfully.";
+
+                TICKETS.unshift(ticket);
+                renderTickets();
+
+                setTimeout(() => el("ticketModal").classList.add("hidden"), 1000);
+
+                await notifyViaEdge({
+                    ticketId:      String(ticket.id),
+                    eventType:     "new_ticket",
+                    authorId:      session.user.id,
+                    authorName:    DISPLAY_NAME,
+                    authorRole:    "candidate",
+                    message:       message,
+                    ticketSubject: subject,
+                    candidateName: rec.title || "",
+                    projectName:   projectName,
+                    projectId:     rec.project_id || "",
+                });
+            } catch (e) {
+                msgEl.className = "modal-msg show error";
+                msgEl.textContent = "Failed: " + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Submit";
+            }
+        });
+
+        await loadTickets();
+    </script>
+</body>
+</html>

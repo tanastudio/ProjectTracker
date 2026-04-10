@@ -1,0 +1,233 @@
+:root {
+    --sidebar-w: 260px;
+}
+
+
+/* =========================
+   App Layout (Sidebar)
+   ========================= */
+
+.app {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 280px;
+    background: #ffffff;
+    color: #0f172a;
+    border-right: 1px solid #e5e7eb;
+    padding: 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: none;
+}
+
+.sidebar-logo {
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+    color: #0f172a;
+    padding: 8px 10px 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 14px;
+    font-weight: 500;
+    font-size: 16px;
+    color: #0f172a;
+    text-decoration: none;
+    transition: background .16s ease, color .16s ease, transform .08s ease;
+}
+
+    .sidebar-link:hover {
+        background: #f3f4f6;
+        color: #0f172a;
+        text-decoration: none;
+    }
+
+    .sidebar-link:active {
+        transform: translateY(1px);
+    }
+
+    .sidebar-link.active {
+        background: #eef4ff;
+        color: #0f172a;
+        box-shadow: inset 0 0 0 1px #c7d7fe;
+    }
+
+    .sidebar-link::before {
+        content: "";
+        width: 18px;
+        height: 18px;
+        flex: 0 0 18px;
+        border-radius: 6px;
+        opacity: .95;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 18px 18px;
+    }
+
+/* Projects */
+.sidebar-nav .sidebar-link:nth-child(1)::before {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z'/><path d='M4 16.5 12 21l8-4.5'/><path d='M4 12l8 4.5 8-4.5'/></svg>");
+}
+
+/* Dashboard */
+#sidebarDashboardLink::before {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='8' height='8' rx='2'/><rect x='13' y='3' width='8' height='5' rx='2'/><rect x='13' y='10' width='8' height='11' rx='2'/><rect x='3' y='13' width='8' height='8' rx='2'/></svg>");
+}
+
+/* Tickets */
+#sidebarTicketsLink::before {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M7 4h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-6l-4 4v-4H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Z'/></svg>");
+}
+
+/* Update Status */
+#sidebarFormLink::before {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20h9'/><path d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z'/></svg>");
+}
+
+/* Admin */
+#sidebarAdminLink::before {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z'/><path d='M9.5 12.5 11 14l3.5-4'/></svg>");
+}
+
+/* Logout button inside sidebar */
+.sidebar .btn {
+    justify-content: flex-start;
+    gap: 12px;
+}
+
+.sidebar #logoutBtn {
+    margin-top: 8px;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 14px;
+    background: transparent;
+    color: #0f172a;
+    border: 1px solid transparent;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    font-weight: 500;
+}
+
+    .sidebar #logoutBtn:hover {
+        background: #f3f4f6;
+        border-color: transparent;
+        color: #0f172a;
+        box-shadow: none;
+        transform: none;
+    }
+
+.content {
+    flex: 1;
+    padding: 28px 32px;
+}
+
+@media (max-width: 900px) {
+    .app {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .content {
+        padding: 20px 16px;
+    }
+}
+
+/* Logout icon style */
+.sidebar-link-logout {
+    position: relative;
+    padding-left: 32px;
+}
+
+    .sidebar-link-logout::before {
+        content: "";
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        width: 18px;
+        height: 18px;
+        transform: translateY(-50%);
+        background-repeat: no-repeat;
+        background-size: 18px 18px;
+        /* logout icon (arrow leaving box) */
+        background-image: url("data:image/svg+xml;utf8, <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231f2937' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'> <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/> <polyline points='16 17 21 12 16 7'/> <line x1='21' y1='12' x2='9' y2='12'/> </svg>");
+    }
+
+
+/* Buttons (global standard: match Dashboard Refresh button) */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid #111827;
+    background: #111827;
+    color: #ffffff;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: transform .08s ease, opacity .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+    .btn:hover {
+        opacity: .92;
+        transform: translateY(-1px);
+    }
+
+    .btn:active {
+        transform: translateY(0);
+    }
+
+    .btn:focus {
+        outline: none;
+        box-shadow: var(--ring);
+    }
+
+/* Outline button (used for secondary actions) */
+.btn-outline {
+    background: #ffffff;
+    color: #111827;
+    border: 1px solid rgba(15,23,42,0.12);
+    box-shadow: 0 10px 26px rgba(2,6,23,0.08);
+}
+
+    .btn-outline:hover {
+        background: rgba(255,255,255,0.95);
+        box-shadow: 0 14px 30px rgba(2,6,23,0.10);
+        transform: translateY(-1px);
+    }
+
+/* Small button helper */
+.btn-sm {
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-weight: 800;
+}

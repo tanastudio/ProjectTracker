@@ -1,0 +1,304 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Update Candidate</title>
+
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="sidebar.css" />
+    <link rel="stylesheet" href="form.css" />
+
+    <script>
+        (function () {
+            const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+            document.documentElement.setAttribute("data-user-role", cachedRole);
+        })();
+    </script>
+
+    <style>
+        /* Hide restricted nav items before form.js loads */
+        #navUpdateStatus,
+        #navAdmin {
+            display: none;
+        }
+
+        html[data-user-role="internal"] #navUpdateStatus,
+        html[data-user-role="admin"] #navUpdateStatus {
+            display: flex;
+        }
+
+        html[data-user-role="admin"] #navAdmin {
+            display: flex;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Sidebar (shared via sidebar.css) -->
+        <aside class="sidebar">
+            <div class="sidebar-sticky">
+                <div class="brand">
+                    <div class="brand-title">Mentis Project Hub</div>
+                </div>
+
+                <nav class="nav">
+                    <a class="nav-link" id="navProjects" href="./projects.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+                            <path d="m4 12 8 4 8-4"></path>
+                            <path d="m4 17 8 4 8-4"></path>
+                        </svg>
+                        <span>Projects</span>
+                    </a>
+
+                    <a class="nav-link" id="navDashboard" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        <span>Dashboard</span>
+                    </a>
+
+                    <a class="nav-link" id="navTickets" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Tickets</span>
+                    </a>
+
+                    <a class="nav-link active" id="navUpdateStatus" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+                        </svg>
+                        <span>Update Status</span>
+                    </a>
+
+                    <a class="nav-link" id="navAdmin" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+                </nav>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="sidebar-user" id="userChip">Loading...</div>
+                <button class="nav-link logout-link" type="button" id="logoutBtn">
+                    <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <path d="M16 17l5-5-5-5"></path>
+                        <path d="M21 12H9"></path>
+                    </svg>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main">
+            <!-- Sticky header (shared via sidebar.css) -->
+            <header class="hero">
+                <div class="hero-inner">
+                    <div>
+                        <h1 id="formTitle" class="page-title">Update Candidate Status</h1>
+                        <p class="page-desc">
+                            <span class="muted">Auto-save</span>
+                            <span> • </span>
+                            <span class="muted small">Status: <span id="saveState" class="save-pill save-idle">Idle</span></span>
+                            <span> • </span>
+                            <span class="muted small">Last sync: <span id="lastSync">-</span></span>
+                        </p>
+                    </div>
+
+                    <div class="hero-actions">
+                        <button id="reloadBtn" class="btn btn-ghost" type="button">Reload</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Keep your existing form content unchanged -->
+            <div class="container">
+                <!-- TOP AREA (fit in one viewport without scrolling) -->
+                <section class="top-area" id="topArea">
+                    <div class="card form-card">
+
+                        <div class="form-grid">
+                            <!-- Left: Candidate -->
+                            <div class="panel-box">
+
+                                <div class="panel-top">
+                                    <button id="newCandidateBtn" class="btn btn-primary btn-full">+ New Candidate</button>
+                                </div>
+
+                                <label class="label">Select Candidate (Code / Name / Email)</label>
+                                <input id="candPick" class="input" list="candidateList" placeholder="Type then select..." autocomplete="off" />
+                                <datalist id="candidateList"></datalist>
+
+                                <div class="spacer"></div>
+
+                                <div class="two-col">
+                                    <div>
+                                        <label class="label">Code</label>
+                                        <input id="candCode" class="input" placeholder="Enter a unique code..." />
+                                    </div>
+                                    <div>
+                                        <label class="label">Candidate Name</label>
+                                        <input id="candName" class="input" placeholder="-" />
+                                    </div>
+                                </div>
+
+                                <div class="two-col">
+                                    <div>
+                                        <label class="label">Email</label>
+                                        <input id="candEmail" class="input" placeholder="-" />
+                                        <div id="emailHint" class="hint hint-error" style="display:none; margin-top:6px; padding:6px 10px; border-radius:8px; font-size:12px;">Invalid email format</div>
+                                    </div>
+                                    <div>
+                                        <label class="label">Last Updated By</label>
+                                        <input id="candUpdatedBy" class="input" placeholder="-" />
+                                    </div>
+                                </div>
+
+                                <div id="newModeHint" class="hint muted small" style="display:none;">
+                                    New Candidate mode: enter a unique Code first. Other fields will save after you leave the field (blur) or change a dropdown.
+                                </div>
+
+                                <div id="dupHint" class="hint hint-error" style="display:none;">
+                                    Duplicate Code detected. Saving is blocked until Code is unique.
+                                </div>
+
+                                <div id="loadHint" class="hint hint-warn" style="display:none;">
+                                    Failed to load from Supabase. Check Console for the exact error (RLS/policies/schema).
+                                </div>
+
+                                <div class="form-actions-bottom">
+                                    <button id="saveTopBtn" class="btn btn-primary btn-full" type="button">Save</button>
+                                </div>
+                            </div>
+
+                            <!-- Right: Process Steps -->
+                            <div class="panel-box">
+                                <div class="panel-subtitle">Process Steps</div>
+
+                                <!-- Dynamically rendered by form.js after loading fields from DB -->
+                                <div id="stepsGrid" class="steps-grid"></div>
+
+                                <div class="spacer"></div>
+
+                                <div class="two-col">
+                                    <div>
+                                        <label class="label">Issue</label>
+                                        <textarea id="candIssue" class="input ta" placeholder="-" rows="2"></textarea>
+                                        <div id="issueHint" class="hint hint-error" style="display:none; margin-top:6px; padding:6px 10px; border-radius:8px; font-size:12px;">Required: please describe the issue before saving.</div>
+                                    </div>
+                                    <div>
+                                        <label class="label">Decision</label>
+                                        <textarea id="candDecision" class="input ta" placeholder="-" rows="2"></textarea>
+                                        <div id="decisionHint" class="hint hint-error" style="display:none; margin-top:6px; padding:6px 10px; border-radius:8px; font-size:12px;">Required: please enter a decision before saving.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="top-footnote muted small">
+                            Tip: Top form saves on blur/change. Table cells save with a short debounce. Sorting is UI-only.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TABLE AREA (scroll to see) -->
+                <section class="card table-card">
+                    <div class="table-toolbar">
+
+                        <div class="tool tool-grow">
+                            <label class="label">Search (Code / Name / Email)</label>
+                            <input id="searchInput" class="input" placeholder="Type to filter the table..." autocomplete="off" />
+                        </div>
+
+                        <div class="tool">
+                            <label class="label">Filter Column</label>
+                            <select id="filterColumn" class="select"></select>
+                        </div>
+
+                        <div class="tool">
+                            <label class="label">Filter Status</label>
+                            <select id="filterStatus" class="select"></select>
+                        </div>
+
+                        <div class="tool tool-inline">
+                            <label class="check">
+                                <input id="showInactive" type="checkbox" />
+                                Show inactive
+                            </label>
+                        </div>
+
+                        <div class="tool tool-right">
+                            <button id="addRowBtn" class="btn" type="button">+ Add Candidate</button>
+                        </div>
+                    </div>
+
+                    <div class="hscroll-top" id="hscrollTop" aria-label="Horizontal scroll">
+                        <div class="hscroll-top-inner" id="hscrollTopInner"></div>
+                    </div>
+
+                    <div class="table-wrap table-wrap-edit" id="tableWrap">
+                        <table class="excel excel-edit" id="grid">
+                            <thead id="thead">
+                                <!-- Dynamically rendered by form.js after loading fields from DB -->
+                            </thead>
+                            <tbody id="tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="footnote">
+                        Tips: Edit any cell → auto-save. Deactivate instead of delete. Sorting is UI-only.
+                    </div>
+                </section>
+
+                <div id="addCandidateModal" class="modal-overlay" aria-hidden="true">
+                    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="addCandidateTitle">
+                        <div class="modal-head">
+                            <h3 id="addCandidateTitle">Add Candidate</h3>
+                            <button id="addCandidateCloseBtn" class="btn btn-ghost" type="button">Close</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="modal-grid">
+                                <div>
+                                    <label class="label">Code</label>
+                                    <input id="addCandCode" class="input" placeholder="e.g. SAMP-0013" autocomplete="off" />
+                                </div>
+                                <div>
+                                    <label class="label">Candidate Name</label>
+                                    <input id="addCandName" class="input" placeholder="e.g. John Doe" autocomplete="off" />
+                                </div>
+                            </div>
+                            <div class="modal-grid single">
+                                <div>
+                                    <label class="label">Email</label>
+                                    <input id="addCandEmail" class="input" placeholder="candidate@email.com" autocomplete="off" />
+                                </div>
+                            </div>
+                            <div id="addCandError" class="hint hint-error" style="display:none; margin-top:10px;"></div>
+                        </div>
+                        <div class="modal-foot">
+                            <button id="addCandidateCancelBtn" class="btn btn-ghost" type="button">Cancel</button>
+                            <button id="addCandidateSubmitBtn" class="btn btn-primary" type="button">Create Candidate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script type="module" src="form.js"></script>
+        </main>
+    </div>
+</body>
+</html>

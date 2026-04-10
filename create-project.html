@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"/>
+  <meta name="referrer" content="strict-origin-when-cross-origin"/>
+  <title>Create Project</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="sidebar.css"/>
+
+  <script>
+    (function () {
+      const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+      document.documentElement.setAttribute("data-user-role", cachedRole);
+    })();
+  </script>
+
+  <style>
+    /* Hide nav items that require specific roles before JS loads */
+    #navUpdateStatus,
+    #navAdmin { display: none; }
+
+    html[data-user-role="internal"] #navUpdateStatus,
+    html[data-user-role="admin"]    #navUpdateStatus { display: flex; }
+
+    html[data-user-role="admin"] #navAdmin { display: flex; }
+  </style>
+
+  <style>
+    .wrap { max-width: 820px; margin: 0 auto; padding: 0; }
+
+    /* Stepper */
+    .stepper { display: flex; align-items: center; gap: 0; margin-bottom: 28px; }
+    .step-item { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .step-item:last-child { flex: 0; }
+    .step-dot {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgba(15,23,42,.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #94a3b8; background: #fff;
+      flex-shrink: 0; transition: all .2s;
+    }
+    .step-dot.active { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+    .step-dot.done { border-color: #22c55e; color: #fff; background: #22c55e; }
+    .step-label { font-size: 12px; font-weight: 700; color: #94a3b8; white-space: nowrap; }
+    .step-label.active { color: #3b82f6; }
+    .step-label.done { color: #22c55e; }
+    .step-line { flex: 1; height: 2px; background: rgba(15,23,42,.10); margin: 0 8px; }
+    .step-line.done { background: #22c55e; }
+
+    /* Card */
+    .card {
+      background: rgba(255,255,255,.88); border: 1px solid rgba(15,23,42,.12);
+      border-radius: 18px; padding: 24px; box-shadow: 0 12px 30px rgba(2,6,23,.10);
+    }
+    .card-title { font-size: 18px; font-weight: 900; letter-spacing: -.01em; margin: 0 0 4px; }
+    .card-desc { font-size: 13px; color: #64748b; margin: 0 0 20px; }
+
+    /* Form elements */
+    .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .form-group label { font-size: 12px; font-weight: 800; color: #64748b; }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 0 14px; height: 46px; border-radius: 12px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 14px;
+      outline: none; box-shadow: inset 0 1px 2px rgba(15,23,42,.04); font-family: inherit;
+      transition: border-color .15s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #3b82f6; }
+    .form-textarea { height: 80px; padding: 10px 14px; resize: vertical; }
+    .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 20px; }
+    .btn-primary {
+      min-height: 46px; padding: 0 22px; border-radius: 12px; border: none;
+      background: #3b82f6; color: #fff; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-ghost {
+      min-height: 46px; padding: 0 18px; border-radius: 12px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff; font-size: 14px;
+      font-weight: 700; color: #374151; cursor: pointer; transition: background .15s;
+    }
+    .btn-ghost:hover { background: #f8fafc; }
+    .btn-danger {
+      min-height: 36px; padding: 0 14px; border-radius: 10px; border: none;
+      background: rgba(239,68,68,.10); color: #dc2626; font-size: 13px;
+      font-weight: 700; cursor: pointer;
+    }
+
+    /* Hint */
+    .hint { border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+    .hint-error { display: block; background: rgba(239,68,68,.08); color: #dc2626; border: 1px solid rgba(239,68,68,.2); }
+    .hint-ok { display: block; background: rgba(34,197,94,.08); color: #16a34a; border: 1px solid rgba(34,197,94,.2); }
+
+    /* Fields builder */
+    .field-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .field-row {
+      display: grid; grid-template-columns: 1fr 140px 80px auto;
+      gap: 8px; align-items: center; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 12px; padding: 10px 12px;
+    }
+    .field-row .field-label-input { font-size: 13px; }
+    .field-row .field-key-badge {
+      font-size: 11px; font-family: monospace; color: #64748b;
+      background: rgba(15,23,42,.06); border-radius: 6px; padding: 3px 7px;
+    }
+    .field-row-fixed { opacity: .7; }
+    .drag-handle { cursor: grab; color: #94a3b8; font-size: 16px; user-select: none; }
+
+    /* CSV preview */
+    .csv-preview { overflow-x: auto; margin-top: 12px; }
+    .csv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .csv-table th, .csv-table td { padding: 8px 10px; border: 1px solid rgba(15,23,42,.08); text-align: left; }
+    .csv-table th { background: rgba(15,23,42,.04); font-weight: 700; font-size: 12px; }
+    .csv-table tr:nth-child(even) td { background: rgba(248,250,252,.8); }
+    .csv-error-row td { background: rgba(239,68,68,.06) !important; color: #dc2626; }
+
+    /* Members */
+    .user-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+    .user-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: rgba(248,250,252,.8);
+      border: 1px solid rgba(15,23,42,.08); border-radius: 12px;
+    }
+    .user-item-info { display: flex; flex-direction: column; gap: 2px; }
+    .user-item-name { font-size: 14px; font-weight: 700; }
+    .user-item-email { font-size: 12px; color: #64748b; }
+    .pill-role {
+      display: inline-block; padding: 3px 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 800; border: 1px solid rgba(15,23,42,.10);
+    }
+    .pill-client { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .pill-internal { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+    .pill-admin { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
+    .pill-candidate { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+
+    /* Summary */
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .summary-item { background: rgba(248,250,252,.8); border: 1px solid rgba(15,23,42,.08); border-radius: 12px; padding: 12px 14px; }
+    .summary-item .s-label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+    .summary-item .s-val { font-size: 15px; font-weight: 800; margin-top: 4px; }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed rgba(15,23,42,.15); border-radius: 14px;
+      padding: 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+      background: rgba(248,250,252,.5);
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: #3b82f6; background: rgba(239,246,255,.6); }
+    .upload-icon { font-size: 28px; margin-bottom: 8px; }
+    .upload-hint { font-size: 13px; color: #64748b; }
+
+    /* Step panels */
+    .step-panel { display: none; }
+    .step-panel.active { display: block; }
+
+    /* Progress */
+    .progress-bar { height: 4px; border-radius: 2px; background: rgba(15,23,42,.08); overflow: hidden; margin-bottom: 14px; }
+    .progress-bar-inner { height: 100%; background: #3b82f6; border-radius: 2px; transition: width .3s; }
+
+    /* Checkbox row for members */
+    .member-check-row {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+      background: rgba(248,250,252,.8); border: 1px solid rgba(15,23,42,.08);
+      border-radius: 12px; cursor: pointer;
+    }
+    .member-check-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+    .member-check-row.checked { border-color: #bfdbfe; background: rgba(239,246,255,.6); }
+    .member-check-row .member-role-select {
+      margin-left: auto; height: 34px; padding: 0 10px; border-radius: 8px;
+      border: 1px solid rgba(15,23,42,.12); font-size: 12px; background: #fff; font-family: inherit;
+    }
+
+    .section-title { font-size: 13px; font-weight: 800; color: #374151; margin: 16px 0 8px; }
+    .muted { color: #64748b; font-size: 13px; }
+    .small { font-size: 12px; }
+
+    /* Two-panel fields layout */
+    .fields-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; margin-bottom: 16px; }
+    .fields-panel { border: 1px solid rgba(15,23,42,.10); border-radius: 14px; padding: 14px 16px; background: rgba(248,250,252,.5); }
+    .fields-panel-title { font-size: 14px; font-weight: 800; color: #0f172a; margin: 0 0 2px; }
+    .fields-panel-subtitle { font-size: 12px; color: #64748b; margin: 0 0 12px; }
+    .field-library-list { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; margin-bottom: 12px; }
+    .field-lib-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border-radius: 10px; border: 1px solid rgba(15,23,42,.08); background: #fff;
+      cursor: pointer; transition: border-color .15s, background .15s;
+    }
+    .field-lib-item:hover:not(.field-lib-added) { border-color: #3b82f6; background: #eff6ff; }
+    .field-lib-item.field-lib-added { opacity: .4; cursor: default; pointer-events: none; }
+    .field-lib-label { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .field-lib-type { font-size: 11px; color: #94a3b8; flex-shrink: 0; }
+    .field-lib-add { font-size: 18px; font-weight: 900; color: #3b82f6; line-height: 1; flex-shrink: 0; }
+    .field-lib-added-icon { font-size: 13px; color: #22c55e; flex-shrink: 0; }
+    .field-right-fixed {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+      padding: 7px 10px; border-radius: 8px; background: rgba(15,23,42,.04); color: #475569;
+    }
+    .fields-create-sep { border: none; border-top: 1px solid rgba(15,23,42,.08); margin: 12px 0; }
+    .field-right-list { display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+    .field-right-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border-radius: 10px; border: 1px solid rgba(15,23,42,.08); background: #fff;
+    }
+    .field-right-label { font-size: 13px; font-weight: 700; flex: 1; }
+    .field-right-type { font-size: 11px; color: #94a3b8; }
+    .field-right-item.drag-over-top { border-top: 2px solid #3b82f6; }
+    .field-right-item.drag-over-bottom { border-bottom: 2px solid #3b82f6; }
+  </style>
+</head>
+
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-sticky">
+      <div class="brand">
+        <div class="brand-title">Mentis Project Hub</div>
+      </div>
+
+      <nav class="nav">
+        <a class="nav-link" id="navProjects" href="./projects.html">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+            <path d="m4 12 8 4 8-4"></path>
+            <path d="m4 17 8 4 8-4"></path>
+          </svg>
+          <span>Projects</span>
+        </a>
+
+        <a class="nav-link" id="navDashboard" href="#">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+          <span>Dashboard</span>
+        </a>
+
+        <a class="nav-link" id="navTickets" href="#">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Tickets</span>
+        </a>
+
+        <a class="nav-link" id="navUpdateStatus" href="#">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+          </svg>
+          <span>Update Status</span>
+        </a>
+
+        <a class="nav-link active" id="navAdmin" href="./admin.html">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+            <path d="M9 12l2 2 4-4"></path>
+          </svg>
+          <span>Admin</span>
+        </a>
+
+        <a class="nav-link" id="navAdminAccess" href="./admin-access.html">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Access</span>
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="userChip">Loading...</div>
+      <button class="nav-link logout-link" type="button" id="logoutBtn">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <path d="M16 17l5-5-5-5"></path>
+          <path d="M21 12H9"></path>
+        </svg>
+        <span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="hero">
+      <div class="hero-inner">
+        <div>
+          <h1 class="page-title">Create New Project</h1>
+          <p class="page-desc">Set up project info, define process fields, assign members, and upload candidates.</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div id="draftBanner" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:12px 16px;margin-bottom:14px;display:none;align-items:center;gap:12px;">
+        <span style="font-size:13px;color:#92400e;flex:1;">You have an unsaved draft. Would you like to restore it?</span>
+        <button id="draftRestore" style="min-height:34px;padding:0 14px;border-radius:9px;border:none;background:#f59e0b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Restore Draft</button>
+        <button id="draftDiscard" style="min-height:34px;padding:0 14px;border-radius:9px;border:1px solid rgba(15,23,42,.12);background:#fff;font-size:13px;font-weight:700;cursor:pointer;color:#374151;">Discard</button>
+      </div>
+      <div id="hint" class="hint"></div>
+
+      <!-- Stepper -->
+      <div class="stepper" id="stepper">
+        <div class="step-item">
+          <div class="step-dot active" id="dot1">1</div>
+          <div class="step-label active" id="lbl1">Project Info</div>
+        </div>
+        <div class="step-line" id="line1"></div>
+        <div class="step-item">
+          <div class="step-dot" id="dot2">2</div>
+          <div class="step-label" id="lbl2">Fields</div>
+        </div>
+        <div class="step-line" id="line2"></div>
+        <div class="step-item">
+          <div class="step-dot" id="dot3">3</div>
+          <div class="step-label" id="lbl3">Members</div>
+        </div>
+        <div class="step-line" id="line3"></div>
+        <div class="step-item">
+          <div class="step-dot" id="dot4">4</div>
+          <div class="step-label" id="lbl4">Candidates</div>
+        </div>
+        <div class="step-line" id="line4"></div>
+        <div class="step-item">
+          <div class="step-dot" id="dot5">5</div>
+          <div class="step-label" id="lbl5">Review</div>
+        </div>
+      </div>
+
+      <!-- Step 1: Project Info -->
+      <div class="step-panel active" id="panel1">
+        <div class="card">
+          <div class="card-title">Project Information</div>
+          <div class="card-desc">Basic details about this project.</div>
+
+          <div class="form-row2">
+            <div class="form-group" style="flex:2;">
+              <label>Project Name *</label>
+              <input class="form-input" id="projName" type="text" placeholder="e.g. Leadership Assessment Q1 2025" maxlength="120"/>
+            </div>
+            <div class="form-group">
+              <label>Code Prefix <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>
+              <input class="form-input" id="projCodePrefix" type="text" placeholder="e.g. LA" maxlength="10" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"/>
+            </div>
+          </div>
+          <div class="muted small" style="margin-top:-10px;margin-bottom:14px;">Prefix <strong>LA26</strong> → LA26-0001, LA26-0002, ...</div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea class="form-textarea" id="projDesc" placeholder="Optional — what is this project about?"></textarea>
+          </div>
+          <div class="form-row2">
+            <div class="form-group">
+              <label>Start Date</label>
+              <input class="form-input" id="projStart" type="date"/>
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input class="form-input" id="projEnd" type="date"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-select" id="projStatus">
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" id="step1Next">Next: Define Fields →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Fields -->
+      <div class="step-panel" id="panel2">
+        <div class="card">
+          <div class="card-title">Process Fields</div>
+          <div class="card-desc">Select from the field library or create new ones. Fixed fields are always included.</div>
+
+          <div class="fields-layout">
+            <!-- Left: Library -->
+            <div class="fields-panel">
+              <div class="fields-panel-title">Field Library</div>
+              <div class="fields-panel-subtitle">Reuse fields from other projects · click to add</div>
+              <div class="field-library-list" id="fieldLibraryList">
+                <div class="muted small">Loading library...</div>
+              </div>
+              <hr class="fields-create-sep"/>
+              <div class="section-title" style="margin-top:0;margin-bottom:8px;">Create New Field</div>
+              <div style="display:flex;flex-direction:column;gap:7px;">
+                <input class="form-input" id="newFieldLabel" placeholder="e.g. Hogan Assessment" style="height:40px;"/>
+                <div style="display:flex;gap:8px;">
+                  <select class="form-select" id="newFieldType" style="height:40px;flex:1;font-size:13px;">
+                    <option value="select">select (status)</option>
+                    <option value="text">text</option>
+                  </select>
+                  <button class="btn-primary" id="addFieldBtn" style="min-height:40px;padding:0 16px;font-size:13px;white-space:nowrap;">+ Add</button>
+                </div>
+                <div class="muted small">Key is auto-generated from label.</div>
+              </div>
+            </div>
+
+            <!-- Right: Selected fields -->
+            <div class="fields-panel">
+              <div class="fields-panel-title">Project Fields</div>
+              <div class="fields-panel-subtitle">Drag to reorder · click ✕ to remove</div>
+
+              <div class="muted small" style="margin-bottom:6px;">Fixed (always included)</div>
+              <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+                <div class="field-right-fixed">Email <span class="field-key-badge">email</span></div>
+                <div class="field-right-fixed">Issue <span class="field-key-badge">issue</span></div>
+                <div class="field-right-fixed">Decision <span class="field-key-badge">decision</span></div>
+                <div class="field-right-fixed">Overall Status <span class="field-key-badge">overall_status</span></div>
+              </div>
+
+              <div class="section-title" style="margin-top:0;margin-bottom:8px;">Process Steps</div>
+              <div class="field-right-list" id="customFields"></div>
+              <div id="customFieldsEmpty" class="muted small" style="padding:10px 0;">No fields selected. Pick from the library or create new ones.</div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-ghost" id="step2Back">← Back</button>
+            <button class="btn-primary" id="step2Next">Next: Assign Members →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Members -->
+      <div class="step-panel" id="panel3">
+        <div class="card">
+          <div class="card-title">Assign Members</div>
+          <div class="card-desc">Select which users can access this project. Clients and internal staff only — candidates are added via CSV upload.</div>
+
+          <div class="section-title">Available Users</div>
+          <div id="membersList" class="user-list">
+            <div class="muted">Loading users...</div>
+          </div>
+          <div class="muted small" style="margin-top:8px;">Check to include. Set member role (viewer = read-only, editor = can update status).</div>
+
+          <div class="btn-row">
+            <button class="btn-ghost" id="step3Back">← Back</button>
+            <button class="btn-primary" id="step3Next">Next: Upload Candidates →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Candidates CSV -->
+      <div class="step-panel" id="panel4">
+        <div class="card">
+          <div class="card-title">Upload Candidates</div>
+          <div class="card-desc">Upload a CSV file. Required columns: <code>name</code> and <code>email</code>. A temporary password will be auto-generated for each candidate.</div>
+
+          <div style="margin-bottom:14px;">
+            <a href="./candidates-template.csv" download="candidates-template.csv" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#2563eb;text-decoration:none;padding:8px 14px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;transition:background .15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download CSV Template
+            </a>
+          </div>
+
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">📄</div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:4px;">Drop CSV file here or click to browse</div>
+            <div class="upload-hint">Required: name, email — all other columns are ignored</div>
+            <input type="file" id="csvInput" accept=".csv" style="display:none"/>
+          </div>
+
+          <div id="csvPreviewWrap" style="display:none;">
+            <div class="section-title" id="csvSummary"></div>
+            <div class="csv-preview">
+              <table class="csv-table" id="csvTable"></table>
+            </div>
+          </div>
+
+          <div class="muted small" style="margin-top:12px;">
+            Tip: You can skip this step and upload candidates later from the project admin page.
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-ghost" id="step4Back">← Back</button>
+            <button class="btn-primary" id="step4Next">Next: Review →</button>
+            <button class="btn-ghost" id="step4Skip">Skip for now</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5: Review & Create -->
+      <div class="step-panel" id="panel5">
+        <div class="card">
+          <div class="card-title">Review & Create</div>
+          <div class="card-desc">Check everything before creating the project.</div>
+
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="s-label">Project Name</div>
+              <div class="s-val" id="sumName">—</div>
+            </div>
+            <div class="summary-item">
+              <div class="s-label">Status</div>
+              <div class="s-val" id="sumStatus">—</div>
+            </div>
+            <div class="summary-item">
+              <div class="s-label">Timeline</div>
+              <div class="s-val" id="sumDates">—</div>
+            </div>
+            <div class="summary-item">
+              <div class="s-label">Process Fields</div>
+              <div class="s-val" id="sumFields">—</div>
+            </div>
+          </div>
+
+          <div class="section-title">Members</div>
+          <div id="sumMembers" class="muted small">No members selected.</div>
+
+          <div class="section-title" style="margin-top:14px;">Candidates</div>
+          <div id="sumCandidates" class="muted small">No CSV uploaded.</div>
+
+          <div class="btn-row">
+            <button class="btn-ghost" id="step5Back">← Back</button>
+            <button class="btn-primary" id="createBtn">🚀 Create Project</button>
+          </div>
+
+          <div id="createProgress" style="display:none; margin-top:16px;">
+            <div class="progress-bar"><div class="progress-bar-inner" id="progressBar" style="width:0%"></div></div>
+            <div class="muted small" id="progressMsg">Starting...</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /layout -->
+
+<script type="module">
+import { supabase } from "./supabaseClient.js";
+
+const el = (id) => document.getElementById(id);
+
+/* ── Draft (localStorage) ── */
+const DRAFT_KEY = "create_project_draft";
+
+function saveDraft() {
+  try {
+    const draft = {
+      step: currentStep,
+      name: el("projName").value,
+      desc: el("projDesc").value,
+      start: el("projStart").value,
+      end: el("projEnd").value,
+      status: el("projStatus").value,
+      customFields,
+      members: Array.from(selectedMembers.entries()),
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch (_) {}
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+}
+
+function applyDraft(draft) {
+  el("projName").value  = draft.name  || "";
+  el("projDesc").value  = draft.desc  || "";
+  el("projStart").value = draft.start || "";
+  el("projEnd").value   = draft.end   || "";
+  el("projStatus").value = draft.status || "active";
+  customFields = draft.customFields || [];
+  selectedMembers = new Map(draft.members || []);
+  renderCustomFields();
+  const step = Math.min(draft.step || 1, 4); // don't restore into Review
+  setStep(step);
+  if (step >= 2) { loadFieldLibrary(); }
+  if (step >= 3) { loadUsers(); }
+}
+
+/* ── helpers ── */
+function showHint(text, isErr = false) {
+  const h = el("hint");
+  h.className = "hint " + (isErr ? "hint-error" : "hint-ok");
+  h.textContent = text;
+  h.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function clearHint() { const h = el("hint"); h.className = "hint"; h.textContent = ""; }
+
+function slugify(str) {
+  return str.trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ── auth guard ── */
+async function requireAdmin() {
+  const { data } = await supabase.auth.getSession();
+  const session = data?.session;
+  if (!session) { window.location.replace("./index.html"); return null; }
+  supabase.auth.onAuthStateChange((_e, s) => { if (!s) window.location.replace("./index.html"); });
+  const { data: prof } = await supabase.from("profiles").select("role,display_name").eq("id", session.user.id).maybeSingle();
+  if (prof?.role !== "admin") { window.location.replace("./projects.html"); return null; }
+  sessionStorage.setItem("user_role", "admin");
+  document.documentElement.setAttribute("data-user-role", "admin");
+  const _chip = el("userChip");
+  if (_chip) _chip.textContent = `${prof?.display_name || session.user.email || session.user.id} (admin)`;
+  return session;
+}
+const session = await requireAdmin();
+if (!session) throw new Error("no access");
+
+/* ── Check for saved draft ── */
+{
+  const raw = localStorage.getItem(DRAFT_KEY);
+  if (raw) {
+    try {
+      const draft = JSON.parse(raw);
+      if (draft?.name) {
+        const banner = el("draftBanner");
+        banner.style.display = "flex";
+        el("draftRestore").addEventListener("click", () => {
+          banner.style.display = "none";
+          applyDraft(draft);
+        });
+        el("draftDiscard").addEventListener("click", () => {
+          clearDraft();
+          banner.style.display = "none";
+        });
+      }
+    } catch (_) { clearDraft(); }
+  }
+}
+
+el("logoutBtn").addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  sessionStorage.removeItem("selected_project_id");
+  window.location.replace("./index.html");
+});
+
+function goProjectPage(page) {
+  const pid = String(sessionStorage.getItem("selected_project_id") || "").trim();
+  if (!pid) { window.location.href = "./projects.html"; return; }
+  window.location.href = `./${page}?project=${encodeURIComponent(pid)}`;
+}
+
+el("navDashboard")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("dashboard.html"); });
+el("navTickets")?.addEventListener("click",   (e) => { e.preventDefault(); goProjectPage("tickets.html"); });
+el("navUpdateStatus")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("form.html"); });
+
+/* ── stepper state ── */
+let currentStep = 1;
+const TOTAL_STEPS = 5;
+
+function setStep(n) {
+  el("panel" + currentStep).classList.remove("active");
+  currentStep = n;
+  el("panel" + currentStep).classList.add("active");
+
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const dot = el("dot" + i);
+    const lbl = el("lbl" + i);
+    dot.className = "step-dot" + (i < n ? " done" : i === n ? " active" : "");
+    lbl.className = "step-label" + (i < n ? " done" : i === n ? " active" : "");
+    if (i < n) dot.textContent = "✓";
+    else dot.textContent = String(i);
+    if (i < TOTAL_STEPS) {
+      el("line" + i).className = "step-line" + (i < n ? " done" : "");
+    }
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ── Step 1: Project Info ── */
+el("step1Next").addEventListener("click", () => {
+  const name = el("projName").value.trim();
+  if (!name) { showHint("Project name is required.", true); return; }
+  clearHint();
+  setStep(2);
+  loadFieldLibrary();
+  saveDraft();
+});
+
+/* ── Step 2: Fields ── */
+let customFields = []; // [{label, key, type, field_role}]
+let fieldLibrary = []; // [{label, key, type}] loaded from DB
+
+function isInCustom(key) { return customFields.some(f => f.key === key); }
+
+function renderFieldLibrary() {
+  const list = el("fieldLibraryList");
+  if (fieldLibrary.length === 0) {
+    list.innerHTML = "<div class='muted small'>No existing fields found.</div>";
+    return;
+  }
+  list.innerHTML = fieldLibrary.map(f => {
+    const added = isInCustom(f.key);
+    return `
+      <div class="field-lib-item ${added ? "field-lib-added" : ""}" data-lib-key="${escapeHtml(f.key)}" title="${escapeHtml(f.label)}">
+        <span class="field-lib-label">${escapeHtml(f.label)}</span>
+        <span class="field-lib-type">${escapeHtml(f.type)}</span>
+        ${added ? '<span class="field-lib-added-icon">✓</span>' : '<span class="field-lib-add">+</span>'}
+      </div>`;
+  }).join("");
+
+  list.querySelectorAll(".field-lib-item:not(.field-lib-added)").forEach(item => {
+    item.addEventListener("click", () => {
+      const key = item.dataset.libKey;
+      const f = fieldLibrary.find(x => x.key === key);
+      if (!f || isInCustom(f.key)) return;
+      customFields.push({ label: f.label, key: f.key, type: f.type, field_role: "step" });
+      renderFieldLibrary();
+      renderCustomFields();
+      clearHint();
+    });
+  });
+}
+
+function renderCustomFields() {
+  const list = el("customFields");
+  const empty = el("customFieldsEmpty");
+  if (customFields.length === 0) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  list.innerHTML = customFields.map((f, i) => `
+    <div class="field-right-item" draggable="true" data-idx="${i}">
+      <span class="drag-handle" style="color:#94a3b8;font-size:15px;cursor:grab;">⠿</span>
+      <span class="field-right-label">${escapeHtml(f.label)}</span>
+      <span class="field-key-badge" style="font-size:11px;">${escapeHtml(f.key)}</span>
+      <span class="field-right-type">${escapeHtml(f.type)}</span>
+      <button class="btn-danger" data-del-field="${i}" style="min-height:28px;padding:0 10px;font-size:12px;">✕</button>
+    </div>
+  `).join("");
+
+  list.querySelectorAll("[data-del-field]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      customFields.splice(Number(btn.dataset.delField), 1);
+      renderCustomFields();
+      renderFieldLibrary();
+    });
+  });
+
+  // Drag-to-reorder
+  let dragIdx = null;
+  list.querySelectorAll(".field-right-item").forEach(row => {
+    row.addEventListener("dragstart", e => {
+      dragIdx = Number(row.dataset.idx);
+      e.dataTransfer.effectAllowed = "move";
+      setTimeout(() => row.style.opacity = "0.4", 0);
+    });
+    row.addEventListener("dragend", () => {
+      row.style.opacity = "";
+      list.querySelectorAll(".field-right-item").forEach(r => r.classList.remove("drag-over-top", "drag-over-bottom"));
+    });
+    row.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const overIdx = Number(row.dataset.idx);
+      if (overIdx === dragIdx) return;
+      list.querySelectorAll(".field-right-item").forEach(r => r.classList.remove("drag-over-top", "drag-over-bottom"));
+      const rect = row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      row.classList.add(e.clientY < mid ? "drag-over-top" : "drag-over-bottom");
+    });
+    row.addEventListener("dragleave", () => {
+      row.classList.remove("drag-over-top", "drag-over-bottom");
+    });
+    row.addEventListener("drop", e => {
+      e.preventDefault();
+      const overIdx = Number(row.dataset.idx);
+      if (overIdx === dragIdx) return;
+      const rect = row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      const insertBefore = e.clientY < mid;
+      const moved = customFields.splice(dragIdx, 1)[0];
+      const target = insertBefore ? overIdx : overIdx + 1;
+      const insertAt = dragIdx < overIdx ? target - 1 : target;
+      customFields.splice(insertAt, 0, moved);
+      renderCustomFields();
+    });
+  });
+}
+
+async function loadFieldLibrary() {
+  const list = el("fieldLibraryList");
+  list.innerHTML = "<div class='muted small'>Loading...</div>";
+  const { data } = await supabase
+    .from("fields")
+    .select("key, label, type")
+    .eq("field_role", "step")
+    .eq("is_active", true)
+    .order("label");
+
+  const seen = new Set();
+  // Keep existing library entries (newly created this session) first
+  for (const f of fieldLibrary) seen.add(f.key);
+  for (const f of (data || [])) {
+    if (!seen.has(f.key)) {
+      seen.add(f.key);
+      fieldLibrary.push({ key: f.key, label: f.label, type: f.type });
+    }
+  }
+  // Sort by label
+  fieldLibrary.sort((a, b) => a.label.localeCompare(b.label));
+  renderFieldLibrary();
+}
+
+el("addFieldBtn").addEventListener("click", () => {
+  const label = el("newFieldLabel").value.trim();
+  const type = el("newFieldType").value;
+  if (!label) { showHint("Enter a field label.", true); return; }
+  const key = slugify(label);
+  if (!key) { showHint("Invalid label — can't generate a key.", true); return; }
+  if (isInCustom(key)) { showHint(`"${key}" is already in the project fields.`, true); return; }
+  // Add to library if not there
+  if (!fieldLibrary.some(f => f.key === key)) {
+    fieldLibrary.push({ label, key, type });
+    fieldLibrary.sort((a, b) => a.label.localeCompare(b.label));
+  }
+  customFields.push({ label, key, type, field_role: "step" });
+  el("newFieldLabel").value = "";
+  clearHint();
+  renderFieldLibrary();
+  renderCustomFields();
+});
+
+el("newFieldLabel").addEventListener("keydown", e => { if (e.key === "Enter") el("addFieldBtn").click(); });
+
+el("step2Back").addEventListener("click", () => { clearHint(); setStep(1); saveDraft(); });
+el("step2Next").addEventListener("click", () => { clearHint(); setStep(3); loadUsers(); saveDraft(); });
+
+renderCustomFields();
+
+/* ── Step 3: Members ── */
+let allUsers = [];
+let selectedMembers = new Map(); // userId -> memberRole
+
+async function loadUsers() {
+  const list = el("membersList");
+  list.innerHTML = "<div class='muted'>Loading...</div>";
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, role")
+    .in("role", ["admin", "internal", "client"])
+    .order("role");
+  if (error) { list.innerHTML = "<div class='muted'>Failed to load users.</div>"; return; }
+  allUsers = data || [];
+  renderMembersList();
+}
+
+function renderMembersList() {
+  const list = el("membersList");
+  if (allUsers.length === 0) {
+    list.innerHTML = "<div class='muted'>No users found.</div>";
+    return;
+  }
+  list.innerHTML = allUsers.map(u => {
+    const checked = selectedMembers.has(u.id);
+    const memberRole = selectedMembers.get(u.id) || "viewer";
+    return `
+      <div class="member-check-row ${checked ? "checked" : ""}" data-uid="${escapeHtml(u.id)}">
+        <input type="checkbox" ${checked ? "checked" : ""} data-check="${escapeHtml(u.id)}"/>
+        <div class="user-item-info">
+          <span class="user-item-name">${escapeHtml(u.display_name || u.id)}</span>
+          <span class="user-item-email"><span class="pill-role pill-${escapeHtml(u.role)}">${escapeHtml(u.role)}</span></span>
+        </div>
+        <select class="member-role-select" data-role-sel="${escapeHtml(u.id)}" ${checked ? "" : "disabled"}>
+          <option value="viewer" ${memberRole === "viewer" ? "selected" : ""}>viewer</option>
+          <option value="editor" ${memberRole === "editor" ? "selected" : ""}>editor</option>
+        </select>
+      </div>
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-check]").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const uid = chk.dataset.check;
+      const row = chk.closest(".member-check-row");
+      const sel = row.querySelector("[data-role-sel]");
+      if (chk.checked) {
+        selectedMembers.set(uid, sel.value);
+        row.classList.add("checked");
+        sel.disabled = false;
+      } else {
+        selectedMembers.delete(uid);
+        row.classList.remove("checked");
+        sel.disabled = true;
+      }
+    });
+  });
+
+  list.querySelectorAll("[data-role-sel]").forEach(sel => {
+    sel.addEventListener("change", () => {
+      const uid = sel.dataset.roleSel;
+      if (selectedMembers.has(uid)) selectedMembers.set(uid, sel.value);
+    });
+  });
+}
+
+el("step3Back").addEventListener("click", () => { clearHint(); setStep(2); saveDraft(); });
+el("step3Next").addEventListener("click", () => { clearHint(); setStep(4); saveDraft(); });
+
+/* ── Step 4: CSV Upload ── */
+let csvRows = []; // [{name, email}]
+
+function handleCsvFile(file) {
+  if (!file || !file.name.endsWith(".csv")) { showHint("Please upload a .csv file.", true); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => parseCsv(e.target.result);
+  reader.readAsText(file);
+}
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) { showHint("CSV must have a header row and at least one data row.", true); return; }
+
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
+  const nameIdx = headers.indexOf("name");
+  const emailIdx = headers.indexOf("email");
+
+  if (nameIdx === -1 || emailIdx === -1) {
+    showHint(`CSV must have "name" and "email" columns. Found: ${headers.join(", ")}`, true);
+    return;
+  }
+
+  csvRows = [];
+  const errors = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+    const name = cols[nameIdx] || "";
+    const email = (cols[emailIdx] || "").toLowerCase();
+    if (!name || !email) { errors.push(i + 1); }
+    csvRows.push({ name, email, hasError: !name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) });
+  }
+
+  renderCsvPreview(headers, lines, nameIdx, emailIdx);
+  clearHint();
+  if (errors.length) showHint(`${errors.length} rows have missing name/email (rows: ${errors.slice(0,5).join(", ")}${errors.length > 5 ? "..." : ""})`, true);
+}
+
+function renderCsvPreview(headers, lines, nameIdx, emailIdx) {
+  const wrap = el("csvPreviewWrap");
+  const validCount = csvRows.filter(r => !r.hasError).length;
+  el("csvSummary").textContent = `${csvRows.length} rows found — ${validCount} valid, ${csvRows.length - validCount} with errors`;
+  wrap.style.display = "block";
+
+  const table = el("csvTable");
+  table.innerHTML = `
+    <thead><tr>${["#", "Name", "Email"].map(h => `<th>${h}</th>`).join("")}</tr></thead>
+    <tbody>${csvRows.slice(0, 20).map((r, i) => `
+      <tr class="${r.hasError ? "csv-error-row" : ""}">
+        <td>${i + 1}</td>
+        <td>${escapeHtml(r.name)}</td>
+        <td>${escapeHtml(r.email)}</td>
+      </tr>
+    `).join("")}${csvRows.length > 20 ? `<tr><td colspan="3" class="muted">... and ${csvRows.length - 20} more rows</td></tr>` : ""}</tbody>
+  `;
+}
+
+const uploadZone = el("uploadZone");
+uploadZone.addEventListener("click", () => el("csvInput").click());
+uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+uploadZone.addEventListener("drop", e => {
+  e.preventDefault();
+  uploadZone.classList.remove("drag-over");
+  handleCsvFile(e.dataTransfer.files[0]);
+});
+el("csvInput").addEventListener("change", e => handleCsvFile(e.target.files[0]));
+
+el("step4Back").addEventListener("click", () => { clearHint(); setStep(3); saveDraft(); });
+el("step4Next").addEventListener("click", () => { clearHint(); setStep(5); buildSummary(); saveDraft(); });
+el("step4Skip").addEventListener("click", () => { csvRows = []; clearHint(); setStep(5); buildSummary(); saveDraft(); });
+
+/* ── Step 5: Review ── */
+function buildSummary() {
+  el("sumName").textContent = el("projName").value.trim() || "—";
+  el("sumStatus").textContent = el("projStatus").value;
+  const s = el("projStart").value, e = el("projEnd").value;
+  el("sumDates").textContent = s && e ? `${s} → ${e}` : s || e || "Not set";
+  el("sumFields").textContent = customFields.length + " custom + 4 fixed";
+
+  const memNames = Array.from(selectedMembers.keys()).map(uid => {
+    const u = allUsers.find(x => x.id === uid);
+    return u ? `${u.display_name || uid} (${selectedMembers.get(uid)})` : uid;
+  });
+  el("sumMembers").textContent = memNames.length ? memNames.join(", ") : "No members selected.";
+  el("sumCandidates").textContent = csvRows.length ? `${csvRows.filter(r=>!r.hasError).length} valid candidates ready to import` : "No CSV uploaded — skip for now.";
+}
+
+el("step5Back").addEventListener("click", () => { clearHint(); setStep(4); });
+
+/* ── Create Project ── */
+el("createBtn").addEventListener("click", async () => {
+  clearHint();
+  el("createBtn").disabled = true;
+  el("createProgress").style.display = "block";
+
+  const setProgress = (pct, msg) => {
+    el("progressBar").style.width = pct + "%";
+    el("progressMsg").textContent = msg;
+  };
+
+  try {
+    // 1. Create project
+    setProgress(10, "Creating project...");
+    const { data: proj, error: projErr } = await supabase
+      .from("projects")
+      .insert({
+        name: el("projName").value.trim(),
+        description: el("projDesc").value.trim() || null,
+        status: el("projStatus").value,
+        start_date: el("projStart").value || null,
+        end_date: el("projEnd").value || null,
+        created_by: session.user.id,
+        code_prefix: el("projCodePrefix").value.trim() || null,
+      })
+      .select("id")
+      .single();
+    if (projErr) throw projErr;
+    const projectId = proj.id;
+
+    // 2. Insert fields
+    setProgress(25, "Creating fields...");
+    const FIXED_FIELDS = [
+      { key: "email",          label: "Email",          type: "text",   sort_order: 15, field_role: "email",          options: null },
+      { key: "issue",          label: "Issue",          type: "text",   sort_order: 100, field_role: "issue",         options: null },
+      { key: "decision",       label: "Decision",       type: "text",   sort_order: 110, field_role: "decision",      options: null },
+      { key: "overall_status", label: "Overall Status", type: "select", sort_order: 999, field_role: "overall_status",
+        options: ["Not Started","In Progress","Completed","Issue"] },
+    ];
+    const STATUS_OPTIONS = ["Not Started","In Progress","Completed","Issue"];
+    const customFieldsToInsert = customFields.map((f, i) => ({
+      project_id: projectId,
+      key: f.key,
+      label: f.label,
+      type: f.type,
+      sort_order: 20 + i * 10,
+      field_role: "step",
+      is_active: true,
+      visible: true,
+      options: f.type === "select" ? STATUS_OPTIONS : null,
+    }));
+    const allFieldsToInsert = [
+      ...FIXED_FIELDS.map((f, i) => ({ project_id: projectId, ...f, is_active: true, visible: true })),
+      ...customFieldsToInsert,
+    ];
+    const { error: fieldsErr } = await supabase.from("fields").insert(allFieldsToInsert);
+    if (fieldsErr) throw fieldsErr;
+
+    // 3. Add members (including admin)
+    setProgress(40, "Adding members...");
+    const membersToInsert = [{ user_id: session.user.id, project_id: projectId, role: "editor" }];
+    for (const [uid, role] of selectedMembers.entries()) {
+      if (uid !== session.user.id) membersToInsert.push({ user_id: uid, project_id: projectId, role });
+    }
+    const { error: memErr } = await supabase
+      .from("project_members")
+      .upsert(membersToInsert, { onConflict: "user_id,project_id" });
+    if (memErr) throw memErr;
+
+    // 4. Import candidates from CSV
+    const validRows = csvRows.filter(r => !r.hasError);
+    if (validRows.length > 0) {
+      setProgress(55, `Importing ${validRows.length} candidates...`);
+      let done = 0;
+      for (const row of validRows) {
+        try {
+          const { error: fnErr } = await supabase.functions.invoke("admin-create-user", {
+            body: { email: row.email, display_name: row.name, project_id: projectId },
+          });
+          if (fnErr) console.warn("Failed to import candidate:", row.email, fnErr);
+        } catch (e) {
+          console.warn("Failed to import candidate:", row.email, e);
+        }
+        done++;
+        setProgress(55 + Math.round((done / validRows.length) * 35), `Imported ${done}/${validRows.length} candidates...`);
+      }
+    }
+
+    setProgress(100, "Done! Redirecting...");
+    clearDraft();
+    sessionStorage.setItem("selected_project_id", projectId);
+    showHint(`Project "${el("projName").value.trim()}" created successfully!`, false);
+
+    setTimeout(() => {
+      window.location.href = `./dashboard.html?project=${encodeURIComponent(projectId)}`;
+    }, 1200);
+
+  } catch (err) {
+    console.error(err);
+    showHint("Error: " + (err?.message || String(err)), true);
+    el("createBtn").disabled = false;
+    el("createProgress").style.display = "none";
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,671 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title id="pageTitle">Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="sidebar.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <script>
+        (function () {
+            const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+            document.documentElement.setAttribute("data-user-role", cachedRole);
+        })();
+    </script>
+
+    <style>
+        :root {
+            --sidebar-w: 260px;
+            --bg: #f5f7fb;
+            --text: #0f172a;
+            --muted: #64748b;
+            --active: #eef4ff;
+            --active-border: #c7d7fe;
+            --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--font);
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        .layout {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+        }
+
+        /* SVG stroke override — sidebar.css targets .nav-ico; these pages use bare <svg> */
+        .nav-link svg { width: 22px; height: 22px; flex: 0 0 22px; stroke: #64748b; }
+        .nav-link.active svg { stroke: #3b82f6; }
+
+        .page-shell {
+            min-width: 0;
+            padding: 0 28px 28px;
+        }
+
+        .hero {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(245, 247, 251, 0.94);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(217, 224, 234, 0.9);
+            margin: 0 -28px 14px;
+            padding: 14px 28px 12px;
+        }
+
+        .hero-inner {
+            max-width: 1240px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .hero-title {
+            margin: 0 0 4px;
+            font-size: 24px;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .hero-meta {
+            margin: 0;
+            color: #5f6f86;
+            font-size: 13px;
+            line-height: 1.6;
+            font-weight: 400;
+        }
+
+        .hero-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .user-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 36px;
+            padding: 0 14px;
+            border: 1px solid #d8dee8;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.78);
+            color: #334155;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            max-width: 340px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .hero-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-wrap {
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        /* Permission-based sidebar rendering before dashboard.js finishes loading */
+        #navUpdateStatus,
+        #navAdmin {
+            display: none;
+        }
+
+        html[data-user-role="internal"] #navUpdateStatus,
+        html[data-user-role="admin"] #navUpdateStatus {
+            display: flex;
+        }
+
+        html[data-user-role="admin"] #navAdmin {
+            display: flex;
+        }
+
+        /* ── View tabs ─────────────────────────────────────────── */
+        .view-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 4px;
+            width: fit-content;
+            box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+        }
+
+        .view-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 22px;
+            border: none;
+            border-radius: 7px;
+            font-size: 13.5px;
+            font-weight: 500;
+            cursor: pointer;
+            background: transparent;
+            color: #64748b;
+            transition: background 0.14s, color 0.14s;
+            white-space: nowrap;
+        }
+
+        .view-tab svg {
+            width: 15px;
+            height: 15px;
+            flex: 0 0 15px;
+            stroke: currentColor;
+        }
+
+        .view-tab.active {
+            background: #3b82f6;
+            color: #fff;
+            box-shadow: 0 1px 4px rgba(59,130,246,0.28);
+        }
+
+        .view-tab:not(.active):hover {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        /* ── Shared: both tabs prevent outer page scroll ────────── */
+        body.overview-active,
+        body.candidates-active {
+            overflow: hidden;
+        }
+
+        body.overview-active .layout,
+        body.candidates-active .layout {
+            height: 100vh;
+        }
+
+        body.overview-active .page-shell,
+        body.candidates-active .page-shell {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            padding-bottom: 14px;
+        }
+
+        body.overview-active .hero,
+        body.candidates-active .hero {
+            flex: 0 0 auto;
+        }
+
+        body.overview-active .dashboard-wrap,
+        body.candidates-active .dashboard-wrap {
+            flex: 1 1 0;
+            min-height: 0;
+            min-width: 0;
+            width: min(1240px, 100%);
+            margin-inline: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.overview-active .view-tabs,
+        body.candidates-active .view-tabs {
+            flex: 0 0 auto;
+        }
+
+        body.overview-active main.container,
+        body.candidates-active main.container {
+            flex: 1 1 0;
+            min-height: 0;
+            min-width: 0;
+            max-width: 100%;
+            width: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 0;
+        }
+
+        /* ── Candidates tab: table fills remaining space ─────────── */
+        body.candidates-active #viewCandidates {
+            flex: 1 1 0;
+            min-height: 0;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.candidates-active #viewCandidates > .card {
+            flex: 1 1 0;
+            min-height: 0;
+            min-width: 0;       /* prevents card from stretching beyond viewport */
+            margin-bottom: 0;
+            display: flex;
+            flex-direction: column;
+            /* no overflow:hidden — would clip the table's bottom scrollbar */
+        }
+
+        body.candidates-active .table-toolbar { flex: 0 0 auto; }
+        body.candidates-active .footnote      { flex: 0 0 auto; }
+
+        body.candidates-active .table-wrap.dashboard-table {
+            flex: 1 1 0;
+            min-height: 0;
+            min-width: 0;
+            width: 100%;
+            max-height: none;
+            overflow: auto;
+            margin-inline: auto;
+        }
+
+        /* ── Overview tab: charts fill remaining space ──────────── */
+        body.overview-active #viewOverview {
+            flex: 1 1 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* The single .card inside Overview */
+        body.overview-active #viewOverview > .card {
+            flex: 1 1 0;
+            min-height: 0;
+            margin-bottom: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Grid: remove fixed height, let flex drive it */
+        body.overview-active .dash2-grid {
+            flex: 1 1 0;
+            min-height: 0;
+            height: auto;
+        }
+
+        body.overview-active .left-stack {
+            min-height: 0;
+        }
+
+        /* Pie panel: grows to fill space above KPI cards */
+        body.overview-active .left-stack > .panel:first-child {
+            flex: 1 1 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Chart areas: fill their panel */
+        body.overview-active .pie-area {
+            flex: 1 1 0;
+            min-height: 100px;
+            height: auto;
+        }
+
+        body.overview-active .panel.full-height {
+            overflow: hidden;
+        }
+
+        body.overview-active .bar-area {
+            flex: 1 1 0;
+            min-height: 160px;
+            height: auto;
+        }
+
+        @media (max-width: 1100px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: static;
+                height: auto;
+                border-right: 0;
+                border-bottom: 1px solid #e5e7eb;
+                overflow: visible;
+            }
+
+            .sidebar-top {
+                overflow: visible;
+            }
+
+            .sidebar-bottom {
+                margin-top: 8px;
+            }
+
+            .page-shell {
+                padding: 0 16px 24px;
+            }
+
+            .hero {
+                position: static;
+                margin: 0 -16px 16px;
+                padding: 14px 16px 12px;
+            }
+
+            .hero-inner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .hero-right {
+                width: 100%;
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-sticky">
+                <div class="brand">
+                    <div class="brand-title">Mentis Project Hub</div>
+                </div>
+
+                <nav class="nav">
+                    <button class="nav-link" type="button" id="navProjects">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+                            <path d="m4 12 8 4 8-4"></path>
+                            <path d="m4 17 8 4 8-4"></path>
+                        </svg>
+                        <span>Projects</span>
+                    </button>
+
+                    <button class="nav-link active" type="button" id="navDashboard">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        <span>Dashboard</span>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navTickets">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Tickets</span>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navUpdateStatus">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+                        </svg>
+                        <span>Update Status</span>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navAdmin">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        <span>Admin</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user" id="userChip">Loading...</div>
+                <button class="nav-link logout-link" type="button" id="logoutBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <path d="M16 17l5-5-5-5"></path>
+                        <path d="M21 12H9"></path>
+                    </svg>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="page-shell">
+            <div class="hero">
+                <div class="hero-inner">
+                    <div>
+                        <h1 id="projectTitle" class="hero-title">Project</h1>
+                        <p class="hero-meta">
+                            Dashboard overview for the selected project. • Last refresh:
+                            <span id="lastRefresh">-</span>
+                        </p>
+                    </div>
+
+                    <div class="hero-right">
+                        <div class="hero-actions">
+                            <button id="refreshBtn" class="btn" type="button">Refresh</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-wrap">
+                <!-- ── View tabs ──────────────────────────────── -->
+                <div class="view-tabs" role="tablist" aria-label="Dashboard views">
+                    <button class="view-tab active" type="button" data-tab="overview" role="tab" aria-selected="true" aria-controls="viewOverview">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        Overview
+                    </button>
+                    <button class="view-tab" type="button" data-tab="candidates" role="tab" aria-selected="false" aria-controls="viewCandidates">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        Candidates
+                    </button>
+                </div>
+
+                <main class="container">
+                    <!-- ── Overview tab ───────────────────────── -->
+                    <div id="viewOverview" role="tabpanel" aria-labelledby="tab-overview">
+                    <section class="card">
+                        <div class="dash2-grid">
+                            <div class="left-stack">
+                                <div class="panel">
+                                    <div class="panel-head">
+                                        <div class="panel-title">Overall Status</div>
+                                        <div class="panel-hint">Click pie/KPI to view details</div>
+                                    </div>
+
+                                    <div class="chart-wrap pie-area">
+                                        <canvas id="overallPie"></canvas>
+                                    </div>
+                                </div>
+
+                                <div class="kpi-mini-grid kpi-5">
+                                    <div class="kpi-mini kpi-total kpi-span-2 kpi-click" data-status="Total">
+                                        <div class="kpi-mini-title">Total Candidates</div>
+                                        <div id="kpiTotal" class="kpi-mini-value">0</div>
+                                    </div>
+
+                                    <div class="kpi-mini kpi-completed kpi-span-2 kpi-click" data-status="Completed">
+                                        <div class="kpi-mini-title">Completed</div>
+                                        <div id="kpiCompleted" class="kpi-mini-value">0</div>
+                                    </div>
+
+                                    <div class="kpi-mini kpi-inprogress kpi-span-2 kpi-click" data-status="In Progress">
+                                        <div class="kpi-mini-title">In Progress</div>
+                                        <div id="kpiInProgress" class="kpi-mini-value">0</div>
+                                    </div>
+
+                                    <div class="kpi-mini kpi-issue kpi-span-3 kpi-click" data-status="Issue">
+                                        <div class="kpi-mini-title">Issue</div>
+                                        <div id="kpiIssue" class="kpi-mini-value">0</div>
+                                    </div>
+
+                                    <div class="kpi-mini kpi-notstarted kpi-span-3 kpi-click" data-status="Not Started">
+                                        <div class="kpi-mini-title">Not Started</div>
+                                        <div id="kpiNotStarted" class="kpi-mini-value">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="panel full-height">
+                                <div class="panel-head">
+                                    <div class="panel-title">Status by Process</div>
+                                </div>
+                                <div class="chart-wrap bar-area">
+                                    <canvas id="processStacked"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    </div><!-- /viewOverview -->
+
+                    <!-- ── Candidates tab ─────────────────────── -->
+                    <div id="viewCandidates" role="tabpanel" aria-labelledby="tab-candidates" style="display:none">
+                    <section class="card">
+                        <div class="table-toolbar">
+                            <div class="tool tool-grow">
+                                <label class="label">Search (Code / Name / Email)</label>
+                                <input id="dashSearchInput" class="input" placeholder="Type to filter..." autocomplete="off" />
+                            </div>
+                            <div class="tool">
+                                <label class="label">Filter Column</label>
+                                <select id="dashFilterColumn" class="select"></select>
+                            </div>
+                            <div class="tool">
+                                <label class="label">Filter Status</label>
+                                <select id="dashFilterStatus" class="select"></select>
+                            </div>
+                            <div class="tool export-tool">
+                                <label class="label">Export Current View</label>
+                                <div class="export-dropdown">
+                                    <button id="exportMenuBtn" class="btn" type="button" aria-haspopup="true" aria-expanded="false">Export</button>
+                                    <div id="exportMenu" class="export-menu" hidden>
+                                        <button id="exportCsvBtn" class="export-menu-item" type="button">CSV (.csv)</button>
+                                        <button id="exportXlsxBtn" class="export-menu-item" type="button">Excel (.xlsx)</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-wrap dashboard-table" id="dashboardTableWrap">
+                            <table class="excel" id="dashboardTable">
+                                <thead>
+                                    <tr id="dashboardHeadRow">
+                                        <th class="sticky-col sticky-col-0">Request</th>
+                                        <th class="sticky-col sticky-col-1">Code</th>
+                                        <th class="sticky-col sticky-col-2">Candidate Name</th>
+                                        <th style="min-width:180px;">Email</th>
+                                        <th style="min-width:120px;">Overall Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="footnote">Powered by Mentis @2026</div>
+                    </section>
+                    </div><!-- /viewCandidates -->
+
+                </main>
+            </div>
+        </main>
+    </div>
+
+    <div id="statusModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-head">
+                <div>
+                    <div id="modalTitle" class="modal-title">Candidates</div>
+                    <div id="modalSub" class="modal-sub">-</div>
+                </div>
+                <button id="modalCloseBtn" class="modal-close" aria-label="Close">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="modal-table-wrap">
+                    <table class="modal-table">
+                        <thead>
+                            <tr>
+                                <th style="width:180px;">Code</th>
+                                <th style="width:220px;">Candidate Name</th>
+                                <th style="min-width:220px;">Issue</th>
+                                <th style="min-width:220px;">Decision</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-foot">
+                <button id="modalCloseBtn2" class="btn btn-ghost">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="requestModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="reqTitle">
+            <div class="modal-head">
+                <div>
+                    <div id="reqTitle" class="modal-title">Request / Comment</div>
+                    <div id="reqSub" class="modal-sub">-</div>
+                </div>
+                <button id="reqCloseBtn" class="modal-close" aria-label="Close">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="req-grid">
+                    <div>
+                        <div class="req-label">To</div>
+                        <input id="reqTo" class="req-input" type="email" placeholder="candidate@email.com" />
+                    </div>
+                    <div>
+                        <div class="req-label">Subject</div>
+                        <input id="reqSubject" class="req-input" type="text" />
+                    </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <div class="req-label">Message</div>
+                    <textarea id="reqMessage" class="req-textarea" rows="7" placeholder="Type your request/comment..."></textarea>
+                </div>
+
+                <div id="reqHint" class="req-hint"></div>
+            </div>
+
+            <div class="modal-foot">
+                <button id="reqCancelBtn" class="btn btn-ghost">Cancel</button>
+                <button id="reqSendBtn" class="btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="dashboard.js"></script>
+</body>
+</html>

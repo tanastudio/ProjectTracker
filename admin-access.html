@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Admin - Access Management</title>
+
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="sidebar.css" />
+
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .layout {
+            height: 100vh;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .main {
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Page container: allow wider content because sidebar eats width */
+        .wrap {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        .small {
+            font-size: 11px;
+        }
+
+        .section-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: #0f172a;
+        }
+
+        .section-desc {
+            margin: 4px 0 0;
+        }
+
+        #hint {
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+
+        .card {
+            background: rgba(255,255,255,.82);
+            border: 1px solid rgba(15,23,42,.12);
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 12px 30px rgba(2,6,23,.12);
+        }
+
+        .panel {
+            min-width: 0;
+            background: rgba(255,255,255,.82);
+            border: 1px solid rgba(15,23,42,.12);
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 12px 30px rgba(2,6,23,.10);
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+            margin-top: 10px;
+            align-items: start;
+        }
+
+        @media (max-width: 1180px) {
+            .wrap { max-width: 100%; }
+        }
+
+        #profilesTable {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+            margin-top: 10px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0 10px;
+            border-bottom: none;
+            vertical-align: middle;
+            font-size: 12px;
+        }
+
+        th {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 800;
+            white-space: nowrap;
+            padding-bottom: 2px;
+        }
+
+        #profilesBody tr {
+            background: rgba(255,255,255,.72);
+            box-shadow: 0 6px 18px rgba(15,23,42,.06);
+        }
+
+        #profilesBody td {
+            padding-top: 10px;
+            padding-bottom: 10px;
+            border-top: 1px solid rgba(15,23,42,.06);
+            border-bottom: 1px solid rgba(15,23,42,.06);
+            background: rgba(255,255,255,.78);
+        }
+
+            #profilesBody td:first-child {
+                border-left: 1px solid rgba(15,23,42,.06);
+                border-top-left-radius: 12px;
+                border-bottom-left-radius: 12px;
+            }
+
+            #profilesBody td:last-child {
+                border-right: 1px solid rgba(15,23,42,.06);
+                border-top-right-radius: 12px;
+                border-bottom-right-radius: 12px;
+            }
+
+        #profilesBody tr:hover td {
+            background: rgba(248,250,252,.96);
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+            font-size: 12px;
+        }
+
+        select {
+            width: 100%;
+            min-width: 150px;
+            height: 40px;
+            padding: 0 11px;
+            border-radius: 10px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: #fff;
+            outline: none;
+            font-size: 13px;
+            box-shadow: inset 0 1px 2px rgba(15,23,42,.03);
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(255,255,255,.92);
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .row-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .btn-sm {
+            min-height: 40px;
+            padding: 0 12px;
+            border-radius: 10px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 9px;
+        }
+
+            .form-row label {
+                font-size: 11px;
+                font-weight: 800;
+                color: #64748b;
+            }
+
+            .form-row .help {
+                font-size: 11px;
+                color: #64748b;
+            }
+
+        .mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+
+            .mini-table td,
+            .mini-table th {
+                font-size: 11px;
+                padding: 8px 6px;
+                border-bottom: 1px solid rgba(15,23,42,.08);
+            }
+
+        .tip {
+            margin-top: 10px;
+            border: 1px solid rgba(15,23,42,.08);
+            background: rgba(248,250,252,.9);
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: #475569;
+            line-height: 1.35;
+        }
+
+        .col-name {
+            width: 42%;
+        }
+
+        .col-role {
+            width: 24%;
+            min-width: 160px;
+        }
+
+        .col-act {
+            width: 34%;
+        }
+
+        .name-input {
+            width: 100%;
+            min-width: 220px;
+            height: 40px;
+            padding: 0 11px;
+            border-radius: 10px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: #fff;
+            outline: none;
+            font-size: 13px;
+            box-shadow: inset 0 1px 2px rgba(15,23,42,.03);
+        }
+
+            .name-input[readonly] {
+                background: rgba(148,163,184,.12);
+                color: #475569;
+                cursor: not-allowed;
+                border-style: dashed;
+            }
+
+        .name-note {
+            margin-top: 6px;
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.35;
+        }
+
+        .page-status {
+            margin-left: 8px;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+            .page-status:empty {
+                display: none;
+            }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 8px;
+            margin-bottom: 4px;
+        }
+
+            .toolbar .left {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 8px;
+                align-items: center;
+                width: 100%;
+            }
+
+            .toolbar input {
+                min-width: 0;
+                width: 100%;
+                height: 40px;
+                padding: 0 12px;
+                border-radius: 10px;
+                border: 1px solid rgba(15,23,42,.10);
+                outline: none;
+                background: #fff;
+                font-size: 13px;
+            }
+
+        #refreshBtn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-sticky">
+                <div class="brand">
+                    <div class="brand-title">Mentis Project Hub</div>
+                </div>
+
+                <nav class="nav">
+                    <a class="nav-link" href="./projects.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+                            <path d="m4 12 8 4 8-4"></path>
+                            <path d="m4 17 8 4 8-4"></path>
+                        </svg>
+                        <span>Projects</span>
+                    </a>
+
+                    <a class="nav-link" id="navDashboard" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        <span>Dashboard</span>
+                    </a>
+
+                    <a class="nav-link" id="navTickets" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Tickets</span>
+                    </a>
+
+                    <a class="nav-link" id="navUpdateStatus" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+                        </svg>
+                        <span>Update Status</span>
+                    </a>
+
+                    <a class="nav-link" id="navAdmin" href="./admin.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+
+                    <a class="nav-link active" href="./admin-access.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <span>Access</span>
+                    </a>
+                </nav>
+
+                <div class="sidebar-sep"></div>
+
+                <div class="sidebar-footer">
+                    <div class="sidebar-user" id="userChip">Loading...</div>
+
+                    <button class="nav-link logout-link" type="button" id="logoutBtn">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <path d="M16 17l5-5-5-5"></path>
+                            <path d="M21 12H9"></path>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main">
+            <header class="hero">
+                <div class="hero-inner">
+                    <div>
+                        <h1 class="page-title">Access Management</h1>
+                        <p class="page-desc">
+                            Admin-only: manage <b>profiles.role</b>, <b>profiles.display_name</b>, and <b>project_members</b>.
+                            <span id="msg" class="page-status"></span>
+                        </p>
+                    </div>
+
+                    <div class="hero-actions">
+                        <button id="gotoAdmin" class="btn btn-ghost" type="button">Admin Home</button>
+                        <button id="gotoProjects" class="btn btn-ghost" type="button">Projects</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="wrap">
+                    <div id="hint" class="hint"></div>
+
+                    <div class="grid2">
+                        <!-- LEFT: Users -->
+                        <div class="panel">
+                            <div class="section-title">Users</div>
+                            <div class="muted small" id="count" style="margin-left:auto;"></div>
+                            <p class="muted small section-desc">
+                                Set role and display name (shown in Created By).
+                            </p>
+
+                            <div class="toolbar">
+                                <div class="left">
+                                    <input id="q" type="text" placeholder="Search user by name" />
+                                    <button id="refreshBtn" class="btn btn-outline btn-sm" type="button">Refresh</button>
+                                </div>
+                            </div>
+
+                            <table id="profilesTable">
+                                <thead>
+                                    <tr>
+                                        <th class="col-name">Display Name</th>
+                                        <th class="col-role">Role</th>
+                                        <th class="col-act">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="profilesBody"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- RIGHT: Memberships -->
+                        <div class="panel">
+                            <div class="section-title">Project Memberships</div>
+                            <p class="muted small section-desc">
+                                Add/remove project access for internal/client users. Member role controls viewer/editor behavior.
+                            </p>
+
+                            <div class="form-row">
+                                <label for="pickUser">User</label>
+                                <select id="pickUser"></select>
+                                <div class="help">Pick a user, then manage memberships below.</div>
+                            </div>
+
+                            <div class="form-row">
+                                <label for="pickProject">Project</label>
+                                <select id="pickProject"></select>
+                                <div class="help">If empty, your RLS blocks projects select for admin.</div>
+                            </div>
+
+                            <div class="form-row">
+                                <label for="pickMemberRole">Member Role (project_members.role)</label>
+                                <select id="pickMemberRole">
+                                    <option value="viewer">viewer</option>
+                                    <option value="editor">editor</option>
+                                </select>
+                                <div class="help">viewer = read-only (client), editor = can update (internal/admin).</div>
+                            </div>
+
+                            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                <button id="addMembershipBtn" class="btn btn-sm" type="button">Add / Update Membership</button>
+                                <span class="muted small" id="memStatus"></span>
+                            </div>
+
+                            <div class="section-title" style="margin-top:14px;">Current memberships</div>
+                            <table class="mini-table">
+                                <thead>
+                                    <tr>
+                                        <th>Project</th>
+                                        <th>Role</th>
+                                        <th style="width: 1%;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="memBody"></tbody>
+                            </table>
+
+                            <div class="tip">
+                                Tip: If internal/client has no project membership, your app may route them away depending on your dashboard logic.
+                            </div>
+                        </div>
+                    </div>
+            </div>
+
+            <!-- Keep your original JS (only add sidebar navigation wiring; all functions remain) -->
+            <script type="module">
+                import { supabase } from "./supabaseClient.js";
+
+                const el = (id) => document.getElementById(id);
+
+                function showHint(text, isErr = false) {
+                    const h = el("hint");
+                    h.className = "hint " + (isErr ? "hint-error" : "hint-ok");
+                    h.textContent = text;
+                    h.style.display = "block";
+                }
+
+                function clearHint() {
+                    const h = el("hint");
+                    h.className = "hint";
+                    h.textContent = "";
+                    h.style.display = "none";
+                }
+
+                function setMsg(text) {
+                    el("msg").textContent = text;
+                }
+
+                function escapeHtml(s) {
+                    return String(s ?? "")
+                        .replaceAll("&", "&amp;")
+                        .replaceAll("<", "&lt;")
+                        .replaceAll(">", "&gt;")
+                        .replaceAll('"', "&quot;")
+                        .replaceAll("'", "&#039;");
+                }
+
+                window.addEventListener("error", (e) => {
+                    showHint("JS error: " + (e?.message || "unknown"), true);
+                });
+
+                window.addEventListener("unhandledrejection", (e) => {
+                    const msg = e?.reason?.message || String(e?.reason || "unknown promise error");
+                    showHint("Promise error: " + msg, true);
+                });
+
+                async function requireAdmin() {
+                    const { data, error } = await supabase.auth.getSession();
+                    if (error) {
+                        showHint("getSession error: " + error.message, true);
+                        return null;
+                    }
+
+                    const session = data?.session;
+                    if (!session) {
+                        window.location.replace("./index.html");
+                        return null;
+                    }
+
+                    supabase.auth.onAuthStateChange((_evt, s) => {
+                        if (!s) window.location.replace("./index.html");
+                    });
+
+                    const { data: profile, error: pErr } = await supabase
+                        .from("profiles")
+                        .select("role, display_name")
+                        .eq("id", session.user.id)
+                        .maybeSingle();
+
+                    if (pErr) {
+                        showHint("Cannot load profile: " + pErr.message, true);
+                        return null;
+                    }
+
+                    if (String(profile?.role || "") !== "admin") {
+                        window.location.replace("./projects.html");
+                        return null;
+                    }
+
+                    return { session, displayName: profile?.display_name || "" };
+                }
+
+                function getProjectIdFromUrlOrStorage() {
+                    const url = new URL(window.location.href);
+                    const p = url.searchParams.get("project");
+                    if (p) return p;
+                    return sessionStorage.getItem("selected_project_id");
+                }
+
+                function goNeedProject(pageFile) {
+                    const pid = getProjectIdFromUrlOrStorage();
+                    if (!pid) {
+                        window.location.href = "./projects.html";
+                        return;
+                    }
+                    window.location.href = `./${pageFile}?project=${encodeURIComponent(pid)}`;
+                }
+
+                setMsg("Checking admin access...");
+
+                const _authResult = await requireAdmin();
+                if (!_authResult) throw new Error("No access/session");
+                const session = _authResult.session;
+
+                // Keep original behavior: show who, ready message
+                const _chipName = _authResult.displayName || session.user.email || session.user.id;
+                const _chip = el("userChip");
+                if (_chip) _chip.textContent = `${_chipName} (admin)`;
+                setMsg("Ready.");
+
+                // Sidebar navigation wiring (adds only; does not remove any existing function)
+                el("navDashboard")?.addEventListener("click", (e) => { e.preventDefault(); goNeedProject("dashboard.html"); });
+                el("navTickets")?.addEventListener("click", (e) => { e.preventDefault(); goNeedProject("tickets.html"); });
+                el("navUpdateStatus")?.addEventListener("click", (e) => { e.preventDefault(); goNeedProject("form.html"); });
+                el("navAdmin")?.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    const pid = getProjectIdFromUrlOrStorage();
+                    const v = Date.now(); // cache-bust
+                    if (!pid) {
+                        window.location.href = `./projects.html?v=${v}`;
+                        return;
+                    }
+                    window.location.href = `./admin.html?project=${encodeURIComponent(pid)}&v=${v}`;
+                });
+
+                el("logoutBtn").addEventListener("click", async () => {
+                    await supabase.auth.signOut();
+                    sessionStorage.removeItem("selected_project_id");
+                    window.location.replace("./index.html");
+                });
+
+                el("gotoProjects").addEventListener("click", () => {
+                    window.location.href = "./projects.html";
+                });
+
+                el("gotoAdmin").addEventListener("click", () => {
+                    const pid = getProjectIdFromUrlOrStorage();
+                    const v = Date.now(); // cache-bust so browser always fetches latest admin.html
+                    if (pid) {
+                        window.location.href = `./admin.html?project=${encodeURIComponent(pid)}&v=${v}`;
+                    } else {
+                        window.location.href = `./admin.html?v=${v}`;
+                    }
+                });
+
+                let PROFILES = [];
+                let PROJECTS = [];
+                let MEMBERSHIPS = [];
+
+                function roleSelectHtml(currentRole, userId) {
+                    const roles = ["admin", "internal", "client", "candidate"];
+                    const isCandidate = String(currentRole || "") === "candidate";
+
+                    const opts = roles.map((r) => {
+                        const selected = String(currentRole) === r ? "selected" : "";
+                        return `<option value="${r}" ${selected}>${r}</option>`;
+                    }).join("");
+
+                    if (isCandidate) {
+                        return `
+            <select data-role-select="${escapeHtml(userId)}" disabled>
+                ${opts}
+            </select>
+        `;
+                    }
+
+                    return `<select data-role-select="${escapeHtml(userId)}">${opts}</select>`;
+                }
+
+                function nameInputHtml(currentName, userId, role) {
+                    const safeName = escapeHtml(currentName || "");
+                    const safeUserId = escapeHtml(userId);
+                    const isCandidate = String(role || "") === "candidate";
+
+                    if (isCandidate) {
+                        return `
+                            <input
+                                class="name-input"
+                                data-name-input="${safeUserId}"
+                                value="${safeName}"
+                                placeholder="Synced from candidate record"
+                                readonly
+                            />
+                        `;
+                                }
+
+                                return `
+                        <input
+                            class="name-input"
+                            data-name-input="${safeUserId}"
+                            value="${safeName}"
+                            placeholder="e.g. Jiradech"
+                        />
+                    `;
+                }
+
+                async function loadProfiles() {
+                    clearHint();
+
+                    const { data, error } = await supabase
+                        .from("profiles")
+                        .select("id, role, display_name, candidate_record_id, created_at")
+                        .order("created_at", { ascending: false });
+
+                    if (error) throw error;
+
+                    PROFILES = data || [];
+                    el("count").textContent = `${PROFILES.length} users`;
+                }
+
+                async function loadProjects() {
+                    clearHint();
+
+                    const { data, error } = await supabase
+                        .from("projects")
+                        .select("id, name")
+                        .order("name", { ascending: true });
+
+                    if (error) throw error;
+
+                    PROJECTS = data || [];
+                }
+
+                async function loadMembershipsForUser(userId) {
+                    clearHint();
+
+                    const { data, error } = await supabase
+                        .from("project_members")
+                        .select("project_id, role, projects(name)")
+                        .eq("user_id", userId);
+
+                    if (error) throw error;
+
+                    MEMBERSHIPS = data || [];
+                }
+
+                function renderProfilesTable() {
+                    const q = String(el("q").value || "").trim().toLowerCase();
+
+                    const rows = (PROFILES || []).filter((p) => {
+                        if (!q) return true;
+
+                        const hay = [
+                            p.id,
+                            p.role,
+                            p.display_name,
+                            p.candidate_record_id
+                        ].map((x) => String(x || "").toLowerCase()).join(" | ");
+
+                        return hay.includes(q);
+                    });
+
+                    const tbody = el("profilesBody");
+
+                    if (rows.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="3" class="muted">No users found.</td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = rows.map((p) => {
+                        const uid = escapeHtml(p.id);
+                        const role = escapeHtml(p.role || "");
+                        const name = escapeHtml(p.display_name || "");
+
+                        return `
+                          <tr>
+                            <td>${nameInputHtml(name, uid, p.role || "")}</td>
+                            <td>${roleSelectHtml(role, uid)}</td>
+                            <td>
+                              <div class="row-actions">
+                                <button class="btn btn-outline btn-sm" type="button" data-save-profile="${uid}">Save profile</button>
+                                <button class="btn btn-outline btn-sm" type="button" data-pick-user="${uid}">Manage</button>
+                              </div>
+                            </td>
+                          </tr>
+                        `;
+                    }).join("");
+
+                    tbody.querySelectorAll("[data-save-profile]").forEach((btn) => {
+                        btn.addEventListener("click", async () => {
+                            const userId = btn.getAttribute("data-save-profile");
+                            await saveProfileForUser(userId);
+                        });
+                    });
+
+                    tbody.querySelectorAll("[data-pick-user]").forEach((btn) => {
+                        btn.addEventListener("click", async () => {
+                            const userId = btn.getAttribute("data-pick-user");
+                            el("pickUser").value = userId;
+                            await refreshMembershipPanel();
+                        });
+                    });
+                }
+
+                function renderUserDropdown() {
+                    const sel = el("pickUser");
+                    if (!PROFILES || PROFILES.length === 0) {
+                        sel.innerHTML = "";
+                        return;
+                    }
+
+                    sel.innerHTML = (PROFILES || []).map((p) => {
+                        const label = `${p.display_name ? p.display_name + " - " : ""}${p.id} (${p.role || "-"})`;
+                        return `<option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`;
+                    }).join("");
+                }
+
+                function renderProjectDropdown() {
+                    const sel = el("pickProject");
+                    if (!PROJECTS || PROJECTS.length === 0) {
+                        sel.innerHTML = "";
+                        return;
+                    }
+
+                    sel.innerHTML = (PROJECTS || []).map((p) => {
+                        const label = p.name ? `${p.name}` : p.id;
+                        return `<option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`;
+                    }).join("");
+                }
+
+                function renderMembershipsTable() {
+                    const body = el("memBody");
+
+                    if (!MEMBERSHIPS || MEMBERSHIPS.length === 0) {
+                        body.innerHTML = `<tr><td colspan="3" class="muted">No memberships.</td></tr>`;
+                        return;
+                    }
+
+                    body.innerHTML = MEMBERSHIPS.map((m) => {
+                        const projName = m.projects?.name || m.project_id;
+                        return `
+                          <tr>
+                            <td>${escapeHtml(projName)}</td>
+                            <td><span class="pill">${escapeHtml(m.role || "viewer")}</span></td>
+                            <td>
+                              <button class="btn btn-outline btn-sm" type="button"
+                                data-del-mem="${escapeHtml(String(m.project_id))}">Remove</button>
+                            </td>
+                          </tr>
+                        `;
+                    }).join("");
+
+                    body.querySelectorAll("[data-del-mem]").forEach((btn) => {
+                        btn.addEventListener("click", async () => {
+                            const projectId = btn.getAttribute("data-del-mem");
+                            await removeMembership(projectId);
+                        });
+                    });
+                }
+
+                async function saveProfileForUser(userId) {
+                    clearHint();
+
+                    const roleSel = document.querySelector(`[data-role-select="${CSS.escape(userId)}"]`);
+                    const nextRole = String(roleSel?.value || "").trim();
+
+                    const nameInp = document.querySelector(`[data-name-input="${CSS.escape(userId)}"]`);
+                    const nextName = String(nameInp?.value || "").trim();
+
+                    if (!nextRole) {
+                        showHint("Role is empty.", true);
+                        return;
+                    }
+
+                    try {
+                        setMsg("Saving profile...");
+
+                        const payload = {
+                            role: nextRole,
+                            display_name: nextName || null
+                        };
+
+                        const { error: updateErr } = await supabase
+                            .from("profiles")
+                            .update(payload)
+                            .eq("id", userId);
+
+                        if (updateErr) throw updateErr;
+
+                        await loadProfiles();
+                        renderProfilesTable();
+                        renderUserDropdown();
+
+                        if (el("pickUser").value === userId) {
+                            el("pickUser").value = userId;
+                        }
+
+                        showHint(`Saved profile -> ${userId} | role=${nextRole} | display_name=${nextName || "-"}`, false);
+                        setMsg("Ready.");
+                    } catch (err) {
+                        showHint("Save profile failed: " + (err?.message || String(err)), true);
+                        setMsg("Ready (error).");
+                    }
+                }
+
+                async function upsertMembership() {
+                    clearHint();
+
+                    const userId = el("pickUser").value;
+                    const projectId = el("pickProject").value;
+                    const role = el("pickMemberRole").value;
+
+                    if (!userId || !projectId) {
+                        showHint("Missing user/project.", true);
+                        return;
+                    }
+
+                    try {
+                        el("memStatus").textContent = "Saving...";
+
+                        const payload = { user_id: userId, project_id: projectId, role };
+
+                        const { error } = await supabase
+                            .from("project_members")
+                            .upsert(payload, { onConflict: "user_id,project_id" });
+
+                        if (error) throw error;
+
+                        el("memStatus").textContent = "Saved.";
+                        await loadMembershipsForUser(userId);
+                        renderMembershipsTable();
+                    } catch (err) {
+                        el("memStatus").textContent = "";
+                        showHint("Upsert membership failed: " + (err?.message || String(err)), true);
+                    }
+                }
+
+                async function removeMembership(projectId) {
+                    clearHint();
+
+                    const userId = el("pickUser").value;
+                    if (!userId || !projectId) return;
+
+                    try {
+                        el("memStatus").textContent = "Removing...";
+
+                        const { error } = await supabase
+                            .from("project_members")
+                            .delete()
+                            .eq("user_id", userId)
+                            .eq("project_id", projectId);
+
+                        if (error) throw error;
+
+                        el("memStatus").textContent = "Removed.";
+                        await loadMembershipsForUser(userId);
+                        renderMembershipsTable();
+                    } catch (err) {
+                        el("memStatus").textContent = "";
+                        showHint("Remove membership failed: " + (err?.message || String(err)), true);
+                    }
+                }
+
+                async function refreshMembershipPanel() {
+                    try {
+                        const userId = el("pickUser").value;
+                        if (!userId) return;
+
+                        el("memStatus").textContent = "Loading...";
+                        await loadMembershipsForUser(userId);
+                        renderMembershipsTable();
+                        el("memStatus").textContent = "";
+                    } catch (err) {
+                        el("memStatus").textContent = "";
+                        showHint("Load memberships failed: " + (err?.message || String(err)), true);
+                    }
+                }
+
+                el("refreshBtn").addEventListener("click", async () => {
+                    await boot();
+                });
+
+                el("q").addEventListener("input", () => {
+                    renderProfilesTable();
+                });
+
+                el("pickUser").addEventListener("change", async () => {
+                    await refreshMembershipPanel();
+                });
+
+                el("addMembershipBtn").addEventListener("click", async () => {
+                    await upsertMembership();
+                });
+
+                async function boot() {
+                    clearHint();
+                    setMsg("Loading users & projects...");
+
+                    try {
+                        await Promise.all([loadProfiles(), loadProjects()]);
+
+                        renderProfilesTable();
+                        renderUserDropdown();
+                        renderProjectDropdown();
+
+                        if (PROFILES.length > 0) {
+                            el("pickUser").value = PROFILES[0].id;
+                            await refreshMembershipPanel();
+                        } else {
+                            el("memBody").innerHTML = `<tr><td colspan="3" class="muted">No users found.</td></tr>`;
+                        }
+
+                        setMsg("Ready.");
+                    } catch (err) {
+                        showHint("Boot failed: " + (err?.message || String(err)), true);
+                        setMsg("Ready (error).");
+                    }
+                }
+
+                await boot();
+            </script>
+        </main>
+    </div>
+</body>
+</html>

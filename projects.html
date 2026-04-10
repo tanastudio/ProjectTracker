@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Select Project</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="sidebar.css" />
+
+    <script>
+        (function () {
+            const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+            document.documentElement.setAttribute("data-user-role", cachedRole);
+        })();
+    </script>
+
+    <style>
+        :root {
+            --sidebar-w: 260px;
+            --bg: #eef2f7;
+            --panel: #ffffff;
+            --panel-soft: #f8fbff;
+            --border: #d9e0ea;
+            --text: #0f172a;
+            --muted: #64748b;
+            --active: #eef4ff;
+            --active-border: #c7d7fe;
+            --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--font);
+            color: var(--text);
+            background: var(--bg);
+            background-image: radial-gradient(circle at 20% 20%, rgba(99,102,241,0.06) 0%, transparent 50%),
+                              radial-gradient(circle at 80% 80%, rgba(59,130,246,0.06) 0%, transparent 50%);
+        }
+
+        .layout {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+        }
+
+        /* SVG stroke override — sidebar.css targets .nav-ico; these pages use bare <svg> */
+        .nav-link svg { width: 22px; height: 22px; flex: 0 0 22px; stroke: #64748b; }
+        .nav-link.active svg { stroke: #3b82f6; }
+
+        .content {
+            min-width: 0;
+            padding: 0 28px 28px;
+        }
+
+        .content-inner {
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(245, 247, 251, 0.94);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(217, 224, 234, 0.9);
+            margin: 0 -28px 14px;
+            padding: 14px 28px 12px;
+        }
+
+        .hero-inner {
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        .page-title {
+            margin: 0 0 4px;
+            font-size: 24px;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .page-desc {
+            margin: 0;
+            max-width: 760px;
+            color: #5f6f86;
+            font-size: 13px;
+            line-height: 1.6;
+            font-weight: 400;
+        }
+
+        .project-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            padding-top: 4px;
+        }
+
+        .proj {
+            border: 1.5px solid #dde3ed;
+            border-radius: 14px;
+            background: #ffffff;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04);
+            transition: box-shadow .18s ease, border-color .18s ease;
+            cursor: pointer;
+        }
+
+            .proj:hover {
+                box-shadow: 0 4px 16px rgba(15, 23, 42, 0.09), 0 12px 32px rgba(15, 23, 42, 0.07);
+            }
+
+            .proj:focus-visible {
+                outline: 3px solid rgba(59, 130, 246, 0.18);
+                outline-offset: 2px;
+            }
+
+            .proj.is-selected {
+                /* border-color set dynamically via JS per accent */
+                border-width: 2px;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12), 0 8px 28px rgba(15, 23, 42, 0.08);
+            }
+
+        /* Project avatar */
+        .proj-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+            letter-spacing: 0.02em;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        /* Check icon inside project card */
+        .proj-check {
+            display: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #3b82f6;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .proj.is-selected .proj-check {
+            display: flex;
+        }
+
+        /* Lock icons — right side of sidebar nav */
+        .nav-lock {
+            margin-left: auto;
+            flex-shrink: 0;
+            color: #94a3b8;
+        }
+
+        /* Hide locks once a project is selected */
+        html[data-project-selected] .nav-lock {
+            display: none;
+        }
+
+        /* Action panel — always present (fixed card size), buttons fade in on select */
+        .proj-action-panel {
+            /* no height animation */
+        }
+
+        .proj-action-panel-inner {
+            /* wrapper kept for structure */
+        }
+
+        .proj-action-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-top: 12px;
+            border-top: 1px solid #e9eef5;
+            margin-top: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .proj.is-selected .proj-action-btns {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .proj-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 9px;
+            border: 1.5px solid #1e293b;
+            background: #1e293b;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: var(--font);
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .proj-btn:hover {
+            background: #0f172a;
+            border-color: #0f172a;
+        }
+
+        .proj-btn.ghost {
+            background: #fff;
+            color: #374151;
+            border-color: #d8dee8;
+        }
+
+        .proj-btn.ghost:hover {
+            background: #f1f5f9;
+            border-color: #bfd0ea;
+        }
+
+        /* ── Card header ── */
+        .proj-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .proj-head-left { flex: 1; min-width: 0; }
+
+        .title {
+            margin: 0;
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.25;
+            color: #0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .role-pill {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 4px;
+            font-size: 11.5px;
+            font-weight: 500;
+            color: #64748b;
+        }
+
+        /* ── Two-column stats (Xero style) ── */
+        .proj-stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-top: 1px solid #eef1f6;
+            border-bottom: 1px solid #eef1f6;
+            margin-bottom: 10px;
+        }
+
+        .proj-stat-col {
+            padding: 8px 12px;
+        }
+
+        .proj-stat-col + .proj-stat-col {
+            border-left: 1px solid #eef1f6;
+        }
+
+        .proj-stat-num {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            color: #0f172a;
+        }
+
+        .proj-stat-lbl {
+            margin-top: 2px;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        /* ── 4-status mini row ── */
+        .proj-status-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .proj-status-chip {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 6px 4px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.07);
+        }
+
+        .proj-status-chip .sc-num {
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .proj-status-chip .sc-lbl {
+            font-size: 8.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .sc-completed { background: #d1fae5; border-color: #a7f3d0; }
+        .sc-completed .sc-num { color: #15803d; }
+
+        .sc-inprogress { background: #dbeafe; border-color: #bfdbfe; }
+        .sc-inprogress .sc-num { color: #1d4ed8; }
+
+        .sc-issue { background: #fee2e2; border-color: #fecaca; }
+        .sc-issue .sc-num { color: #b91c1c; }
+
+        .sc-notstarted { background: #fef3c7; border-color: #fde68a; }
+        .sc-notstarted .sc-num { color: #92400e; }
+
+        /* ── Progress bar ── */
+        .proj-progress-wrap {
+            margin-bottom: 0;
+        }
+
+        .proj-progress-bar {
+            height: 5px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+
+        .proj-progress-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #60a5fa, #3b82f6);
+            transition: width .3s ease;
+        }
+
+        .proj-progress-pct {
+            margin-top: 3px;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 500;
+            text-align: right;
+        }
+
+        .empty {
+            border: 1px dashed #d8dee8;
+            border-radius: 18px;
+            background: #fff;
+            padding: 18px;
+            color: #64748b;
+        }
+
+        .proj-actions {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .btn-settings {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid #d8dee8;
+            background: #f8fafc;
+            color: #64748b;
+            cursor: pointer;
+            transition: background .15s, border-color .15s, color .15s;
+            flex-shrink: 0;
+        }
+
+        .btn-settings:hover {
+            background: #f1f5f9;
+            border-color: #bfd0ea;
+            color: #0f172a;
+        }
+
+        .hero-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .user-badge {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            min-height: 36px;
+            padding: 0 14px;
+            border: 1px solid #d8dee8;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.78);
+            color: #334155;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* Permission-based sidebar rendering before projects.js finishes loading */
+        #navUpdateStatus,
+        #navAdmin,
+        #navAccess {
+            display: none;
+        }
+
+        html[data-user-role="internal"] #navUpdateStatus,
+        html[data-user-role="admin"] #navUpdateStatus {
+            display: flex;
+        }
+
+        html[data-user-role="admin"] #navAdmin {
+            display: flex;
+        }
+
+        html[data-user-role="admin"] #navAccess {
+            display: flex;
+        }
+
+        @media (max-width: 1100px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: static;
+                height: auto;
+                border-right: 0;
+                border-bottom: 1px solid #e5e7eb;
+                overflow: visible;
+            }
+
+            .sidebar-top {
+                overflow: visible;
+            }
+
+            .sidebar-bottom {
+                margin-top: 8px;
+            }
+
+            .content {
+                padding: 0 16px 24px;
+            }
+
+            .hero {
+                position: static;
+                margin: 0 -16px 16px;
+                padding: 16px;
+            }
+
+            .summary {
+                grid-template-columns: repeat(2, minmax(120px, 1fr));
+            }
+
+            .page-title {
+                font-size: 24px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .hero-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .project-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .proj-status-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-sticky">
+                <div class="brand">
+                    <div class="brand-title">Mentis Project Hub</div>
+                </div>
+
+                <nav class="nav">
+                    <button class="nav-link active" type="button" id="navProjects">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+                            <path d="m4 12 8 4 8-4"></path>
+                            <path d="m4 17 8 4 8-4"></path>
+                        </svg>
+                        <span>Projects</span>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navDashboard">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        <span>Dashboard</span>
+                        <svg class="nav-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navTickets">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Tickets</span>
+                        <svg class="nav-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navUpdateStatus">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+                        </svg>
+                        <span>Update Status</span>
+                        <svg class="nav-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navAdmin">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        <span>Admin</span>
+                    </button>
+
+                    <button class="nav-link" type="button" id="navAccess">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="8.5" cy="7" r="4"></circle>
+                            <path d="M20 8v6"></path>
+                            <path d="M23 11h-6"></path>
+                        </svg>
+                        <span>Access</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user" id="userChip">Loading...</div>
+                <button class="nav-link logout-link" type="button" id="logoutBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <path d="M16 17l5-5-5-5"></path>
+                        <path d="M21 12H9"></path>
+                    </svg>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="content">
+            <div class="hero">
+                <div class="hero-inner hero-row">
+                    <div>
+                        <h1 class="page-title">Select a project</h1>
+                        <p class="page-desc" id="msg">
+                            Choose a workspace to open dashboards, update candidate progress, and manage project tickets with role-based access.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="content-inner">
+                <div class="project-list" id="grid"></div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { supabase } from "./supabaseClient.js";
+
+        const el = (id) => document.getElementById(id);
+
+        async function requireSession() {
+            const { data } = await supabase.auth.getSession();
+            const session = data?.session;
+
+            if (!session) {
+                window.location.replace("./index.html");
+                return null;
+            }
+
+            supabase.auth.onAuthStateChange((_evt, s) => {
+                if (!s) window.location.replace("./index.html");
+            });
+
+            return session;
+        }
+
+        function makeChip(label, value, className) {
+            const div = document.createElement("div");
+            div.className = `chip ${className || ""}`.trim();
+            const lbl = document.createElement("span");
+            lbl.className = "lbl";
+            lbl.textContent = label;
+            const val = document.createElement("span");
+            val.className = "val";
+            val.textContent = value;
+            div.appendChild(lbl);
+            div.appendChild(val);
+            return div;
+        }
+
+        function calcCompletedPercent(total, completed) {
+            const t = Number(total || 0);
+            const c = Number(completed || 0);
+            if (!t) return 0;
+            return Math.max(0, Math.min(100, Math.round((c / t) * 100)));
+        }
+
+        function goNeedProject(page) {
+            const selectedProjectId = sessionStorage.getItem("selected_project_id");
+            if (!selectedProjectId) {
+                window.location.href = "./projects.html";
+                return;
+            }
+            window.location.href = `./${page}?project=${encodeURIComponent(selectedProjectId)}`;
+        }
+
+        function setSidebarAccess(profileRole) {
+            const role = String(profileRole || "").trim().toLowerCase();
+
+            sessionStorage.setItem("user_role", role);
+            document.documentElement.setAttribute("data-user-role", role);
+
+            const navUpdate = el("navUpdateStatus");
+            const navAdmin = el("navAdmin");
+            const navAccess = el("navAccess");
+
+            const canSeeUpdate = role === "admin" || role === "internal";
+            const canSeeAdmin = role === "admin";
+
+            if (navUpdate) {
+                navUpdate.style.display = canSeeUpdate ? "flex" : "none";
+                navUpdate.classList.toggle("is-hidden", !canSeeUpdate);
+            }
+
+            if (navAdmin) {
+                navAdmin.style.display = canSeeAdmin ? "flex" : "none";
+                navAdmin.classList.toggle("is-hidden", !canSeeAdmin);
+            }
+
+            if (navAccess) {
+                navAccess.style.display = canSeeAdmin ? "flex" : "none";
+                navAccess.classList.toggle("is-hidden", !canSeeAdmin);
+            }
+        }
+
+        const session = await requireSession();
+        if (!session) throw new Error("No session");
+
+        el("logoutBtn").addEventListener("click", async () => {
+            await supabase.auth.signOut();
+            sessionStorage.removeItem("selected_project_id");
+            window.location.replace("./index.html");
+        });
+
+        const { data: prof } = await supabase
+            .from("profiles")
+            .select("role, display_name")
+            .eq("id", session.user.id)
+            .maybeSingle();
+
+        const displayName =
+            prof?.display_name ||
+            session.user.user_metadata?.display_name ||
+            session.user.email ||
+            "User";
+        const userRole = String(prof?.role || "").trim().toLowerCase() || "viewer";
+        const chip = document.getElementById("userChip");
+        if (chip) chip.textContent = `${displayName} (${userRole})`;
+
+        if (prof?.role === "candidate") {
+            window.location.replace("./candidate-status.html");
+            throw new Error("candidate redirected");
+        }
+
+        setSidebarAccess(prof?.role);
+
+        const { data: mem, error } = await supabase
+            .from("project_members")
+            .select("project_id, role, projects(name, status)")
+            .eq("user_id", session.user.id);
+
+        if (error) {
+            el("msg").textContent = "Cannot load memberships: " + error.message;
+            throw error;
+        }
+
+        el("navProjects").addEventListener("click", () => {
+            window.location.href = "./projects.html";
+        });
+
+        el("navDashboard").addEventListener("click", () => {
+            goNeedProject("dashboard.html");
+        });
+
+        el("navTickets").addEventListener("click", () => {
+            goNeedProject("tickets.html");
+        });
+
+        el("navUpdateStatus").addEventListener("click", () => {
+            goNeedProject("form.html");
+        });
+
+        el("navAdmin").addEventListener("click", () => {
+            window.location.href = "./admin.html";
+        });
+
+        el("navAccess").addEventListener("click", () => {
+            window.location.href = "./admin-access.html";
+        });
+
+        if (!mem || mem.length === 0) {
+            el("msg").textContent = "No projects assigned. Please contact admin.";
+            el("grid").innerHTML = `<div class="empty">No projects assigned.</div>`;
+            throw new Error("No projects assigned");
+        }
+
+        const projectIds = mem.map((m) => m.project_id);
+
+        const { data: sums, error: sumErr } = await supabase
+            .from("project_overall_summary")
+            .select("*")
+            .in("project_id", projectIds);
+
+        if (sumErr) {
+            console.error(sumErr);
+        }
+
+        const summaryByProject = new Map();
+        for (const s of (sums || [])) {
+            summaryByProject.set(String(s.project_id), s);
+        }
+
+        const grid = el("grid");
+        grid.innerHTML = "";
+
+        const currentProjectId = String(sessionStorage.getItem("selected_project_id") || "");
+        if (currentProjectId) {
+            document.documentElement.setAttribute("data-project-selected", "true");
+        }
+
+        const ACCENTS = [
+            { border: '#3b82f6', avatar: '#3b82f6', chipBg: '#eff6ff' }, // blue
+            { border: '#8b5cf6', avatar: '#7c3aed', chipBg: '#f5f3ff' }, // violet
+            { border: '#10b981', avatar: '#059669', chipBg: '#ecfdf5' }, // emerald
+            { border: '#f59e0b', avatar: '#d97706', chipBg: '#fffbeb' }, // amber
+            { border: '#ef4444', avatar: '#dc2626', chipBg: '#fff1f2' }, // rose
+        ];
+
+        function getInitials(name) {
+            return String(name || "?")
+                .split(/\s+/)
+                .slice(0, 2)
+                .map(w => w[0]?.toUpperCase() || "")
+                .join("");
+        }
+
+        // Select a project without navigating — updates UI only
+        function selectProject(projectId, cardEl) {
+            sessionStorage.setItem("selected_project_id", String(projectId));
+            document.documentElement.setAttribute("data-project-selected", "true");
+            document.querySelectorAll(".proj.is-selected").forEach(c => {
+                c.classList.remove("is-selected");
+                c.style.borderColor = "";
+            });
+            cardEl.classList.add("is-selected");
+            cardEl.style.borderColor = cardEl.dataset.accentBorder || "";
+        }
+
+        function makeNavBtn(label, page, projectId, cls = "") {
+            const btn = document.createElement("button");
+            btn.className = "proj-btn" + (cls ? " " + cls : "");
+            btn.textContent = label;
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                sessionStorage.setItem("selected_project_id", String(projectId));
+                window.location.href = `./${page}?project=${encodeURIComponent(projectId)}`;
+            });
+            return btn;
+        }
+
+        (mem || []).filter((m) => m.projects?.status !== "archived").forEach((m, idx) => {
+            const accent = ACCENTS[idx % ACCENTS.length];
+            const name = m.projects?.name || "Project";
+            const role = m.role || "viewer";
+
+            const s = summaryByProject.get(String(m.project_id));
+            const total = s?.total_candidates ?? 0;
+            const completed = s?.n_completed ?? 0;
+            const inProgress = s?.n_in_progress ?? 0;
+            const issue = s?.n_issue ?? 0;
+            const notStarted = s?.n_not_started ?? 0;
+            const pct = calcCompletedPercent(total, completed);
+
+            const isSelected = currentProjectId === String(m.project_id);
+
+            const div = document.createElement("div");
+            div.className = "proj" + (isSelected ? " is-selected" : "");
+            if (isSelected) div.style.borderColor = accent.border;
+            div.tabIndex = 0;
+            div.setAttribute("role", "button");
+            div.setAttribute("aria-label", `Select ${name}`);
+            div.dataset.accentBorder = accent.border;
+
+            div.addEventListener("click", () => selectProject(m.project_id, div));
+            div.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectProject(m.project_id, div); }
+            });
+
+            // ── Header ──
+            const projHead = document.createElement("div");
+            projHead.className = "proj-head";
+
+            // Left: avatar + check + title + role
+            const headLeft = document.createElement("div");
+            headLeft.className = "proj-head-left";
+            headLeft.style.cssText = "display:flex;align-items:flex-start;gap:10px;min-width:0;";
+
+            const avatar = document.createElement("div");
+            avatar.className = "proj-avatar";
+            avatar.style.background = accent.avatar;
+            avatar.textContent = getInitials(name);
+
+            const checkIcon = document.createElement("div");
+            checkIcon.className = "proj-check";
+            checkIcon.style.background = accent.border;
+            checkIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+            const titleWrap = document.createElement("div");
+            titleWrap.style.minWidth = "0";
+
+            const titleEl = document.createElement("p");
+            titleEl.className = "title";
+            titleEl.textContent = name;
+
+            const roleEl = document.createElement("div");
+            roleEl.className = "role-pill";
+            roleEl.textContent = `Role: ${role}`;
+
+            titleWrap.appendChild(titleEl);
+            titleWrap.appendChild(roleEl);
+
+            headLeft.appendChild(avatar);
+            headLeft.appendChild(checkIcon);
+            headLeft.appendChild(titleWrap);
+
+            // Right: settings button (admin only)
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "proj-actions";
+
+            if (userRole === "admin") {
+                const settingsBtn = document.createElement("button");
+                settingsBtn.className = "btn-settings";
+                settingsBtn.title = "Project Settings";
+                settingsBtn.setAttribute("aria-label", "Project Settings");
+                settingsBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
+                settingsBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    sessionStorage.setItem("selected_project_id", String(m.project_id));
+                    window.location.href = `./project-settings.html?project=${encodeURIComponent(m.project_id)}`;
+                });
+                actionsDiv.appendChild(settingsBtn);
+            }
+
+            projHead.appendChild(headLeft);
+            projHead.appendChild(actionsDiv);
+            div.appendChild(projHead);
+
+            // ── Two-column stats (Xero style) ──
+            const statsRow = document.createElement("div");
+            statsRow.className = "proj-stats-row";
+
+            const colTotal = document.createElement("div");
+            colTotal.className = "proj-stat-col";
+            colTotal.innerHTML = `<div class="proj-stat-num" style="color:${accent.border}">${total}</div><div class="proj-stat-lbl">Total Candidates</div>`;
+
+            const colPct = document.createElement("div");
+            colPct.className = "proj-stat-col";
+            colPct.innerHTML = `<div class="proj-stat-num">${pct}%</div><div class="proj-stat-lbl">Completion</div>`;
+
+            statsRow.appendChild(colTotal);
+            statsRow.appendChild(colPct);
+            div.appendChild(statsRow);
+
+            // ── 4 status mini chips ──
+            const statusRow = document.createElement("div");
+            statusRow.className = "proj-status-row";
+
+            function makeStatusChip(cls, num, lbl) {
+                const c = document.createElement("div");
+                c.className = `proj-status-chip ${cls}`;
+                c.innerHTML = `<span class="sc-num">${num}</span><span class="sc-lbl">${lbl}</span>`;
+                return c;
+            }
+            statusRow.appendChild(makeStatusChip("sc-completed",  completed,   "Completed"));
+            statusRow.appendChild(makeStatusChip("sc-inprogress", inProgress,  "In Progress"));
+            statusRow.appendChild(makeStatusChip("sc-issue",      issue,       "Issue"));
+            statusRow.appendChild(makeStatusChip("sc-notstarted", notStarted,  "Not Started"));
+            div.appendChild(statusRow);
+
+            // ── Progress bar ──
+            const progressWrap = document.createElement("div");
+            progressWrap.className = "proj-progress-wrap";
+
+            const progressBar = document.createElement("div");
+            progressBar.className = "proj-progress-bar";
+
+            const progressFill = document.createElement("div");
+            progressFill.className = "proj-progress-fill";
+            progressFill.style.cssText = `width:${pct}%; background:linear-gradient(90deg,${accent.border}99,${accent.border})`;
+
+            const progressPct = document.createElement("div");
+            progressPct.className = "proj-progress-pct";
+            progressPct.textContent = `${pct}% complete`;
+
+            progressBar.appendChild(progressFill);
+            progressWrap.appendChild(progressBar);
+            progressWrap.appendChild(progressPct);
+            div.appendChild(progressWrap);
+
+            // ── Action panel (expands on select) ──
+            const actionPanel = document.createElement("div");
+            actionPanel.className = "proj-action-panel";
+
+            const actionInner = document.createElement("div");
+            actionInner.className = "proj-action-panel-inner";
+
+            const actionBtns = document.createElement("div");
+            actionBtns.className = "proj-action-btns";
+
+            actionBtns.appendChild(makeNavBtn("Open Dashboard", "dashboard.html", m.project_id));
+            actionBtns.appendChild(makeNavBtn("View Tickets", "tickets.html", m.project_id, "ghost"));
+
+            if (userRole === "admin" || userRole === "internal") {
+                actionBtns.appendChild(makeNavBtn("Update Status", "form.html", m.project_id, "ghost"));
+            }
+            if (userRole === "admin") {
+                actionBtns.appendChild(makeNavBtn("Settings", "project-settings.html", m.project_id, "ghost"));
+            }
+
+            actionInner.appendChild(actionBtns);
+            actionPanel.appendChild(actionInner);
+            div.appendChild(actionPanel);
+
+            grid.appendChild(div);
+        });
+    </script>
+</body>
+</html>

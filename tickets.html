@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Project Tickets</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="sidebar.css" />
+
+    <script>
+        (function () {
+            const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+            document.documentElement.setAttribute("data-user-role", cachedRole);
+        })();
+    </script>
+
+    <style>
+        .wrap {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 12px 30px rgba(2, 6, 23, 0.12);
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        .small {
+            font-size: 12px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: end;
+            margin-top: 8px;
+            margin-bottom: 10px;
+        }
+
+        .tool {
+            min-width: 180px;
+            flex: 1 1 180px;
+        }
+
+        .label {
+            display: block;
+            font-size: 11px;
+            font-weight: 900;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .input,
+        .select,
+        .textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            border-radius: 10px;
+            padding: 8px 10px;
+            background: #fff;
+            outline: none;
+            font: inherit;
+            font-size: 13px;
+        }
+
+        .textarea {
+            min-height: 78px;
+            resize: vertical;
+            line-height: 1.4;
+        }
+
+            .input:disabled,
+            .select:disabled,
+            .textarea:disabled {
+                background: #f8fafc;
+                color: #64748b;
+                cursor: not-allowed;
+            }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        table {
+            width: 100%;
+            min-width: 700px;
+            border-collapse: collapse;
+            table-layout: auto;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            vertical-align: middle;
+            font-size: 12px;
+        }
+
+        th {
+            font-size: 11px;
+            font-weight: 900;
+            color: #64748b;
+            background: #f8fafc;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            white-space: nowrap;
+        }
+
+        .ticket-row {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .ticket-row:hover td {
+            background: rgba(15, 23, 42, 0.025);
+        }
+
+        .ticket-row.is-expanded td {
+            background: rgba(59, 130, 246, 0.04);
+            border-bottom: none;
+        }
+
+        .expand-chevron {
+            display: inline-block;
+            font-size: 10px;
+            color: #94a3b8;
+            transition: transform 0.15s ease;
+            margin-right: 4px;
+            flex-shrink: 0;
+        }
+
+        .ticket-row.is-expanded .expand-chevron {
+            transform: rotate(90deg);
+        }
+
+        .ticket-detail-row > td {
+            padding: 0 !important;
+            background: #f8fafc;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+        }
+
+        .ticket-detail {
+            padding: 12px 14px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .detail-message-box {
+            background: #fff;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #334155;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            font-weight: 900;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
+
+        .detail-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .detail-control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 120px;
+        }
+
+        .detail-control-group .label {
+            margin-bottom: 0;
+        }
+
+        .reply-count-badge {
+            display: inline-flex;
+            align-items: center;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 0 6px;
+            margin-left: 6px;
+        }
+
+        .priority-low    { color: #94a3b8; }
+        .priority-normal { color: #475569; }
+        .priority-high   { color: #d97706; font-weight: 700; }
+        .priority-urgent { color: #dc2626; font-weight: 700; }
+
+        .hidden-row { display: none; }
+
+        .code-cell {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            background: #fff;
+            font-size: 11px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .pill-open {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1e40af;
+        }
+
+        .pill-done {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+            color: #065f46;
+        }
+
+        .pill-empty {
+            background: #f8fafc;
+            color: #64748b;
+        }
+
+        .msg {
+            margin-top: 8px;
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            background: rgba(15, 23, 42, 0.02);
+            display: none;
+        }
+
+            .msg.show {
+                display: block;
+            }
+
+            .msg.error {
+                border-color: rgba(239, 68, 68, 0.25);
+                background: rgba(239, 68, 68, 0.1);
+                color: #991b1b;
+            }
+
+            .msg.ok {
+                color: #0f172a;
+            }
+
+        .subject {
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.3;
+            min-width: 0;
+            max-width: 520px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .message-cell {
+            min-width: 260px;
+            white-space: normal;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12px;
+            word-break: break-word;
+        }
+
+
+        /* Reply thread */
+        .reply-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .reply-empty {
+            font-style: italic;
+            padding: 4px 0;
+        }
+
+        .reply-item {
+            border-radius: 10px;
+            padding: 7px 10px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .reply-staff {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+
+        .reply-client {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+        }
+
+        .reply-meta-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+            flex-wrap: wrap;
+        }
+
+        .reply-author-name {
+            font-weight: 700;
+            font-size: 11px;
+            color: #0f172a;
+        }
+
+        .reply-author-role {
+            font-size: 11px;
+            color: #64748b;
+            background: rgba(15,23,42,0.06);
+            padding: 1px 6px;
+            border-radius: 999px;
+        }
+
+        .reply-time {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-left: auto;
+        }
+
+        .reply-body {
+            color: #1e293b;
+            white-space: pre-wrap;
+        }
+
+        .new-reply {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .reply-submit {
+            align-self: flex-end;
+            padding: 5px 12px;
+            font-size: 12px;
+        }
+
+        .save-btn {
+            min-width: 82px;
+        }
+
+        .role-note {
+            margin-top: 0; /* keep header height same as projects/dashboard */
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        /* Permission-based sidebar rendering before tickets.js loads */
+        #navUpdateStatus,
+        #navAdmin {
+            display: none;
+        }
+
+        html[data-user-role="internal"] #navUpdateStatus,
+        html[data-user-role="admin"] #navUpdateStatus {
+            display: flex;
+        }
+
+        html[data-user-role="admin"] #navAdmin {
+            display: flex;
+        }
+
+        @media (max-width: 1024px) {
+            .wrap {
+                max-width: 100%;
+            }
+
+            .card {
+                padding: 14px;
+            }
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Sidebar (same structure as projects/dashboard) -->
+        <aside class="sidebar">
+            <div class="sidebar-sticky">
+                <div class="brand">
+                    <div class="brand-title">Mentis Project Hub</div>
+                </div>
+
+                <nav class="nav">
+                    <a class="nav-link" href="./projects.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+                            <path d="m4 12 8 4 8-4"></path>
+                            <path d="m4 17 8 4 8-4"></path>
+                        </svg>
+                        <span>Projects</span>
+                    </a>
+
+                    <a class="nav-link" id="navDashboard" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        <span>Dashboard</span>
+                    </a>
+
+                    <a class="nav-link active" id="navTickets" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Tickets</span>
+                    </a>
+
+                    <a class="nav-link" id="navUpdateStatus" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+                        </svg>
+                        <span>Update Status</span>
+                    </a>
+
+                    <a class="nav-link" id="navAdmin" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user" id="userChip">Loading...</div>
+                <button class="nav-link logout-link" type="button" id="logoutBtn">
+                    <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <path d="M16 17l5-5-5-5"></path>
+                        <path d="M21 12H9"></path>
+                    </svg>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main">
+            <!-- Sticky header (same pattern as projects/dashboard) -->
+            <header class="hero">
+                <div class="hero-inner">
+                    <div>
+                        <h1 class="page-title">Project Tickets</h1>
+                        <p class="page-desc">
+                            <span id="projectName">Loading project...</span>
+                            <span> | </span>
+                            <span id="editModeNote"></span>
+                        </p>
+                    </div>
+
+                    <div class="hero-actions">
+                        <button id="refreshBtn" class="btn" type="button">Refresh</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="wrap">
+                <div class="card">
+                    <div class="toolbar">
+                        <div class="tool">
+                            <label class="label" for="searchInput">Search</label>
+                            <input id="searchInput" class="input" type="text"
+                                   placeholder="Search by code / candidate / subject / message / created by / owner" />
+                        </div>
+
+                        <div class="tool">
+                            <label class="label" for="statusFilter">Status</label>
+                            <select id="statusFilter" class="select">
+                                <option value="">All</option>
+                                <option value="open">Open only</option>
+                                <option value="done">Done only</option>
+                            </select>
+                        </div>
+
+                        <div class="tool">
+                            <label class="label" for="priorityFilter">Priority</label>
+                            <select id="priorityFilter" class="select">
+                                <option value="">All</option>
+                                <option value="low">Low</option>
+                                <option value="normal">Normal</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="msg" class="msg"></div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:96px;">Code</th>
+                                    <th style="width:128px;">Candidate</th>
+                                    <th>Subject</th>
+                                    <th style="width:92px;">Status</th>
+                                    <th style="width:92px;">Priority</th>
+                                    <th id="thOwner" style="width:130px;">Owner</th>
+                                    <th style="width:120px;">Created By</th>
+                                    <th style="width:132px;">Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Keep your existing module script exactly as-is below this line -->
+    <script type="module">
+        import { supabase } from "./supabaseClient.js";
+        import { normalizeStatus, normalizePriority } from "./lib/ticket-utils.js";
+
+        const el = (id) => document.getElementById(id);
+
+        const tbody = el("tbody");
+        const msg = el("msg");
+        const searchInput = el("searchInput");
+        const statusFilter = el("statusFilter");
+        const priorityFilter = el("priorityFilter");
+        const editModeNote = el("editModeNote");
+
+        let PROJECT_CTX = null;
+        let ALL_ITEMS = [];
+        let REPLIES_BY_TICKET = new Map();
+        let NAME_BY_USER_ID = new Map();
+        let OWNER_OPTIONS = [];
+        let SESSION_USER_ID = null;
+        let SESSION_JWT = null;
+        let PROFILE_ROLE = null;
+        let DISPLAY_NAME = "";
+        let CAN_EDIT = false;
+        let IS_CLIENT = false;
+
+        function showMsg(text, isError = false) {
+            msg.className = "msg show " + (isError ? "error" : "ok");
+            msg.textContent = text;
+        }
+
+        function clearMsg() {
+            msg.className = "msg";
+            msg.textContent = "";
+        }
+
+        function escapeHtml(s) {
+            return String(s ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function formatDate(v) {
+            if (!v) return "-";
+            const d = new Date(v);
+            if (Number.isNaN(d.getTime())) return String(v);
+            return d.toLocaleString();
+        }
+
+        // normalizeStatus and normalizePriority imported from ./lib/ticket-utils.js
+
+        function getStatusPillClass(status) {
+            return status === "done" ? "pill pill-done" : "pill pill-open";
+        }
+
+        async function requireSession() {
+            const { data } = await supabase.auth.getSession();
+            const session = data?.session;
+
+            if (!session) {
+                window.location.replace("./index.html");
+                return null;
+            }
+
+            supabase.auth.onAuthStateChange((_evt, s) => {
+                if (!s) window.location.replace("./index.html");
+            });
+
+            return session;
+        }
+
+        async function loadMyProfileRole(userId) {
+            const { data, error } = await supabase
+                .from("profiles")
+                .select("role, display_name")
+                .eq("id", userId)
+                .maybeSingle();
+
+            if (error) {
+                console.error("profiles role query failed:", error);
+                return null;
+            }
+
+            return {
+                role: String(data?.role || "").trim().toLowerCase() || null,
+                displayName: data?.display_name || "",
+            };
+        }
+
+        async function resolveProjectForUser(userId) {
+            const { data: mem, error } = await supabase
+                .from("project_members")
+                .select("project_id, role, projects(name)")
+                .eq("user_id", userId);
+
+            if (error) throw error;
+            if (!mem || mem.length === 0) throw new Error("No project membership found.");
+
+            const url = new URL(window.location.href);
+            const projectParam = url.searchParams.get("project");
+            const storedProjectId = sessionStorage.getItem("selected_project_id");
+            const wantedId = String(projectParam || storedProjectId || "").trim();
+
+            if (wantedId) {
+                const hit = mem.find((m) => String(m.project_id) === wantedId);
+                if (hit) {
+                    sessionStorage.setItem("selected_project_id", String(hit.project_id));
+                    return {
+                        project_id: hit.project_id,
+                        project_name: hit.projects?.name || "Project",
+                        member_role: hit.role || "viewer"
+                    };
+                }
+            }
+
+            const first = mem[0];
+            return {
+                project_id: first.project_id,
+                project_name: first.projects?.name || "Project",
+                member_role: first.role || "viewer"
+            };
+        }
+
+        async function loadDisplayNameMap(userIds) {
+            const ids = Array.from(new Set((userIds || []).filter(Boolean).map(String)));
+
+            if (ids.length === 0) return new Map();
+
+            const { data, error } = await supabase
+                .from("profiles")
+                .select("id, display_name")
+                .in("id", ids);
+
+            if (error) {
+                console.error("profiles display_name query failed:", error);
+                return new Map();
+            }
+
+            const map = new Map();
+            for (const row of (data || [])) {
+                const id = String(row.id || "");
+                const name = String(row.display_name || "").trim();
+                map.set(id, name || id);
+            }
+
+            return map;
+        }
+
+        async function loadOwnerOptions(projectId) {
+            const { data: members, error } = await supabase
+                .from("project_members")
+                .select("user_id, role")
+                .eq("project_id", projectId);
+
+            if (error) {
+                console.error("project_members owner query failed:", error);
+                return [];
+            }
+
+            const ids = Array.from(new Set((members || []).map((m) => String(m.user_id || "")).filter(Boolean)));
+            const nameMap = await loadDisplayNameMap(ids);
+
+            return ids.map((id) => {
+                const member = (members || []).find((m) => String(m.user_id) === id);
+                const role = String(member?.role || "").trim().toLowerCase();
+                const label = nameMap.get(id) || id;
+
+                return {
+                    user_id: id,
+                    label: role ? `${label} (${role})` : label
+                };
+            });
+        }
+
+        function buildOwnerOptionsHtml(selectedValue) {
+            const current = String(selectedValue || "");
+            const options = [
+                `<option value="">Unassigned</option>`,
+                ...OWNER_OPTIONS.map((opt) => {
+                    const selected = current === String(opt.user_id) ? "selected" : "";
+                    return `<option value="${escapeHtml(opt.user_id)}" ${selected}>${escapeHtml(opt.label)}</option>`;
+                })
+            ];
+            return options.join("");
+        }
+
+        function getDisplayName(userId) {
+            const id = String(userId || "").trim();
+            if (!id) return "-";
+            return NAME_BY_USER_ID.get(id) || id;
+        }
+
+        function buildRepliesHtml(ticketId, legacyReply, legacyRepliedBy, legacyRepliedAt) {
+            const replies = REPLIES_BY_TICKET.get(String(ticketId)) || [];
+
+            // Show legacy reply_message as first entry if it exists and there are no new replies
+            const items = [];
+            if (legacyReply && replies.length === 0) {
+                items.push({
+                    author_id: legacyRepliedBy,
+                    author_role: "internal",
+                    message: legacyReply,
+                    created_at: legacyRepliedAt,
+                    legacy: true,
+                });
+            }
+            items.push(...replies);
+
+            if (items.length === 0) {
+                return `<div class="reply-empty muted small">No replies yet.</div>`;
+            }
+
+            return items.map((r) => {
+                const name = String(r.author_name || "").trim()
+                    || NAME_BY_USER_ID.get(String(r.author_id || ""))
+                    || (r.legacy ? "Staff" : "Unknown");
+                const role = String(r.author_role || "");
+                const isStaff = role === "admin" || role === "internal" || role === "staff";
+                const cls = isStaff ? "reply-staff" : "reply-client";
+                return `
+                  <div class="reply-item ${cls}">
+                    <div class="reply-meta-header">
+                      <span class="reply-author-name">${escapeHtml(name)}</span>
+                      <span class="reply-author-role">${escapeHtml(role || "staff")}</span>
+                      <span class="reply-time">${escapeHtml(formatDate(r.created_at))}</span>
+                    </div>
+                    <div class="reply-body">${escapeHtml(r.message)}</div>
+                  </div>`;
+            }).join("");
+        }
+
+        async function notifyViaEdge(payload) {
+            try {
+                await supabase.functions.invoke("ticket-notify", { body: payload });
+            } catch (e) {
+                console.warn("Email notification failed (non-fatal):", e);
+            }
+        }
+
+        async function submitReply(ticketId, message, replyInput, submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Sending...";
+            try {
+                const { data: reply, error } = await supabase
+                    .from("ticket_replies")
+                    .insert({
+                        ticket_id: ticketId,
+                        author_id: SESSION_USER_ID,
+                        author_role: PROFILE_ROLE || "viewer",
+                        author_name: DISPLAY_NAME,
+                        message: message.trim(),
+                    })
+                    .select()
+                    .single();
+                if (error) throw new Error(error.message);
+
+                // Add to local map
+                if (!REPLIES_BY_TICKET.has(String(ticketId))) {
+                    REPLIES_BY_TICKET.set(String(ticketId), []);
+                }
+                REPLIES_BY_TICKET.get(String(ticketId)).push(reply);
+                NAME_BY_USER_ID.set(String(SESSION_USER_ID), DISPLAY_NAME);
+
+                replyInput.value = "";
+                showMsg("Reply sent.");
+                const _expR = getExpandedIds();
+                render();
+                restoreExpanded(_expR);
+
+                // Scroll reply thread to bottom
+                const _detailTr = tbody.querySelector(`.ticket-detail-row[data-id="${ticketId}"]`);
+                const _thread = _detailTr?.querySelector(".reply-thread");
+                if (_thread) _thread.scrollTop = _thread.scrollHeight;
+
+                // Find the ticket for notification context
+                const ticket = ALL_ITEMS.find((t) => String(t.id) === String(ticketId));
+                await notifyViaEdge({
+                    ticketId: String(ticketId),
+                    eventType: "reply",
+                    authorId: SESSION_USER_ID,
+                    authorName: DISPLAY_NAME,
+                    authorRole: PROFILE_ROLE || "viewer",
+                    message: message.trim(),
+                    ticketSubject: ticket?.subject || "",
+                    candidateName: ticket?.candidate_name || "",
+                    projectName: PROJECT_CTX?.project_name || "",
+                    projectId: PROJECT_CTX?.project_id || "",
+                });
+            } catch (e) {
+                showMsg("Failed to send reply: " + e.message, true);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Reply";
+            }
+        }
+
+        function getExpandedIds() {
+            const ids = new Set();
+            for (const tr of tbody.querySelectorAll(".ticket-row.is-expanded")) {
+                ids.add(tr.dataset.id);
+            }
+            return ids;
+        }
+
+        function restoreExpanded(expandedIds) {
+            for (const id of expandedIds) {
+                const summaryTr = tbody.querySelector(`.ticket-row[data-id="${id}"]`);
+                const detailTr  = tbody.querySelector(`.ticket-detail-row[data-id="${id}"]`);
+                if (summaryTr && detailTr) {
+                    summaryTr.classList.add("is-expanded");
+                    detailTr.classList.remove("hidden-row");
+                }
+            }
+        }
+
+        function render() {
+            const q = String(searchInput.value || "").trim().toLowerCase();
+            const sf = String(statusFilter.value || "").trim().toLowerCase();
+            const pf = String(priorityFilter.value || "").trim().toLowerCase();
+
+            const rows = ALL_ITEMS.filter((row) => {
+                const status = normalizeStatus(row.status);
+                const priority = normalizePriority(row.priority);
+                const createdByName = getDisplayName(row.created_by);
+                const ownerName = getDisplayName(row.owner_user_id);
+
+                if (sf && status !== sf) return false;
+                if (pf && priority !== pf) return false;
+
+                if (q) {
+                    const hay = [
+                        row.code,
+                        row.candidate_name,
+                        row.subject,
+                        row.message,
+                        row.reply_message,
+                        createdByName,
+                        ownerName,
+                        row.status,
+                        row.priority
+                    ].map((x) => String(x || "").toLowerCase()).join(" | ");
+
+                    if (!hay.includes(q)) return false;
+                }
+
+                return true;
+            });
+
+            tbody.innerHTML = "";
+
+            const colCount = IS_CLIENT ? 7 : 8;
+
+            if (rows.length === 0) {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td colspan="${colCount}" class="muted">No tickets found.</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+
+            for (const row of rows) {
+                const status       = normalizeStatus(row.status);
+                const priority     = normalizePriority(row.priority);
+                const createdByText = getDisplayName(row.created_by);
+                const ownerText    = getDisplayName(row.owner_user_id);
+                const canEditRow      = CAN_EDIT;
+                const canEditPriority = CAN_EDIT || IS_CLIENT;
+                const canSave         = CAN_EDIT || IS_CLIENT;
+
+                const replyList   = REPLIES_BY_TICKET.get(String(row.id)) || [];
+                const replyCount  = replyList.length;
+                const statusClass = status === "done" ? "pill pill-done" : "pill pill-open";
+
+                // เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ Summary row เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ
+                const summaryTr = document.createElement("tr");
+                summaryTr.className = "ticket-row";
+                summaryTr.dataset.id = String(row.id);
+                summaryTr.innerHTML = `
+                  <td><div class="code-cell mono">
+                    <span class="expand-chevron">เน€เธยเนโฌโ€เน€เธโ€“</span>${escapeHtml(row.code || "-")}
+                  </div></td>
+                  <td>${escapeHtml(row.candidate_name || "-")}</td>
+                  <td>
+                    <div class="subject">${escapeHtml(row.subject || "-")}</div>
+                    ${replyCount > 0 ? `<span class="reply-count-badge">${replyCount} repl${replyCount === 1 ? "y" : "ies"}</span>` : ""}
+                  </td>
+                  <td><span class="${statusClass}">${status === "done" ? "Done" : "Open"}</span></td>
+                  <td><span class="priority-${priority}">${priority.charAt(0).toUpperCase() + priority.slice(1)}</span></td>
+                  ${IS_CLIENT ? "" : `<td class="muted small">${escapeHtml(ownerText)}</td>`}
+                  <td class="muted small">${escapeHtml(createdByText)}</td>
+                  <td class="muted small">${escapeHtml(formatDate(row.created_at))}</td>
+                `;
+
+                // เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ Detail row เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ
+                const detailTr = document.createElement("tr");
+                detailTr.className = "ticket-detail-row hidden-row";
+                detailTr.dataset.id = String(row.id);
+                detailTr.innerHTML = `
+                  <td colspan="${colCount}">
+                    <div class="ticket-detail">
+
+                      ${row.message ? `<div>
+                        <div class="detail-label">Message</div>
+                        <div class="detail-message-box">${escapeHtml(row.message)}</div>
+                      </div>` : ""}
+
+                      <div class="detail-controls">
+                        ${canEditRow ? `<div class="detail-control-group">
+                          <label class="label">Status</label>
+                          <select class="select row-status">
+                            <option value="open" ${status === "open" ? "selected" : ""}>Open</option>
+                            <option value="done" ${status === "done" ? "selected" : ""}>Done</option>
+                          </select>
+                        </div>` : ""}
+                        <div class="detail-control-group">
+                          <label class="label">Priority</label>
+                          <select class="select row-priority" ${canEditPriority ? "" : "disabled"}>
+                            <option value="low"    ${priority === "low"    ? "selected" : ""}>Low</option>
+                            <option value="normal" ${priority === "normal" ? "selected" : ""}>Normal</option>
+                            <option value="high"   ${priority === "high"   ? "selected" : ""}>High</option>
+                            <option value="urgent" ${priority === "urgent" ? "selected" : ""}>Urgent</option>
+                          </select>
+                        </div>
+                        ${!IS_CLIENT ? `<div class="detail-control-group">
+                          <label class="label">Owner</label>
+                          <select class="select row-owner" ${canEditRow ? "" : "disabled"}>
+                            ${buildOwnerOptionsHtml(row.owner_user_id)}
+                          </select>
+                        </div>` : ""}
+                        ${canSave ? `<button class="btn save-btn row-save" type="button" style="align-self:flex-end;">Save</button>` : ""}
+                      </div>
+
+                      <div>
+                        <div class="detail-label">Replies</div>
+                        <div class="reply-thread">
+                          ${buildRepliesHtml(row.id, row.reply_message, row.replied_by, row.replied_at)}
+                        </div>
+                        ${canSave ? `<div class="new-reply">
+                          <textarea class="textarea new-reply-input" placeholder="Write a reply..."></textarea>
+                          <button class="btn reply-submit" type="button">Reply</button>
+                        </div>` : ""}
+                      </div>
+
+                    </div>
+                  </td>
+                `;
+
+                tbody.appendChild(summaryTr);
+                tbody.appendChild(detailTr);
+            }
+
+            bindRowActions();
+        }
+
+        function bindRowActions() {
+            // เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ Row expand/collapse เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ
+            for (const summaryTr of tbody.querySelectorAll(".ticket-row")) {
+                summaryTr.addEventListener("click", (e) => {
+                    // Don't toggle when clicking interactive elements
+                    if (e.target.closest("select, button, input, textarea")) return;
+
+                    const ticketId = summaryTr.dataset.id;
+                    const detailTr = tbody.querySelector(`.ticket-detail-row[data-id="${ticketId}"]`);
+                    if (!detailTr) return;
+
+                    const isExpanded = summaryTr.classList.toggle("is-expanded");
+                    detailTr.classList.toggle("hidden-row", !isExpanded);
+                });
+            }
+
+            // เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ Save buttons (in detail row) เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ
+            for (const btn of tbody.querySelectorAll(".row-save")) {
+                btn.addEventListener("click", async () => {
+                    const detailTr = btn.closest(".ticket-detail-row");
+                    if (!detailTr) return;
+
+                    const requestId = String(detailTr.dataset.id || "");
+                    if (!requestId) return;
+
+                    const statusEl   = detailTr.querySelector(".row-status");
+                    const priorityEl = detailTr.querySelector(".row-priority");
+                    const ownerEl    = detailTr.querySelector(".row-owner");
+
+                    const newStatus       = normalizeStatus(statusEl?.value);
+                    const newPriority     = normalizePriority(priorityEl?.value);
+                    const newOwnerUserId  = ownerEl ? (String(ownerEl.value || "").trim() || null) : undefined;
+
+                    btn.disabled = true;
+                    btn.textContent = "Saving...";
+
+                    try {
+                        const idx = ALL_ITEMS.findIndex((x) => String(x.id) === requestId);
+                        const oldItem     = idx >= 0 ? ALL_ITEMS[idx] : null;
+                        const oldStatus   = oldItem ? normalizeStatus(oldItem.status) : null;
+                        const oldPriority = oldItem ? normalizePriority(oldItem.priority) : null;
+
+                        // Build RPC params เน€เธยเนยเธเนโฌย column-level enforcement happens server-side
+                        const rpcParams = {
+                            p_ticket_id: requestId,
+                            p_priority:  newPriority,
+                        };
+                        if (!IS_CLIENT) {
+                            rpcParams.p_status = newStatus;
+                            if (newOwnerUserId !== undefined) {
+                                rpcParams.p_owner_user_id = newOwnerUserId ?? null;
+                                rpcParams.p_set_owner     = true;
+                            }
+                        }
+
+                        const { error: rpcError } = await supabase.rpc("update_ticket", rpcParams);
+                        if (rpcError) throw new Error(rpcError.message);
+
+                        // Re-fetch the updated row
+                        const { data, error: fetchError } = await supabase
+                            .from("requests")
+                            .select("id, project_id, record_id, code, candidate_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
+                            .eq("id", requestId)
+                            .single();
+                        if (fetchError) throw new Error(fetchError.message);
+                        if (idx >= 0) ALL_ITEMS[idx] = data;
+
+                        if (!IS_CLIENT) {
+                            NAME_BY_USER_ID = await loadDisplayNameMap([
+                                ...ALL_ITEMS.map((r) => r.created_by),
+                                ...ALL_ITEMS.map((r) => r.owner_user_id),
+                            ]);
+                        }
+
+                        showMsg("Ticket saved.");
+
+                        // Fire status_change / priority_change notifications
+                        const savedTicket = idx >= 0 ? ALL_ITEMS[idx] : null;
+                        if (savedTicket) {
+                            const notifyBase = {
+                                ticketId:      requestId,
+                                authorId:      SESSION_USER_ID,
+                                authorName:    DISPLAY_NAME,
+                                authorRole:    PROFILE_ROLE || "viewer",
+                                ticketSubject: savedTicket.subject || "",
+                                candidateName: savedTicket.candidate_name || "",
+                                projectName:   PROJECT_CTX?.project_name || "",
+                                projectId:     savedTicket.project_id || "",
+                            };
+                            if (!IS_CLIENT && oldStatus && newStatus && oldStatus !== newStatus) {
+                                await notifyViaEdge({ ...notifyBase, eventType: "status_change",
+                                    message: `Status changed from ${oldStatus} to ${newStatus}` });
+                            }
+                            if (oldPriority && newPriority && oldPriority !== newPriority) {
+                                await notifyViaEdge({ ...notifyBase, eventType: "priority_change",
+                                    message: `Priority changed from ${oldPriority} to ${newPriority}` });
+                            }
+                        }
+
+                        const _exp = getExpandedIds();
+                        render();
+                        restoreExpanded(_exp);
+                    } catch (e) {
+                        console.error(e);
+                        showMsg(`Failed to save: ${e.message}`, true);
+                    } finally {
+                        btn.disabled = false;
+                        btn.textContent = "Save";
+                    }
+                });
+            }
+
+            // เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ Reply submit buttons เน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธเน€เธยเนโฌยเนยเธ
+            for (const btn of tbody.querySelectorAll(".reply-submit")) {
+                btn.addEventListener("click", async () => {
+                    const detailTr = btn.closest(".ticket-detail-row");
+                    if (!detailTr) return;
+                    const ticketId = String(detailTr.dataset.id || "");
+                    if (!ticketId) return;
+                    const replyInput = detailTr.querySelector(".new-reply-input");
+                    const message = String(replyInput?.value || "").trim();
+                    if (!message) { showMsg("Reply message cannot be empty.", true); return; }
+                    await submitReply(ticketId, message, replyInput, btn);
+                });
+            }
+        }
+
+        async function loadTickets() {
+            clearMsg();
+
+            showMsg(`Loading tickets for project: ${PROJECT_CTX.project_id}`);
+
+            const { data, error } = await supabase
+                .from("requests")
+                .select("id, project_id, record_id, code, candidate_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
+                .eq("project_id", PROJECT_CTX.project_id)
+                .order("created_at", { ascending: false });
+
+            if (error) throw new Error(`requests select failed: ${error.message}`);
+
+            ALL_ITEMS = Array.isArray(data) ? data : [];
+
+            // Load reply threads
+            REPLIES_BY_TICKET.clear();
+            const ticketIds = ALL_ITEMS.map((r) => r.id).filter(Boolean);
+            if (ticketIds.length > 0) {
+                const { data: replies } = await supabase
+                    .from("ticket_replies")
+                    .select("id, ticket_id, author_id, author_name, author_role, message, created_at")
+                    .in("ticket_id", ticketIds)
+                    .order("created_at", { ascending: true });
+
+                for (const reply of (replies || [])) {
+                    const key = String(reply.ticket_id);
+                    if (!REPLIES_BY_TICKET.has(key)) REPLIES_BY_TICKET.set(key, []);
+                    REPLIES_BY_TICKET.get(key).push(reply);
+                }
+            }
+
+            const replyAuthorIds = [];
+            for (const list of REPLIES_BY_TICKET.values()) {
+                for (const r of list) replyAuthorIds.push(r.author_id);
+            }
+
+            const idsToResolve = [
+                ...ALL_ITEMS.map((r) => r.created_by),
+                ...ALL_ITEMS.map((r) => r.owner_user_id),
+                ...ALL_ITEMS.map((r) => r.replied_by),
+                ...replyAuthorIds,
+            ];
+
+            NAME_BY_USER_ID = await loadDisplayNameMap(idsToResolve);
+
+            showMsg(`Loaded ${ALL_ITEMS.length} ticket(s) for project: ${PROJECT_CTX.project_id}`);
+            render();
+        }
+
+        const session = await requireSession();
+        if (!session) throw new Error("No session");
+
+        SESSION_USER_ID = session.user.id;
+        SESSION_JWT = session.access_token;
+
+        const _profileData = await loadMyProfileRole(SESSION_USER_ID);
+        PROFILE_ROLE = _profileData?.role || null;
+        DISPLAY_NAME = _profileData?.displayName || session.user.email || session.user.id;
+
+        const _chipName = DISPLAY_NAME;
+        const _chip = el("userChip");
+        if (_chip) _chip.textContent = `${_chipName} (${PROFILE_ROLE || "viewer"})`;
+
+        // Hide restricted nav items by default, then show based on role (prevents flash)
+        (function applyRoleNavVisibility() {
+            const isAdmin = PROFILE_ROLE === "admin";
+            const isInternal = PROFILE_ROLE === "internal";
+
+            const canSeeUpdateStatus = isAdmin || isInternal; // internal/admin
+            const canSeeAdmin = isAdmin; // admin only
+
+            const navForm = document.getElementById("navUpdateStatus");
+            if (navForm) navForm.style.display = canSeeUpdateStatus ? "" : "none";
+
+            const navAdmin = document.getElementById("navAdmin");
+            if (navAdmin) navAdmin.style.display = canSeeAdmin ? "" : "none";
+        })();
+
+        PROJECT_CTX = await resolveProjectForUser(SESSION_USER_ID);
+
+        CAN_EDIT   = PROFILE_ROLE === "admin" || String(PROJECT_CTX.member_role || "").toLowerCase() === "editor";
+        IS_CLIENT  = PROFILE_ROLE === "client";
+
+        // Hide Owner column for client role
+        const thOwner = el("thOwner");
+        if (thOwner && IS_CLIENT) thOwner.style.display = "none";
+
+        el("projectName").textContent = `${PROJECT_CTX.project_name} (${PROJECT_CTX.member_role})`;
+        document.title = `Tickets - ${PROJECT_CTX.project_name}`;
+
+
+        if (CAN_EDIT) {
+            editModeNote.textContent = "Edit mode enabled for admin/editor.";
+        } else if (IS_CLIENT) {
+            editModeNote.textContent = "You can update priority and reply to tickets.";
+        } else {
+            editModeNote.textContent = "View only mode. Only admin/editor can update tickets.";
+        }
+
+        OWNER_OPTIONS = await loadOwnerOptions(PROJECT_CTX.project_id);
+
+        // Logout (sidebar link)
+        el("logoutBtn").addEventListener("click", async () => {
+            await supabase.auth.signOut();
+            sessionStorage.removeItem("selected_project_id");
+            window.location.replace("./index.html");
+        });
+
+        // Wire sidebar nav links (keep ?project=...)
+        // Force navigation on click (more reliable than relying on href only).
+        (function wireSidebarLinks() {
+            const pid = encodeURIComponent(PROJECT_CTX.project_id);
+
+            const wire = (id, url) => {
+                const a = document.getElementById(id);
+                if (!a) return;
+
+                // Set href for normal behavior
+                a.setAttribute("href", url);
+
+                // Force navigation (in case href is still "#" or gets overridden)
+                a.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    window.location.href = url;
+                });
+            };
+
+            wire("navDashboard",    `./dashboard.html?project=${pid}`);
+            wire("navTickets",      `./tickets.html?project=${pid}`);
+            wire("navUpdateStatus", `./form.html?project=${pid}`);
+            wire("navAdmin",        `./admin.html?project=${pid}`);
+        })();
+
+        el("refreshBtn").addEventListener("click", async () => {
+            try {
+                await loadTickets();
+                showMsg("Tickets refreshed.");
+            } catch (e) {
+                showMsg("Failed to load tickets: " + e.message, true);
+            }
+        });
+
+        searchInput.addEventListener("input", render);
+        statusFilter.addEventListener("change", render);
+        priorityFilter.addEventListener("change", render);
+
+        try {
+            await loadTickets();
+            if (ALL_ITEMS.length === 0) showMsg("No tickets yet for this project.");
+        } catch (e) {
+            console.error(e);
+            showMsg("Failed to load tickets: " + e.message, true);
+        }
+    </script>
+</body>
+
+</html>
