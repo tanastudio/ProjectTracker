@@ -101,11 +101,26 @@ npm run test:watch # watch mode
 To bulk-create candidate auth users from existing records:
 
 ```bash
-node --env-file=.env create-candidate-users.mjs
+node --env-file=.env provision-users.mjs candidates
 ```
 
 Requires `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PROJECT_ID`, and
 `DEFAULT_CANDIDATE_PASSWORD` in `.env`.
+
+To provision a full local test-user set (admin, internal, client, and candidate):
+
+```bash
+node --env-file=.env provision-users.mjs test-users
+```
+
+This also requires `TEST_USER_PASSWORD` or `DEFAULT_CANDIDATE_PASSWORD` in `.env`.
+
+The legacy wrappers still work:
+
+```bash
+node --env-file=.env create-candidate-users.mjs
+node --env-file=.env provision-local-test-users.mjs
+```
 
 ## Deploying edge functions to production
 

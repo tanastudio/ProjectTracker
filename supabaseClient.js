@@ -4,7 +4,7 @@
 // permitted by Row-Level Security policies. Keep it here.
 //
 // SERVICE ROLE KEY — must NEVER appear in frontend source. It bypasses all RLS.
-// Use it only in server-side scripts (create-candidate-users.mjs) and edge
+// Use it only in server-side scripts (provision-users.mjs) and edge
 // functions, loaded exclusively from environment variables.
 //
 // Environment switching is handled in js/config.js (auto-detects by hostname).
