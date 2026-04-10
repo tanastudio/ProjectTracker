@@ -604,7 +604,7 @@
             forgotPasswordBtn.disabled = true;
 
             try {
-                const redirectTo = `${window.location.origin}${window.location.pathname.replace("index.html", "update-password.html")}`;
+                const redirectTo = new URL("./update-password.html", window.location.href).toString();
 
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
                     redirectTo
