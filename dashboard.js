@@ -66,6 +66,7 @@ const exportXlsxBtn = el("exportXlsxBtn");
 
 let CURRENT_ITEMS = [];
 let REQ_CONTEXT = null;
+let TICKET_STATS_BY_RECORD = new Map();
 
 /* ---------- Auth ---------- */
 async function requireSession() {
@@ -401,6 +402,121 @@ function normalizeStatus(v) {
     return STEP_STATUS.includes(s) ? s : "Not Started";
 }
 
+function getTicketsSeenStorageKey(projectId, userId) {
+    return `tickets_last_seen:${String(projectId || "").trim()}:${String(userId || "").trim()}`;
+}
+
+function getTicketsSeenAt(projectId, userId) {
+    const raw = localStorage.getItem(getTicketsSeenStorageKey(projectId, userId));
+    const stamp = raw ? Date.parse(raw) : Number.NaN;
+    return Number.isFinite(stamp) ? stamp : 0;
+}
+
+function normalizeTicketStatus(value) {
+    return String(value || "").trim().toLowerCase() === "done" ? "done" : "open";
+}
+
+function getRequestButtonMarkup(item) {
+    const stats = TICKET_STATS_BY_RECORD.get(String(item?.id || "")) || { unreadCount: 0, openCount: 0 };
+    const unreadCount = Math.max(0, Number(stats.unreadCount || 0));
+    const openCount = Math.max(0, Number(stats.openCount || 0));
+    const stateClass = unreadCount > 0 ? "has-unread" : openCount > 0 ? "has-open" : "";
+    const countMarkup = unreadCount > 0
+        ? `<span class="ticket-indicator-badge" aria-label="${unreadCount} unread ticket${unreadCount === 1 ? "" : "s"}">${unreadCount}</span>`
+        : openCount > 0
+            ? `<span class="ticket-indicator-count" aria-label="${openCount} open ticket${openCount === 1 ? "" : "s"}">${openCount}</span>`
+            : "";
+
+    const buttonClass = ["btn-mini", "primary", "js-request", stateClass].filter(Boolean).join(" ");
+    return `<button class="${buttonClass}"
+            data-id="${escapeHtml(item?.id)}"
+            data-code="${escapeHtml(item?.code)}"
+            data-name="${escapeHtml(item?.candidateName)}"
+            data-email="${escapeHtml(item?.email)}">
+            <span class="ticket-indicator-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 6h16v12H4z"></path>
+                    <path d="m4 7 8 6 8-6"></path>
+                </svg>
+            </span>
+            <span>Request</span>
+            ${countMarkup}
+        </button>`;
+}
+
+function getTicketActivityMeta(ticket, replies) {
+    const candidates = [];
+    const createdAt = Date.parse(ticket?.created_at || "");
+    if (Number.isFinite(createdAt)) candidates.push({ at: createdAt, actorId: String(ticket?.created_by || "") });
+
+    const repliedAt = Date.parse(ticket?.replied_at || "");
+    if (Number.isFinite(repliedAt)) candidates.push({ at: repliedAt, actorId: String(ticket?.replied_by || "") });
+
+    for (const reply of replies || []) {
+        const at = Date.parse(reply?.created_at || "");
+        if (!Number.isFinite(at)) continue;
+        candidates.push({ at, actorId: String(reply?.author_id || "") });
+    }
+
+    if (candidates.length === 0) {
+        return { lastAt: 0, actorId: "" };
+    }
+
+    candidates.sort((a, b) => a.at - b.at);
+    return candidates[candidates.length - 1];
+}
+
+async function loadTicketStats(projectId) {
+    if (!projectId) {
+        TICKET_STATS_BY_RECORD = new Map();
+        return;
+    }
+
+    const lastSeenAt = getTicketsSeenAt(projectId, __session.user.id);
+
+    const { data: tickets, error: ticketsError } = await supabase
+        .from("requests")
+        .select("id, record_id, status, created_at, created_by, replied_at, replied_by")
+        .eq("project_id", projectId);
+    if (ticketsError) throw ticketsError;
+
+    const ticketIds = (tickets || []).map((ticket) => ticket.id).filter(Boolean);
+    const repliesByTicket = new Map();
+
+    if (ticketIds.length > 0) {
+        const { data: replies, error: repliesError } = await supabase
+            .from("ticket_replies")
+            .select("ticket_id, author_id, created_at")
+            .in("ticket_id", ticketIds)
+            .order("created_at", { ascending: true });
+        if (repliesError) throw repliesError;
+
+        for (const reply of (replies || [])) {
+            const ticketId = String(reply.ticket_id || "");
+            if (!repliesByTicket.has(ticketId)) repliesByTicket.set(ticketId, []);
+            repliesByTicket.get(ticketId).push(reply);
+        }
+    }
+
+    const nextStats = new Map();
+    for (const ticket of (tickets || [])) {
+        const recordId = String(ticket?.record_id || "");
+        if (!recordId) continue;
+
+        const current = nextStats.get(recordId) || { unreadCount: 0, openCount: 0 };
+        if (normalizeTicketStatus(ticket?.status) === "open") current.openCount += 1;
+
+        const activity = getTicketActivityMeta(ticket, repliesByTicket.get(String(ticket.id || "")));
+        if (activity.lastAt > lastSeenAt && activity.actorId && activity.actorId !== __session.user.id) {
+            current.unreadCount += 1;
+        }
+
+        nextStats.set(recordId, current);
+    }
+
+    TICKET_STATS_BY_RECORD = nextStats;
+}
+
 function isEmailShownInDashboard(fieldsList) {
     const emailField = (fieldsList || []).find((f) => {
         const key = String(f?.key || "").toLowerCase();
@@ -474,11 +590,7 @@ function renderTable(items) {
         // Request (sticky-0)
         const tdReq = document.createElement("td");
         tdReq.className = "sticky-col sticky-col-0";
-        tdReq.innerHTML = `<button class="btn-mini primary js-request"
-            data-id="${escapeHtml(it.id)}"
-            data-code="${escapeHtml(it.code)}"
-            data-name="${escapeHtml(it.candidateName)}"
-            data-email="${escapeHtml(it.email)}">Request</button>`;
+        tdReq.innerHTML = getRequestButtonMarkup(it);
         tr.appendChild(tdReq);
 
         // Code (sticky-1)
@@ -772,13 +884,7 @@ function openStatusModal(status) {
         <td class="issue-cell">${escapeHtml(it.issue)}</td>
         <td class="issue-cell">${escapeHtml(it.decision)}</td>
         <td>
-          <button class="btn-mini primary js-request"
-            data-id="${escapeHtml(it.id)}"
-            data-code="${escapeHtml(it.code)}"
-            data-name="${escapeHtml(it.candidateName)}"
-            data-email="${escapeHtml(it.email)}">
-            Request
-          </button>
+          ${getRequestButtonMarkup(it)}
         </td>
       `;
             modalTbody.appendChild(tr);
@@ -872,6 +978,8 @@ async function sendRequestToSupabase() {
 
         reqHint.textContent = "Sent ✅";
         setTimeout(() => closeRequestModal(), 450);
+        await loadTicketStats(PROJECT_CTX.project_id);
+        renderTable(applyDashFilter());
 
         await notifyViaEdge({
             ticketId: String(newTicket.id),
@@ -1118,6 +1226,7 @@ async function refresh() {
         const recordValues = await loadRecordValues(rids);
         const items = buildItems(records, recordValues, fieldsById);
         CURRENT_ITEMS = items;
+        await loadTicketStats(PROJECT_CTX.project_id);
 
         buildDashFilterControls();
 

@@ -592,6 +592,15 @@
         let CAN_EDIT = false;
         let IS_CLIENT = false;
 
+        function getTicketsSeenStorageKey(projectId, userId) {
+            return `tickets_last_seen:${String(projectId || "").trim()}:${String(userId || "").trim()}`;
+        }
+
+        function markTicketsSeen(projectId, userId) {
+            if (!projectId || !userId) return;
+            localStorage.setItem(getTicketsSeenStorageKey(projectId, userId), new Date().toISOString());
+        }
+
         function showMsg(text, isError = false) {
             msg.className = "msg show " + (isError ? "error" : "ok");
             msg.textContent = text;
@@ -1197,6 +1206,7 @@
 
             showMsg(`Loaded ${ALL_ITEMS.length} ticket(s) for project: ${PROJECT_CTX.project_id}`);
             render();
+            markTicketsSeen(PROJECT_CTX.project_id, SESSION_USER_ID);
         }
 
         const session = await requireSession();

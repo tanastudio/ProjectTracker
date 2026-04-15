@@ -768,6 +768,56 @@ table.excel tbody tr:hover td.sticky-col {
     border-color: #0f172a;
 }
 
+.ticket-indicator-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+}
+
+.ticket-indicator-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
+.ticket-indicator-badge,
+.ticket-indicator-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.ticket-indicator-badge {
+    background: #ef4444;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.25);
+}
+
+.ticket-indicator-count {
+    background: rgba(255,255,255,0.16);
+    color: rgba(255,255,255,0.78);
+}
+
+.btn-mini.has-open:not(.has-unread) {
+    background: #334155;
+    border-color: #334155;
+}
+
+.btn-mini.has-open:not(.has-unread):hover {
+    background: #1f2937;
+    border-color: #1f2937;
+}
+
 @media (max-width:700px) {
     .req-grid {
         grid-template-columns: 1fr;
