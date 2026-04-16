@@ -251,6 +251,11 @@
             line-height: 1;
         }
 
+        .proj-btn-badge.is-open-only {
+            background: #e2e8f0;
+            color: #64748b;
+        }
+
         /* ── Card header ── */
         .proj-head {
             display: flex;
@@ -707,7 +712,7 @@
         }
 
         let projectIds = [];
-        let unreadTicketCounts = new Map();
+        let ticketCountsByProject = new Map();
 
         const session = await requireSession();
         if (!session) throw new Error("No session");
@@ -791,14 +796,14 @@
         projectIds = mem.map((m) => m.project_id);
 
         try {
-            unreadTicketCounts = await loadUnreadTicketCountsByProject({
+            ticketCountsByProject = await loadUnreadTicketCountsByProject({
                 supabase,
                 projectIds,
                 userId: session.user.id,
             });
         } catch (badgeError) {
             console.warn("project unread ticket counts failed:", badgeError?.message || badgeError);
-            unreadTicketCounts = new Map();
+            ticketCountsByProject = new Map();
         }
 
         await ticketNavBadge.refresh();
@@ -857,15 +862,19 @@
         function makeNavBtn(label, page, projectId, cls = "") {
             const btn = document.createElement("button");
             btn.className = "proj-btn" + (cls ? " " + cls : "");
-            const unreadCount = page === "tickets.html"
-                ? Number(unreadTicketCounts.get(String(projectId)) || 0)
-                : 0;
+            const ticketCounts = page === "tickets.html"
+                ? (ticketCountsByProject.get(String(projectId)) || { unreadCount: 0, openCount: 0 })
+                : { unreadCount: 0, openCount: 0 };
+            const displayCount = ticketCounts.unreadCount > 0 ? ticketCounts.unreadCount : ticketCounts.openCount;
 
             btn.textContent = label;
-            if (unreadCount > 0) {
+            if (displayCount > 0) {
                 const badge = document.createElement("span");
                 badge.className = "proj-btn-badge";
-                badge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+                if (ticketCounts.unreadCount <= 0 && ticketCounts.openCount > 0) {
+                    badge.classList.add("is-open-only");
+                }
+                badge.textContent = displayCount > 99 ? "99+" : String(displayCount);
                 btn.appendChild(badge);
             }
             btn.addEventListener("click", (e) => {

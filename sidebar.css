@@ -138,6 +138,11 @@ body {
     box-shadow: 0 0 0 2px rgba(255,255,255,0.96);
 }
 
+.nav-ticket-badge.is-open-only {
+    background: #e2e8f0;
+    color: #64748b;
+}
+
 .nav-ticket-badge[hidden] {
     display: none;
 }
