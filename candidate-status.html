@@ -1700,7 +1700,8 @@
                 return `<div class="t-reply-empty">No replies yet.</div>`;
             }
             return replies.map((r) => {
-                const isStaff = r.author_role === "admin" || r.author_role === "internal";
+                const role = String(r.author_role || "").trim().toLowerCase();
+                const isStaff = role && role !== "candidate";
                 const cls = isStaff ? "t-reply-staff" : "t-reply-candidate";
                 const name = escapeHtmlT(r.author_name || r.author_id || "Unknown");
                 return `

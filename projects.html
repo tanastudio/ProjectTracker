@@ -256,6 +256,48 @@
             color: #64748b;
         }
 
+        .proj-btn.ticket-btn {
+            gap: 10px;
+            justify-content: space-between;
+            min-width: 210px;
+        }
+
+        .proj-btn.ticket-btn .proj-btn-label {
+            flex: 0 0 auto;
+        }
+
+        .proj-ticket-counts {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .proj-ticket-chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1.1;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .proj-ticket-chip.is-unread {
+            background: #fee2e2;
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+
+        .proj-ticket-chip.is-open {
+            background: #e2e8f0;
+            color: #475569;
+            border-color: #cbd5e1;
+        }
+
         /* ── Card header ── */
         .proj-head {
             display: flex;
@@ -719,7 +761,6 @@
         const ticketNavBadge = attachTicketNavBadge({
             supabase,
             navElement: document.getElementById("navTickets"),
-            getProjectId: () => sessionStorage.getItem("selected_project_id") || "",
             getProjectIds: () => projectIds,
             userId: session.user.id,
             displayMode: "unread_only",
@@ -862,21 +903,34 @@
 
         function makeNavBtn(label, page, projectId, cls = "") {
             const btn = document.createElement("button");
-            btn.className = "proj-btn" + (cls ? " " + cls : "");
+            const isTicketsButton = page === "tickets.html";
+            btn.className = "proj-btn" + (cls ? " " + cls : "") + (isTicketsButton ? " ticket-btn" : "");
             const ticketCounts = page === "tickets.html"
                 ? (ticketCountsByProject.get(String(projectId)) || { unreadCount: 0, openCount: 0 })
                 : { unreadCount: 0, openCount: 0 };
-            const displayCount = ticketCounts.unreadCount > 0 ? ticketCounts.unreadCount : ticketCounts.openCount;
 
-            btn.textContent = label;
-            if (displayCount > 0) {
-                const badge = document.createElement("span");
-                badge.className = "proj-btn-badge";
-                if (ticketCounts.unreadCount <= 0 && ticketCounts.openCount > 0) {
-                    badge.classList.add("is-open-only");
-                }
-                badge.textContent = displayCount > 99 ? "99+" : String(displayCount);
-                btn.appendChild(badge);
+            if (isTicketsButton) {
+                const labelEl = document.createElement("span");
+                labelEl.className = "proj-btn-label";
+                labelEl.textContent = label;
+                btn.appendChild(labelEl);
+
+                const countsEl = document.createElement("span");
+                countsEl.className = "proj-ticket-counts";
+
+                const unreadEl = document.createElement("span");
+                unreadEl.className = "proj-ticket-chip is-unread";
+                unreadEl.textContent = `Unread ${ticketCounts.unreadCount}`;
+                countsEl.appendChild(unreadEl);
+
+                const openEl = document.createElement("span");
+                openEl.className = "proj-ticket-chip is-open";
+                openEl.textContent = `Open ${ticketCounts.openCount}`;
+                countsEl.appendChild(openEl);
+
+                btn.appendChild(countsEl);
+            } else {
+                btn.textContent = label;
             }
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();

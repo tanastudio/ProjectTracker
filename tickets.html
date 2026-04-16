@@ -631,7 +631,7 @@
     <script type="module">
         import { supabase } from "./supabaseClient.js";
         import { normalizeStatus, normalizePriority } from "./lib/ticket-utils.js";
-        import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+        import { attachTicketNavBadge, isTicketUnreadForUser } from "./lib/ticket-nav-badge.js";
 
         const el = (id) => document.getElementById(id);
 
@@ -656,33 +656,13 @@
         let IS_CLIENT = false;
         let ticketNavBadge = null;
 
-        function getTicketActivityMeta(ticket) {
-            const events = [];
-
-            const createdAt = Date.parse(ticket?.created_at || "");
-            if (Number.isFinite(createdAt)) events.push({ at: createdAt, actorId: String(ticket?.created_by || "") });
-
-            const repliedAt = Date.parse(ticket?.replied_at || "");
-            if (Number.isFinite(repliedAt)) events.push({ at: repliedAt, actorId: String(ticket?.replied_by || "") });
-
-            for (const reply of (REPLIES_BY_TICKET.get(String(ticket?.id || "")) || [])) {
-                const at = Date.parse(reply?.created_at || "");
-                if (!Number.isFinite(at)) continue;
-                events.push({ at, actorId: String(reply?.author_id || "") });
-            }
-
-            if (!events.length) return { lastAt: 0, actorId: "" };
-            events.sort((a, b) => a.at - b.at);
-            return events[events.length - 1];
-        }
-
         function isTicketUnread(ticket) {
-            if (normalizeStatus(ticket?.status) !== "open") return false;
-
-            const activity = getTicketActivityMeta(ticket);
-            const lastReadAt = READ_STATE_BY_TICKET.get(String(ticket?.id || "")) || 0;
-
-            return activity.lastAt > lastReadAt && activity.actorId && activity.actorId !== SESSION_USER_ID;
+            return isTicketUnreadForUser({
+                ticket,
+                replies: REPLIES_BY_TICKET.get(String(ticket?.id || "")) || [],
+                lastReadAt: READ_STATE_BY_TICKET.get(String(ticket?.id || "")) || 0,
+                userId: SESSION_USER_ID,
+            });
         }
 
         async function markTicketSeen(ticketId) {
@@ -1007,7 +987,31 @@
             if (!summaryTr) return;
 
             const item = ALL_ITEMS.find((row) => String(row.id) === String(ticketId));
-            summaryTr.classList.toggle("is-unread", Boolean(item && isTicketUnread(item)));
+            const isUnread = Boolean(item && isTicketUnread(item));
+            summaryTr.classList.toggle("is-unread", isUnread);
+
+            const codeCell = summaryTr.querySelector(".code-cell");
+            const chevron = codeCell?.querySelector(".expand-chevron");
+            const existingDot = codeCell?.querySelector(".unread-dot");
+            if (isUnread && codeCell && chevron && !existingDot) {
+                const dot = document.createElement("span");
+                dot.className = "unread-dot";
+                dot.setAttribute("aria-hidden", "true");
+                codeCell.insertBefore(dot, chevron);
+            } else if (!isUnread && existingDot) {
+                existingDot.remove();
+            }
+
+            const subjectRow = summaryTr.querySelector(".subject-row");
+            const existingBadge = subjectRow?.querySelector(".unread-badge");
+            if (isUnread && subjectRow && !existingBadge) {
+                const badge = document.createElement("span");
+                badge.className = "unread-badge";
+                badge.textContent = "Unread";
+                subjectRow.appendChild(badge);
+            } else if (!isUnread && existingBadge) {
+                existingBadge.remove();
+            }
         }
 
         function render() {
