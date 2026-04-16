@@ -597,8 +597,12 @@
         async function markProjectTicketsSeen(projectId) {
             if (!projectId) return;
             const { error } = await supabase.rpc("mark_project_tickets_seen", { p_project_id: projectId });
-            if (error) throw new Error(error.message);
+            if (error) {
+                console.warn("mark_project_tickets_seen failed:", error.message);
+                return false;
+            }
             await ticketNavBadge?.refresh?.();
+            return true;
         }
 
         function showMsg(text, isError = false) {
