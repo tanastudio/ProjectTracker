@@ -236,6 +236,21 @@
             border-color: #bfd0ea;
         }
 
+        .proj-btn-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 999px;
+            background: #dc2626;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
         /* ── Card header ── */
         .proj-head {
             display: flex;
@@ -612,7 +627,7 @@
 
     <script type="module">
         import { supabase } from "./supabaseClient.js";
-        import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+        import { attachTicketNavBadge, loadUnreadTicketCountsByProject } from "./lib/ticket-nav-badge.js";
 
         const el = (id) => document.getElementById(id);
 
@@ -691,12 +706,16 @@
             }
         }
 
+        let projectIds = [];
+        let unreadTicketCounts = new Map();
+
         const session = await requireSession();
         if (!session) throw new Error("No session");
         const ticketNavBadge = attachTicketNavBadge({
             supabase,
             navElement: document.getElementById("navTickets"),
             getProjectId: () => sessionStorage.getItem("selected_project_id") || "",
+            getProjectIds: () => projectIds,
             userId: session.user.id,
         });
         await ticketNavBadge.refresh();
@@ -769,7 +788,20 @@
             throw new Error("No projects assigned");
         }
 
-        const projectIds = mem.map((m) => m.project_id);
+        projectIds = mem.map((m) => m.project_id);
+
+        try {
+            unreadTicketCounts = await loadUnreadTicketCountsByProject({
+                supabase,
+                projectIds,
+                userId: session.user.id,
+            });
+        } catch (badgeError) {
+            console.warn("project unread ticket counts failed:", badgeError?.message || badgeError);
+            unreadTicketCounts = new Map();
+        }
+
+        await ticketNavBadge.refresh();
 
         const { data: sums, error: sumErr } = await supabase
             .from("project_overall_summary")
@@ -825,7 +857,17 @@
         function makeNavBtn(label, page, projectId, cls = "") {
             const btn = document.createElement("button");
             btn.className = "proj-btn" + (cls ? " " + cls : "");
+            const unreadCount = page === "tickets.html"
+                ? Number(unreadTicketCounts.get(String(projectId)) || 0)
+                : 0;
+
             btn.textContent = label;
+            if (unreadCount > 0) {
+                const badge = document.createElement("span");
+                badge.className = "proj-btn-badge";
+                badge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+                btn.appendChild(badge);
+            }
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 sessionStorage.setItem("selected_project_id", String(projectId));
