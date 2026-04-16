@@ -123,6 +123,7 @@ body {
 
 .nav-ticket-badge {
     margin-left: auto;
+    margin-right: 4px;
     min-width: 20px;
     height: 20px;
     padding: 0 6px;
