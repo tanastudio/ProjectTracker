@@ -130,20 +130,12 @@
             user-select: none;
         }
 
-        .ticket-row.is-unread td {
-            background: rgba(59, 130, 246, 0.035);
-        }
-
         .ticket-row.is-unread {
             box-shadow: inset 3px 0 0 #2563eb;
         }
 
         .ticket-row:hover td {
             background: rgba(15, 23, 42, 0.025);
-        }
-
-        .ticket-row.is-unread:hover td {
-            background: rgba(59, 130, 246, 0.075);
         }
 
         .ticket-row.is-expanded td {
@@ -233,20 +225,6 @@
             margin-left: 6px;
         }
 
-        .unread-badge {
-            display: inline-flex;
-            align-items: center;
-            border-radius: 999px;
-            padding: 1px 7px;
-            background: #dbeafe;
-            color: #1d4ed8;
-            border: 1px solid #bfdbfe;
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: 0.02em;
-            white-space: nowrap;
-            flex: 0 0 auto;
-        }
 
         .priority-low    { color: #94a3b8; }
         .priority-normal { color: #475569; }
@@ -338,8 +316,19 @@
         }
 
         .ticket-row.is-unread .subject {
-            font-weight: 800;
-            color: #1d4ed8;
+            font-weight: 700;
+            color: #1e40af;
+        }
+
+        .ticket-row.is-unread .mono,
+        .ticket-row.is-unread td:nth-child(2) {
+            color: #1e40af;
+            font-weight: 700;
+        }
+
+        .ticket-row.is-unread .muted {
+            color: #3b82f6;
+            font-weight: 600;
         }
 
         .subject-row {
@@ -347,13 +336,6 @@
             align-items: center;
             gap: 8px;
             min-width: 0;
-        }
-
-        .ticket-row.is-unread .mono,
-        .ticket-row.is-unread td:nth-child(2),
-        .ticket-row.is-unread td:last-child {
-            color: #1d4ed8;
-            font-weight: 700;
         }
 
         .message-cell {
@@ -1002,16 +984,6 @@
                 existingDot.remove();
             }
 
-            const subjectRow = summaryTr.querySelector(".subject-row");
-            const existingBadge = subjectRow?.querySelector(".unread-badge");
-            if (isUnread && subjectRow && !existingBadge) {
-                const badge = document.createElement("span");
-                badge.className = "unread-badge";
-                badge.textContent = "Unread";
-                subjectRow.appendChild(badge);
-            } else if (!isUnread && existingBadge) {
-                existingBadge.remove();
-            }
         }
 
         function render() {
@@ -1085,7 +1057,6 @@
                   <td>
                     <div class="subject-row">
                       <div class="subject">${escapeHtml(row.subject || "-")}</div>
-                      ${isUnread ? `<span class="unread-badge">Unread</span>` : ""}
                     </div>
                     ${replyCount > 0 ? `<span class="reply-count-badge">${replyCount} repl${replyCount === 1 ? "y" : "ies"}</span>` : ""}
                   </td>

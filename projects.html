@@ -269,33 +269,28 @@
         .proj-ticket-counts {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
+            gap: 4px;
+            white-space: nowrap;
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
         }
 
         .proj-ticket-chip {
-            display: inline-flex;
-            align-items: center;
-            border-radius: 999px;
-            padding: 2px 8px;
-            font-size: 10px;
-            font-weight: 800;
-            line-height: 1.1;
-            border: 1px solid transparent;
             white-space: nowrap;
         }
 
         .proj-ticket-chip.is-unread {
-            background: #fee2e2;
             color: #b91c1c;
-            border-color: #fecaca;
+            font-weight: 700;
         }
 
         .proj-ticket-chip.is-open {
-            background: #e2e8f0;
             color: #475569;
-            border-color: #cbd5e1;
+        }
+
+        .proj-ticket-sep {
+            color: #cbd5e1;
         }
 
         /* ── Card header ── */
@@ -920,12 +915,17 @@
 
                 const unreadEl = document.createElement("span");
                 unreadEl.className = "proj-ticket-chip is-unread";
-                unreadEl.textContent = `Unread ${ticketCounts.unreadCount}`;
+                unreadEl.textContent = `${ticketCounts.unreadCount} unread`;
                 countsEl.appendChild(unreadEl);
+
+                const sepEl = document.createElement("span");
+                sepEl.className = "proj-ticket-sep";
+                sepEl.textContent = "·";
+                countsEl.appendChild(sepEl);
 
                 const openEl = document.createElement("span");
                 openEl.className = "proj-ticket-chip is-open";
-                openEl.textContent = `Open ${ticketCounts.openCount}`;
+                openEl.textContent = `${ticketCounts.openCount} open`;
                 countsEl.appendChild(openEl);
 
                 btn.appendChild(countsEl);
