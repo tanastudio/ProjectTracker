@@ -722,6 +722,7 @@
             getProjectId: () => sessionStorage.getItem("selected_project_id") || "",
             getProjectIds: () => projectIds,
             userId: session.user.id,
+            displayMode: "unread_only",
         });
         await ticketNavBadge.refresh();
 

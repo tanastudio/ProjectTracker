@@ -236,6 +236,7 @@ const ticketNavBadge = attachTicketNavBadge({
     navElement: document.getElementById("navTickets"),
     getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
     userId: SESSION.user.id,
+    displayMode: "unread_only",
 });
 await ticketNavBadge.refresh();
 

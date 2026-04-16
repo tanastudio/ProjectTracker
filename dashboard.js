@@ -242,6 +242,7 @@ const ticketNavBadge = attachTicketNavBadge({
     navElement: navTickets,
     getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
     userId: __session.user.id,
+    displayMode: "unread_only",
 });
 await ticketNavBadge.refresh();
 

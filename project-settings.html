@@ -581,6 +581,7 @@ const ticketNavBadge = attachTicketNavBadge({
   navElement: document.getElementById("navTickets"),
   getProjectId: () => PROJECT_ID || sessionStorage.getItem("selected_project_id") || "",
   userId: session.user.id,
+  displayMode: "unread_only",
 });
 await ticketNavBadge.refresh();
 

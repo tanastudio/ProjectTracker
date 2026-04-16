@@ -610,6 +610,7 @@
                     navElement: document.getElementById("navTickets"),
                     getProjectId: () => getProjectIdFromUrlOrStorage() || "",
                     userId: session.user.id,
+                    displayMode: "unread_only",
                 });
                 await ticketNavBadge.refresh();
 
