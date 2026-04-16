@@ -134,6 +134,10 @@
             background: rgba(59, 130, 246, 0.035);
         }
 
+        .ticket-row.is-unread {
+            box-shadow: inset 3px 0 0 #2563eb;
+        }
+
         .ticket-row:hover td {
             background: rgba(15, 23, 42, 0.025);
         }
@@ -229,6 +233,21 @@
             margin-left: 6px;
         }
 
+        .unread-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 1px 7px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
+
         .priority-low    { color: #94a3b8; }
         .priority-normal { color: #475569; }
         .priority-high   { color: #d97706; font-weight: 700; }
@@ -240,6 +259,17 @@
             display: flex;
             align-items: center;
             white-space: nowrap;
+        }
+
+        .unread-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #2563eb;
+            display: inline-block;
+            margin-right: 8px;
+            flex: 0 0 auto;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
         }
 
         .pill {
@@ -310,6 +340,20 @@
         .ticket-row.is-unread .subject {
             font-weight: 800;
             color: #1d4ed8;
+        }
+
+        .subject-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .ticket-row.is-unread .mono,
+        .ticket-row.is-unread td:nth-child(2),
+        .ticket-row.is-unread td:last-child {
+            color: #1d4ed8;
+            font-weight: 700;
         }
 
         .message-cell {
@@ -1030,11 +1074,15 @@
                 summaryTr.dataset.id = String(row.id);
                 summaryTr.innerHTML = `
                   <td><div class="code-cell mono">
+                    ${isUnread ? `<span class="unread-dot" aria-hidden="true"></span>` : ""}
                     <span class="expand-chevron">&#9656;</span>${escapeHtml(row.code || "-")}
                   </div></td>
                   <td>${escapeHtml(row.candidate_name || "-")}</td>
                   <td>
-                    <div class="subject">${escapeHtml(row.subject || "-")}</div>
+                    <div class="subject-row">
+                      <div class="subject">${escapeHtml(row.subject || "-")}</div>
+                      ${isUnread ? `<span class="unread-badge">Unread</span>` : ""}
+                    </div>
                     ${replyCount > 0 ? `<span class="reply-count-badge">${replyCount} repl${replyCount === 1 ? "y" : "ies"}</span>` : ""}
                   </td>
                   <td><span class="${statusClass}">${status === "done" ? "Done" : "Open"}</span></td>
