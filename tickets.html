@@ -570,6 +570,7 @@
     <script type="module">
         import { supabase } from "./supabaseClient.js";
         import { normalizeStatus, normalizePriority } from "./lib/ticket-utils.js";
+        import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
         const el = (id) => document.getElementById(id);
 
@@ -591,14 +592,13 @@
         let DISPLAY_NAME = "";
         let CAN_EDIT = false;
         let IS_CLIENT = false;
+        let ticketNavBadge = null;
 
-        function getTicketsSeenStorageKey(projectId, userId) {
-            return `tickets_last_seen:${String(projectId || "").trim()}:${String(userId || "").trim()}`;
-        }
-
-        function markTicketsSeen(projectId, userId) {
-            if (!projectId || !userId) return;
-            localStorage.setItem(getTicketsSeenStorageKey(projectId, userId), new Date().toISOString());
+        async function markProjectTicketsSeen(projectId) {
+            if (!projectId) return;
+            const { error } = await supabase.rpc("mark_project_tickets_seen", { p_project_id: projectId });
+            if (error) throw new Error(error.message);
+            await ticketNavBadge?.refresh?.();
         }
 
         function showMsg(text, isError = false) {
@@ -846,6 +846,7 @@
                 const _expR = getExpandedIds();
                 render();
                 restoreExpanded(_expR);
+                await markProjectTicketsSeen(PROJECT_CTX?.project_id);
 
                 // Scroll reply thread to bottom
                 const _detailTr = tbody.querySelector(`.ticket-detail-row[data-id="${ticketId}"]`);
@@ -1106,6 +1107,7 @@
                         }
 
                         showMsg("Ticket saved.");
+                        await markProjectTicketsSeen(PROJECT_CTX?.project_id);
 
                         // Fire status_change / priority_change notifications
                         const savedTicket = idx >= 0 ? ALL_ITEMS[idx] : null;
@@ -1206,7 +1208,7 @@
 
             showMsg(`Loaded ${ALL_ITEMS.length} ticket(s) for project: ${PROJECT_CTX.project_id}`);
             render();
-            markTicketsSeen(PROJECT_CTX.project_id, SESSION_USER_ID);
+            await markProjectTicketsSeen(PROJECT_CTX.project_id);
         }
 
         const session = await requireSession();
@@ -1239,6 +1241,13 @@
         })();
 
         PROJECT_CTX = await resolveProjectForUser(SESSION_USER_ID);
+        ticketNavBadge = attachTicketNavBadge({
+            supabase,
+            navElement: document.getElementById("navTickets"),
+            getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
+            userId: SESSION_USER_ID,
+        });
+        await ticketNavBadge.refresh();
 
         CAN_EDIT   = PROFILE_ROLE === "admin" || String(PROJECT_CTX.member_role || "").toLowerCase() === "editor";
         IS_CLIENT  = PROFILE_ROLE === "client";

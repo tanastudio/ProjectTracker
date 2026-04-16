@@ -121,6 +121,27 @@ body {
     transition: background .16s ease, border-color .16s ease, color .16s ease, transform .08s ease, opacity .16s ease;
 }
 
+.nav-ticket-badge {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.96);
+}
+
+.nav-ticket-badge[hidden] {
+    display: none;
+}
+
     .nav-link:active {
         transform: translateY(1px);
     }

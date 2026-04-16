@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient.js";
 import { STEP_STATUS, normalizeStatus, computeOverall } from "./lib/form-utils.js";
+import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
 const UUID_PAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -230,6 +231,13 @@ async function resolveProjectForUser(userId) {
 }
 
 const PROJECT_CTX = await resolveProjectForUser(SESSION.user.id);
+const ticketNavBadge = attachTicketNavBadge({
+    supabase,
+    navElement: document.getElementById("navTickets"),
+    getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
+    userId: SESSION.user.id,
+});
+await ticketNavBadge.refresh();
 
 /* ---------- Sidebar wiring ---------- */
 (function wireSidebarLinks() {

@@ -1,4 +1,5 @@
 ﻿import { supabase } from "./supabaseClient.js";
+import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
 /* ---------- Config ---------- */
 const DEFAULT_PROJECT_NAME = "Project ABC";
@@ -236,6 +237,13 @@ async function resolveProjectForUser(userId) {
 
 const PROJECT_CTX = await resolveProjectForUser(__session.user.id);
 if (!PROJECT_CTX) throw new Error("Redirecting...");
+const ticketNavBadge = attachTicketNavBadge({
+    supabase,
+    navElement: navTickets,
+    getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
+    userId: __session.user.id,
+});
+await ticketNavBadge.refresh();
 
 // --- Sync page title from selected project ---
 (() => {
@@ -402,16 +410,6 @@ function normalizeStatus(v) {
     return STEP_STATUS.includes(s) ? s : "Not Started";
 }
 
-function getTicketsSeenStorageKey(projectId, userId) {
-    return `tickets_last_seen:${String(projectId || "").trim()}:${String(userId || "").trim()}`;
-}
-
-function getTicketsSeenAt(projectId, userId) {
-    const raw = localStorage.getItem(getTicketsSeenStorageKey(projectId, userId));
-    const stamp = raw ? Date.parse(raw) : Number.NaN;
-    return Number.isFinite(stamp) ? stamp : 0;
-}
-
 function normalizeTicketStatus(value) {
     return String(value || "").trim().toLowerCase() === "done" ? "done" : "open";
 }
@@ -472,8 +470,6 @@ async function loadTicketStats(projectId) {
         return;
     }
 
-    const lastSeenAt = getTicketsSeenAt(projectId, __session.user.id);
-
     const { data: tickets, error: ticketsError } = await supabase
         .from("requests")
         .select("id, record_id, status, created_at, created_by, replied_at, replied_by")
@@ -481,6 +477,21 @@ async function loadTicketStats(projectId) {
     if (ticketsError) throw ticketsError;
 
     const ticketIds = (tickets || []).map((ticket) => ticket.id).filter(Boolean);
+    const readStateByTicket = new Map();
+
+    if (ticketIds.length > 0) {
+        const { data: readStates, error: readStatesError } = await supabase
+            .from("ticket_read_states")
+            .select("ticket_id, last_read_at")
+            .eq("user_id", __session.user.id)
+            .in("ticket_id", ticketIds);
+        if (readStatesError) throw readStatesError;
+
+        for (const state of (readStates || [])) {
+            readStateByTicket.set(String(state.ticket_id || ""), Date.parse(state.last_read_at || "") || 0);
+        }
+    }
+
     const repliesByTicket = new Map();
 
     if (ticketIds.length > 0) {
@@ -507,7 +518,8 @@ async function loadTicketStats(projectId) {
         if (normalizeTicketStatus(ticket?.status) === "open") current.openCount += 1;
 
         const activity = getTicketActivityMeta(ticket, repliesByTicket.get(String(ticket.id || "")));
-        if (activity.lastAt > lastSeenAt && activity.actorId && activity.actorId !== __session.user.id) {
+        const lastReadAt = readStateByTicket.get(String(ticket.id || "")) || 0;
+        if (activity.lastAt > lastReadAt && activity.actorId && activity.actorId !== __session.user.id) {
             current.unreadCount += 1;
         }
 

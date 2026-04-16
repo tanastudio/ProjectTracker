@@ -531,6 +531,7 @@
 
 <script type="module">
 import { supabase } from "./supabaseClient.js";
+import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -575,6 +576,13 @@ const params = new URLSearchParams(location.search);
 const PROJECT_ID = params.get("project") || sessionStorage.getItem("selected_project_id") || "";
 if (!PROJECT_ID) { window.location.replace("./projects.html"); throw new Error("no project"); }
 sessionStorage.setItem("selected_project_id", PROJECT_ID);
+const ticketNavBadge = attachTicketNavBadge({
+  supabase,
+  navElement: document.getElementById("navTickets"),
+  getProjectId: () => PROJECT_ID || sessionStorage.getItem("selected_project_id") || "",
+  userId: session.user.id,
+});
+await ticketNavBadge.refresh();
 
 /* ── nav ── */
 function goProjectPage(page) {

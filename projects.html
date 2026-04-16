@@ -612,6 +612,7 @@
 
     <script type="module">
         import { supabase } from "./supabaseClient.js";
+        import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
         const el = (id) => document.getElementById(id);
 
@@ -692,6 +693,13 @@
 
         const session = await requireSession();
         if (!session) throw new Error("No session");
+        const ticketNavBadge = attachTicketNavBadge({
+            supabase,
+            navElement: document.getElementById("navTickets"),
+            getProjectId: () => sessionStorage.getItem("selected_project_id") || "",
+            userId: session.user.id,
+        });
+        await ticketNavBadge.refresh();
 
         el("logoutBtn").addEventListener("click", async () => {
             await supabase.auth.signOut();
@@ -805,6 +813,7 @@
         function selectProject(projectId, cardEl) {
             sessionStorage.setItem("selected_project_id", String(projectId));
             document.documentElement.setAttribute("data-project-selected", "true");
+            ticketNavBadge.refresh().catch((err) => console.warn("ticket nav badge refresh failed:", err));
             document.querySelectorAll(".proj.is-selected").forEach(c => {
                 c.classList.remove("is-selected");
                 c.style.borderColor = "";

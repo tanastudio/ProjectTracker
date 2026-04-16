@@ -508,6 +508,7 @@
             <!-- Keep your original JS (only add sidebar navigation wiring; all functions remain) -->
             <script type="module">
                 import { supabase } from "./supabaseClient.js";
+                import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
                 const el = (id) => document.getElementById(id);
 
@@ -604,6 +605,13 @@
                 const _authResult = await requireAdmin();
                 if (!_authResult) throw new Error("No access/session");
                 const session = _authResult.session;
+                const ticketNavBadge = attachTicketNavBadge({
+                    supabase,
+                    navElement: document.getElementById("navTickets"),
+                    getProjectId: () => getProjectIdFromUrlOrStorage() || "",
+                    userId: session.user.id,
+                });
+                await ticketNavBadge.refresh();
 
                 // Keep original behavior: show who, ready message
                 const _chipName = _authResult.displayName || session.user.email || session.user.id;

@@ -544,6 +544,7 @@
 
 <script type="module">
 import { supabase } from "./supabaseClient.js";
+import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -622,6 +623,13 @@ async function requireAdmin() {
 }
 const session = await requireAdmin();
 if (!session) throw new Error("no access");
+const ticketNavBadge = attachTicketNavBadge({
+  supabase,
+  navElement: document.getElementById("navTickets"),
+  getProjectId: () => sessionStorage.getItem("selected_project_id") || "",
+  userId: session.user.id,
+});
+await ticketNavBadge.refresh();
 
 /* ── Check for saved draft ── */
 {
