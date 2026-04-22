@@ -58,6 +58,19 @@ export async function findAuthUserByEmail(
   }
 }
 
+async function writeAuditLog(
+  adminClient: ReturnType<typeof createClient>,
+  entry: Record<string, unknown>,
+) {
+  try {
+    const { error } = await adminClient.from("audit_logs").insert(entry);
+    if (error) console.warn(`admin-create-user audit log failed: ${error.message}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`admin-create-user audit log failed: ${message}`);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -206,6 +219,23 @@ serve(async (req) => {
     }, { onConflict: "user_id,project_id" });
     if (pmErr) throw new Error(`[step 5] project_members upsert failed: ${pmErr.message}`);
     console.log(`admin-create-user [step 5]: project member ok`);
+
+    await writeAuditLog(adminClient, {
+      actor_user_id: caller.id,
+      actor_email: caller.email ?? null,
+      actor_role: "admin",
+      action: "INSERT",
+      table_name: "auth.users",
+      entity_id: userId,
+      project_id: projectId,
+      summary: `Provisioned candidate user ${email}`,
+      metadata: {
+        source: "admin-create-user",
+        candidate_email: email,
+        display_name: displayName,
+        record_id: recordId,
+      },
+    });
 
     return json({ ok: true, user: { id: userId, email }, record_id: recordId });
 

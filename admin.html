@@ -297,6 +297,7 @@
                     </div>
 
                     <div class="hero-actions">
+                        <button id="openAuditBtn" class="btn btn-ghost" type="button">Audit Logs</button>
                         <button id="openAccessBtn" class="btn btn-ghost" type="button">Access Management</button>
                     </div>
                 </div>
@@ -356,6 +357,11 @@
                         <div class="tile" id="tileAccess">
                             <h3>Access Management</h3>
                             <p>View and update user roles across the system.</p>
+                        </div>
+
+                        <div class="tile" id="tileAudit">
+                            <h3>Audit Logs</h3>
+                            <p>Review who changed projects, users, tickets, and candidate records.</p>
                         </div>
                     </div>
 
@@ -524,6 +530,10 @@
             window.location.href = "./admin-access.html";
         });
 
+        el("openAuditBtn").addEventListener("click", () => {
+            window.location.href = "./admin-audit.html";
+        });
+
         // Tiles
         el("tileProjects").addEventListener("click", () => {
             window.location.href = "./projects.html";
@@ -547,6 +557,10 @@
 
         el("tileAccess").addEventListener("click", () => {
             window.location.href = "./admin-access.html";
+        });
+
+        el("tileAudit").addEventListener("click", () => {
+            window.location.href = "./admin-audit.html";
         });
 
         // KPI loading (unchanged behavior)

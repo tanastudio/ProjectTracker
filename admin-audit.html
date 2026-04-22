@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Admin - Audit Logs</title>
+
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="sidebar.css" />
+
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .layout {
+            height: 100vh;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .main {
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .wrap {
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: rgba(255,255,255,.86);
+            border: 1px solid rgba(15,23,42,.12);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 10px 26px rgba(2,6,23,.10);
+        }
+
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            align-items: end;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 0;
+        }
+
+        .field label {
+            font-size: 11px;
+            font-weight: 800;
+            color: #64748b;
+        }
+
+        .field input,
+        .field select {
+            width: 100%;
+            height: 38px;
+            border: 1px solid rgba(15,23,42,.14);
+            border-radius: 8px;
+            background: #fff;
+            color: #0f172a;
+            font: inherit;
+            font-size: 13px;
+            padding: 0 10px;
+            outline: none;
+        }
+
+        .field input:focus,
+        .field select:focus {
+            border-color: rgba(14,165,233,.58);
+            box-shadow: 0 0 0 3px rgba(14,165,233,.12);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .status {
+            margin-top: 10px;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .table-wrap {
+            margin-top: 12px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+            min-width: 980px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px;
+            vertical-align: top;
+            font-size: 12px;
+        }
+
+        th {
+            color: #64748b;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        tbody tr {
+            background: rgba(255,255,255,.76);
+            box-shadow: 0 6px 18px rgba(15,23,42,.06);
+        }
+
+        tbody td {
+            border-top: 1px solid rgba(15,23,42,.06);
+            border-bottom: 1px solid rgba(15,23,42,.06);
+        }
+
+        tbody td:first-child {
+            border-left: 1px solid rgba(15,23,42,.06);
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        tbody td:last-child {
+            border-right: 1px solid rgba(15,23,42,.06);
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 11px;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.12);
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .pill.is-create {
+            color: #047857;
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+
+        .pill.is-update {
+            color: #1d4ed8;
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        .pill.is-delete {
+            color: #b91c1c;
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+
+        .empty {
+            padding: 24px;
+            text-align: center;
+            color: #64748b;
+            border: 1px dashed rgba(15,23,42,.18);
+            border-radius: 12px;
+            background: rgba(248,250,252,.86);
+        }
+
+        .error {
+            color: #b91c1c;
+        }
+
+        @media (max-width: 1100px) {
+            html, body,
+            .layout,
+            .main {
+                height: auto;
+                min-height: 100vh;
+                overflow: visible;
+            }
+
+            .filters {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .toolbar {
+                justify-content: flex-start;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .filters {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-sticky">
+                <div class="brand">
+                    <div class="brand-title">Mentis Project Hub</div>
+                </div>
+
+                <nav class="nav">
+                    <a class="nav-link" href="./projects.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3 4 7l8 4 8-4-8-4Z"></path>
+                            <path d="m4 12 8 4 8-4"></path>
+                            <path d="m4 17 8 4 8-4"></path>
+                        </svg>
+                        <span>Projects</span>
+                    </a>
+
+                    <a class="nav-link" id="navDashboard" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                        <span>Dashboard</span>
+                    </a>
+
+                    <a class="nav-link" id="navTickets" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Tickets</span>
+                    </a>
+
+                    <a class="nav-link" id="navUpdateStatus" href="#">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"></path>
+                        </svg>
+                        <span>Update Status</span>
+                    </a>
+
+                    <a class="nav-link" href="./admin.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+
+                    <a class="nav-link" href="./admin-access.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <span>Access</span>
+                    </a>
+
+                    <a class="nav-link active" href="./admin-audit.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <path d="M14 2v6h6"></path>
+                            <path d="M8 13h8"></path>
+                            <path d="M8 17h5"></path>
+                        </svg>
+                        <span>Audit Logs</span>
+                    </a>
+                </nav>
+
+                <div class="sidebar-sep"></div>
+
+                <div class="sidebar-footer">
+                    <div class="sidebar-user" id="userChip">Loading...</div>
+                    <button class="nav-link logout-link" type="button" id="logoutBtn">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <path d="M16 17l5-5-5-5"></path>
+                            <path d="M21 12H9"></path>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="hero">
+                <div class="hero-inner">
+                    <div>
+                        <h1 class="page-title">Audit Logs</h1>
+                        <p class="page-desc">Admin-only activity log for data changes across projects, users, tickets, and candidate records.</p>
+                    </div>
+                    <div class="hero-actions">
+                        <button id="refreshBtn" class="btn btn-ghost" type="button">Refresh</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="wrap">
+                <section class="panel">
+                    <div class="filters">
+                        <div class="field">
+                            <label for="actorFilter">User</label>
+                            <select id="actorFilter">
+                                <option value="">All users</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="projectFilter">Project</label>
+                            <select id="projectFilter">
+                                <option value="">All projects</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="tableFilter">Area</label>
+                            <select id="tableFilter">
+                                <option value="">All areas</option>
+                                <option value="profiles">Profiles</option>
+                                <option value="projects">Projects</option>
+                                <option value="project_members">Project Members</option>
+                                <option value="fields">Fields</option>
+                                <option value="records">Records</option>
+                                <option value="record_values">Record Values</option>
+                                <option value="requests">Tickets</option>
+                                <option value="ticket_replies">Ticket Replies</option>
+                                <option value="client_record_assignments">Client Assignments</option>
+                                <option value="ticket_read_states">Ticket Read States</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="actionFilter">Action</label>
+                            <select id="actionFilter">
+                                <option value="">All actions</option>
+                                <option value="INSERT">Created</option>
+                                <option value="UPDATE">Updated</option>
+                                <option value="DELETE">Deleted</option>
+                            </select>
+                        </div>
+
+                        <div class="toolbar">
+                            <button id="applyBtn" class="btn" type="button">Apply</button>
+                            <button id="clearBtn" class="btn btn-ghost" type="button">Clear</button>
+                        </div>
+                    </div>
+
+                    <div id="status" class="status">Loading...</div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Area</th>
+                                    <th>Project</th>
+                                    <th>Changed Fields</th>
+                                    <th>Entity</th>
+                                    <th>Summary</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="emptyState" class="empty" hidden>No audit logs found.</div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { supabase } from "./supabaseClient.js";
+        import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+        import {
+            formatAuditActor,
+            formatChangedFields,
+            getAuditActionClass,
+            getAuditActionLabel,
+        } from "./lib/audit-utils.js";
+
+        const el = (id) => document.getElementById(id);
+        const projectNames = new Map();
+
+        function setStatus(message, isError = false) {
+            const node = el("status");
+            node.textContent = message;
+            node.classList.toggle("error", Boolean(isError));
+        }
+
+        function getProjectIdFromUrlOrStorage() {
+            const url = new URL(window.location.href);
+            return url.searchParams.get("project") || sessionStorage.getItem("selected_project_id") || "";
+        }
+
+        function goNeedProject(page) {
+            const pid = getProjectIdFromUrlOrStorage();
+            if (!pid) {
+                window.location.href = "./projects.html";
+                return;
+            }
+            window.location.href = `./${page}?project=${encodeURIComponent(pid)}`;
+        }
+
+        async function requireAdmin() {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+                setStatus("getSession error: " + error.message, true);
+                return null;
+            }
+
+            const session = data?.session;
+            if (!session) {
+                window.location.replace("./index.html");
+                return null;
+            }
+
+            supabase.auth.onAuthStateChange((_evt, s) => {
+                if (!s) window.location.replace("./index.html");
+            });
+
+            const { data: profile, error: profileErr } = await supabase
+                .from("profiles")
+                .select("role, display_name")
+                .eq("id", session.user.id)
+                .maybeSingle();
+
+            if (profileErr) {
+                setStatus("Cannot load profile: " + profileErr.message, true);
+                return null;
+            }
+
+            if (String(profile?.role || "") !== "admin") {
+                window.location.replace("./projects.html");
+                return null;
+            }
+
+            const chip = el("userChip");
+            if (chip) chip.textContent = `${profile?.display_name || session.user.email || session.user.id} (admin)`;
+
+            return session;
+        }
+
+        function appendOption(select, value, label) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            select.appendChild(option);
+        }
+
+        async function loadFilterOptions() {
+            const [profilesRes, projectsRes] = await Promise.all([
+                supabase.from("profiles").select("id, display_name, role").order("display_name", { ascending: true }),
+                supabase.from("projects").select("id, name").order("name", { ascending: true }),
+            ]);
+
+            if (profilesRes.error) throw profilesRes.error;
+            if (projectsRes.error) throw projectsRes.error;
+
+            const actorFilter = el("actorFilter");
+            for (const profile of profilesRes.data || []) {
+                const label = `${profile.display_name || profile.id} (${profile.role || "viewer"})`;
+                appendOption(actorFilter, profile.id, label);
+            }
+
+            const projectFilter = el("projectFilter");
+            for (const project of projectsRes.data || []) {
+                projectNames.set(String(project.id), project.name || project.id);
+                appendOption(projectFilter, project.id, project.name || project.id);
+            }
+        }
+
+        function formatTime(value) {
+            if (!value) return "-";
+            return new Intl.DateTimeFormat("en-GB", {
+                dateStyle: "medium",
+                timeStyle: "short",
+                hour12: false,
+            }).format(new Date(value));
+        }
+
+        function renderLogs(logs) {
+            const body = el("logsBody");
+            const empty = el("emptyState");
+            body.textContent = "";
+            empty.hidden = logs.length > 0;
+
+            for (const log of logs) {
+                const tr = document.createElement("tr");
+
+                const timeTd = document.createElement("td");
+                timeTd.textContent = formatTime(log.occurred_at);
+                tr.appendChild(timeTd);
+
+                const actorTd = document.createElement("td");
+                actorTd.textContent = formatAuditActor(log);
+                tr.appendChild(actorTd);
+
+                const actionTd = document.createElement("td");
+                const actionPill = document.createElement("span");
+                actionPill.className = `pill ${getAuditActionClass(log.action)}`.trim();
+                actionPill.textContent = getAuditActionLabel(log.action);
+                actionTd.appendChild(actionPill);
+                tr.appendChild(actionTd);
+
+                const tableTd = document.createElement("td");
+                tableTd.className = "mono";
+                tableTd.textContent = log.table_name || "-";
+                tr.appendChild(tableTd);
+
+                const projectTd = document.createElement("td");
+                projectTd.textContent = log.project_id ? (projectNames.get(String(log.project_id)) || log.project_id) : "-";
+                tr.appendChild(projectTd);
+
+                const fieldsTd = document.createElement("td");
+                fieldsTd.textContent = formatChangedFields(log.changed_fields);
+                tr.appendChild(fieldsTd);
+
+                const entityTd = document.createElement("td");
+                entityTd.className = "mono";
+                entityTd.textContent = log.entity_id || "-";
+                tr.appendChild(entityTd);
+
+                const summaryTd = document.createElement("td");
+                summaryTd.textContent = log.summary || "-";
+                tr.appendChild(summaryTd);
+
+                body.appendChild(tr);
+            }
+        }
+
+        async function loadLogs() {
+            setStatus("Loading audit logs...");
+
+            let query = supabase
+                .from("audit_logs")
+                .select("id, occurred_at, actor_user_id, actor_email, actor_role, action, table_name, entity_id, project_id, summary, changed_fields")
+                .order("occurred_at", { ascending: false })
+                .limit(200);
+
+            const actorId = el("actorFilter").value;
+            const projectId = el("projectFilter").value;
+            const tableName = el("tableFilter").value;
+            const action = el("actionFilter").value;
+
+            if (actorId) query = query.eq("actor_user_id", actorId);
+            if (projectId) query = query.eq("project_id", projectId);
+            if (tableName) query = query.eq("table_name", tableName);
+            if (action) query = query.eq("action", action);
+
+            const { data, error } = await query;
+            if (error) {
+                setStatus("Cannot load audit logs: " + error.message, true);
+                renderLogs([]);
+                return;
+            }
+
+            renderLogs(data || []);
+            setStatus(`Showing ${data?.length || 0} latest audit log entries.`);
+        }
+
+        window.addEventListener("error", (event) => {
+            setStatus("JS error: " + (event?.message || "unknown"), true);
+        });
+
+        window.addEventListener("unhandledrejection", (event) => {
+            const message = event?.reason?.message || String(event?.reason || "unknown promise error");
+            setStatus("Promise error: " + message, true);
+        });
+
+        const session = await requireAdmin();
+        if (!session) throw new Error("No access/session");
+
+        const ticketNavBadge = attachTicketNavBadge({
+            supabase,
+            navElement: el("navTickets"),
+            getProjectId: () => getProjectIdFromUrlOrStorage() || "",
+            userId: session.user.id,
+            displayMode: "unread_only",
+        });
+        await ticketNavBadge.refresh();
+
+        el("navDashboard").addEventListener("click", (event) => {
+            event.preventDefault();
+            goNeedProject("dashboard.html");
+        });
+
+        el("navTickets").addEventListener("click", (event) => {
+            event.preventDefault();
+            goNeedProject("tickets.html");
+        });
+
+        el("navUpdateStatus").addEventListener("click", (event) => {
+            event.preventDefault();
+            goNeedProject("form.html");
+        });
+
+        el("logoutBtn").addEventListener("click", async () => {
+            await supabase.auth.signOut();
+            sessionStorage.removeItem("selected_project_id");
+            window.location.replace("./index.html");
+        });
+
+        el("applyBtn").addEventListener("click", loadLogs);
+        el("refreshBtn").addEventListener("click", loadLogs);
+        el("clearBtn").addEventListener("click", () => {
+            el("actorFilter").value = "";
+            el("projectFilter").value = "";
+            el("tableFilter").value = "";
+            el("actionFilter").value = "";
+            loadLogs();
+        });
+
+        await loadFilterOptions();
+        await loadLogs();
+    </script>
+</body>
+</html>

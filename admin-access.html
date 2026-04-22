@@ -384,6 +384,16 @@
                         </svg>
                         <span>Access</span>
                     </a>
+
+                    <a class="nav-link" href="./admin-audit.html">
+                        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <path d="M14 2v6h6"></path>
+                            <path d="M8 13h8"></path>
+                            <path d="M8 17h5"></path>
+                        </svg>
+                        <span>Audit Logs</span>
+                    </a>
                 </nav>
 
                 <div class="sidebar-sep"></div>
@@ -416,6 +426,7 @@
                     </div>
 
                     <div class="hero-actions">
+                        <button id="gotoAudit" class="btn btn-ghost" type="button">Audit Logs</button>
                         <button id="gotoAdmin" class="btn btn-ghost" type="button">Admin Home</button>
                         <button id="gotoProjects" class="btn btn-ghost" type="button">Projects</button>
                     </div>
@@ -653,6 +664,10 @@
                     } else {
                         window.location.href = `./admin.html?v=${v}`;
                     }
+                });
+
+                el("gotoAudit").addEventListener("click", () => {
+                    window.location.href = "./admin-audit.html";
                 });
 
                 let PROFILES = [];
