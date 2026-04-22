@@ -405,7 +405,8 @@
             getAuditActionClass,
             getAuditActionLabel,
             getAuditUserId,
-        } from "./lib/audit-utils.js?v=202604221617";
+            isAuditLogForUser,
+        } from "./lib/audit-utils.js?v=202604221625";
 
         const el = (id) => document.getElementById(id);
         const projectNames = new Map();
@@ -587,18 +588,18 @@
         async function loadLogs() {
             setStatus("Loading audit logs...");
 
-            let query = supabase
-                .from("audit_logs")
-                .select("id, occurred_at, actor_user_id, actor_email, actor_role, action, table_name, entity_id, project_id, summary, changed_fields, old_data, new_data")
-                .order("occurred_at", { ascending: false })
-                .limit(200);
-
             const actorId = el("actorFilter").value;
             const projectId = el("projectFilter").value;
             const tableName = el("tableFilter").value;
             const action = el("actionFilter").value;
+            const pageSize = actorId ? 1000 : 200;
 
-            if (actorId) query = query.eq("actor_user_id", actorId);
+            let query = supabase
+                .from("audit_logs")
+                .select("id, occurred_at, actor_user_id, actor_email, actor_role, action, table_name, entity_id, project_id, summary, changed_fields, old_data, new_data")
+                .order("occurred_at", { ascending: false })
+                .limit(pageSize);
+
             if (projectId) query = query.eq("project_id", projectId);
             if (tableName) query = query.eq("table_name", tableName);
             if (action) query = query.eq("action", action);
@@ -610,9 +611,13 @@
                 return;
             }
 
-            await loadLogProfiles(data || []);
-            renderLogs(data || []);
-            setStatus(`Showing ${data?.length || 0} latest audit log entries.`);
+            const filteredLogs = actorId
+                ? (data || []).filter((log) => isAuditLogForUser(log, actorId)).slice(0, 200)
+                : (data || []);
+
+            await loadLogProfiles(filteredLogs);
+            renderLogs(filteredLogs);
+            setStatus(`Showing ${filteredLogs.length} latest audit log entries.`);
         }
 
         window.addEventListener("error", (event) => {

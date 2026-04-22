@@ -7,6 +7,7 @@ import {
     getAuditActionLabel,
     getAuditUserId,
     getChangedFieldNames,
+    isAuditLogForUser,
 } from "../lib/audit-utils.js";
 
 describe("audit-utils", () => {
@@ -49,6 +50,18 @@ describe("audit-utils", () => {
 
         expect(getAuditUserId(log)).toBe("user-2");
         expect(formatAuditUser(log)).toBe("user-2");
+    });
+
+    it("matches filters against the displayed audit user", () => {
+        const log = {
+            actor_role: "viewer",
+            table_name: "project_members",
+            entity_id: "user-2:project-1",
+        };
+
+        expect(isAuditLogForUser(log, "user-2")).toBe(true);
+        expect(isAuditLogForUser(log, "user-3")).toBe(false);
+        expect(isAuditLogForUser(log, "")).toBe(true);
     });
 
     it("formats changed fields in stable order", () => {
