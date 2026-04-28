@@ -1,9 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title id="pageTitle">Dashboard</title>
     <link rel="stylesheet" href="dashboard.css">
@@ -50,7 +50,7 @@
             grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
         }
 
-        /* SVG stroke override — sidebar.css targets .nav-ico; these pages use bare <svg> */
+        /* SVG stroke override: sidebar.css targets .nav-ico; these pages use bare <svg> */
         .nav-link svg { width: 22px; height: 22px; flex: 0 0 22px; stroke: #64748b; }
         .nav-link.active svg { stroke: #3b82f6; }
 
@@ -148,7 +148,7 @@
             display: flex;
         }
 
-        /* ── View tabs ─────────────────────────────────────────── */
+        /* View tabs */
         .view-tabs {
             display: flex;
             gap: 4px;
@@ -195,7 +195,7 @@
             color: #334155;
         }
 
-        /* ── Shared: both tabs prevent outer page scroll ────────── */
+        /* Shared: both tabs prevent outer page scroll */
         body.overview-active,
         body.candidates-active {
             overflow: hidden;
@@ -249,7 +249,7 @@
             padding-bottom: 0;
         }
 
-        /* ── Candidates tab: table fills remaining space ─────────── */
+        /* Candidates tab: table fills remaining space */
         body.candidates-active #viewCandidates {
             flex: 1 1 0;
             min-height: 0;
@@ -265,7 +265,7 @@
             margin-bottom: 0;
             display: flex;
             flex-direction: column;
-            /* no overflow:hidden — would clip the table's bottom scrollbar */
+            /* Do not hide overflow because it would clip the table's bottom scrollbar. */
         }
 
         body.candidates-active .table-toolbar { flex: 0 0 auto; }
@@ -281,7 +281,7 @@
             margin-inline: auto;
         }
 
-        /* ── Overview tab: charts fill remaining space ──────────── */
+        /* Overview tab: charts fill remaining space */
         body.overview-active #viewOverview {
             flex: 1 1 0;
             min-height: 0;
@@ -378,8 +378,12 @@
             }
         }
     </style>
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
-
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -452,7 +456,7 @@
                     <div>
                         <h1 id="projectTitle" class="hero-title">Project</h1>
                         <p class="hero-meta">
-                            Dashboard overview for the selected project. • Last refresh:
+                            Dashboard overview for the selected project. Last refresh:
                             <span id="lastRefresh">-</span>
                         </p>
                     </div>
@@ -466,7 +470,7 @@
             </div>
 
             <div class="dashboard-wrap">
-                <!-- ── View tabs ──────────────────────────────── -->
+                <!-- View tabs -->
                 <div class="view-tabs" role="tablist" aria-label="Dashboard views">
                     <button class="view-tab active" type="button" data-tab="overview" role="tab" aria-selected="true" aria-controls="viewOverview">
                         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -489,7 +493,7 @@
                 </div>
 
                 <main class="container">
-                    <!-- ── Overview tab ───────────────────────── -->
+                    <!-- Overview tab -->
                     <div id="viewOverview" role="tabpanel" aria-labelledby="tab-overview">
                     <section class="card">
                         <div class="dash2-grid">
@@ -545,7 +549,7 @@
                     </section>
                     </div><!-- /viewOverview -->
 
-                    <!-- ── Candidates tab ─────────────────────── -->
+                    <!-- Candidates tab -->
                     <div id="viewCandidates" role="tabpanel" aria-labelledby="tab-candidates" style="display:none">
                     <section class="card">
                         <div class="table-toolbar">
@@ -604,7 +608,6 @@
                     <div id="modalTitle" class="modal-title">Candidates</div>
                     <div id="modalSub" class="modal-sub">-</div>
                 </div>
-                <button id="modalCloseBtn" class="modal-close" aria-label="Close">✕</button>
             </div>
 
             <div class="modal-body">
@@ -636,7 +639,6 @@
                     <div id="reqTitle" class="modal-title">Request / Comment</div>
                     <div id="reqSub" class="modal-sub">-</div>
                 </div>
-                <button id="reqCloseBtn" class="modal-close" aria-label="Close">✕</button>
             </div>
 
             <div class="modal-body">
@@ -669,3 +671,4 @@
     <script type="module" src="dashboard.js"></script>
 </body>
 </html>
+

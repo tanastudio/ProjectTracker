@@ -38,7 +38,6 @@ const statusModal = el("statusModal");
 const modalTitle = el("modalTitle");
 const modalSub = el("modalSub");
 const modalTbody = el("modalTbody");
-const modalCloseBtn = el("modalCloseBtn");
 const modalCloseBtn2 = el("modalCloseBtn2");
 
 const requestModal = el("requestModal");
@@ -48,7 +47,6 @@ const reqTo = el("reqTo");
 const reqSubject = el("reqSubject");
 const reqMessage = el("reqMessage");
 const reqHint = el("reqHint");
-const reqCloseBtn = el("reqCloseBtn");
 const reqCancelBtn = el("reqCancelBtn");
 const reqSendBtn = el("reqSendBtn");
 
@@ -280,7 +278,7 @@ navAdmin?.addEventListener("click", () => {
 async function loadFields(projectId) {
     const { data, error } = await supabase
         .from("fields")
-        .select("id, key, label, type, options, sort_order, field_role, visible, show_in_dashboard, is_active")
+        .select("id, key, label, type, options, sort_order, field_role, visible, show_in_dashboard, show_in_candidate_status, show_in_internal, is_active")
         .eq("project_id", projectId)
         .order("sort_order", { ascending: true });
 
@@ -559,7 +557,6 @@ function buildHeaderFromFields(fieldsList) {
     // Dynamic process fields (step columns) — skip fields rendered as fixed columns
     const skip = new Set(["email", "issue", "decision", "overall_status"]);
     for (const f of fieldsList || []) {
-        if (f.is_active === false) continue;
         if (skip.has(String(f.key || "").toLowerCase())) continue;
         if (skip.has(String(f.field_role || "").toLowerCase())) continue;
         if (f.show_in_dashboard === false) continue;
@@ -633,7 +630,6 @@ function renderTable(items) {
         // Dynamic process columns
         const skip = new Set(["email", "issue", "decision", "overall_status"]);
         for (const f of (FIELD_CACHE?.list || [])) {
-            if (f.is_active === false) continue;
             if (skip.has(String(f.key || "").toLowerCase())) continue;
             if (skip.has(String(f.field_role || "").toLowerCase())) continue;
             if (f.show_in_dashboard === false) continue;
@@ -684,7 +680,6 @@ function getVisibleDashboardFields() {
     });
 
     for (const f of fieldsList) {
-        if (f.is_active === false) continue;
         if (skip.has(String(f.key || "").toLowerCase())) continue;
         if (skip.has(String(f.field_role || "").toLowerCase())) continue;
         if (f.show_in_dashboard === false) continue;
@@ -927,9 +922,15 @@ function openStatusModalFromChart(chart, event) {
 
 async function notifyViaEdge(payload) {
     try {
-        await supabase.functions.invoke("ticket-notify", { body: payload });
+        const { data, error } = await supabase.functions.invoke("ticket-notify", { body: payload });
+        if (error) throw error;
+        if (data?.skipped || data?.ok === false) {
+            throw new Error(data?.reason || "notification skipped");
+        }
+        return { ok: true, data };
     } catch (e) {
         console.warn("Email notification failed (non-fatal):", e);
+        return { ok: false, error: e };
     }
 }
 
@@ -972,7 +973,11 @@ async function sendRequestToSupabase() {
     reqHint.textContent = "Sending...";
 
     try {
+        const ticketId = globalThis.crypto?.randomUUID?.();
+        if (!ticketId) throw new Error("crypto.randomUUID is not available in this browser.");
+
         const payload = {
+            id: ticketId,
             project_id: PROJECT_CTX.project_id,
             record_id: REQ_CONTEXT.recordId,
             code: REQ_CONTEXT.code,
@@ -982,20 +987,16 @@ async function sendRequestToSupabase() {
             created_by: __session.user.id,
         };
 
-        const { data: newTicket, error } = await supabase
+        const { error } = await supabase
             .from("requests")
-            .insert(payload)
-            .select("id")
-            .single();
+            .insert(payload);
         if (error) throw error;
 
-        reqHint.textContent = "Sent ✅";
-        setTimeout(() => closeRequestModal(), 450);
         await loadTicketStats(PROJECT_CTX.project_id);
         renderTable(applyDashFilter());
 
-        await notifyViaEdge({
-            ticketId: String(newTicket.id),
+        const notifyResult = await notifyViaEdge({
+            ticketId,
             eventType: "new_ticket",
             authorId: __session.user.id,
             authorName: USER_DISPLAY_NAME || __session.user.email || "",
@@ -1006,6 +1007,12 @@ async function sendRequestToSupabase() {
             projectName: PROJECT_CTX.project_name || "",
             projectId: PROJECT_CTX.project_id || "",
         });
+        if (!notifyResult.ok) {
+            reqHint.textContent = "Saved, but email notification failed. Please check notification settings.";
+        } else {
+            reqHint.textContent = "Sent ✅";
+            setTimeout(() => closeRequestModal(), 450);
+        }
     } catch (e) {
         console.error(e);
         reqHint.textContent = "Failed: requests table not found or permission denied (check RLS/policy).";
@@ -1222,7 +1229,6 @@ async function refresh() {
         const skipRoles = new Set(["email", "issue", "decision", "overall_status"]);
         STEP_KEYS.length = 0;
         for (const f of (fields.list || [])) {
-            if (f.is_active === false) continue;
             if (String(f.type || "").toLowerCase() !== "select") continue;
             if (f.show_in_dashboard === false) continue;
             if (skipRoles.has(String(f.key || "").toLowerCase())) continue;
@@ -1299,14 +1305,12 @@ tbody?.addEventListener("click", (e) => {
     });
 });
 
-reqCloseBtn?.addEventListener("click", closeRequestModal);
 reqCancelBtn?.addEventListener("click", closeRequestModal);
 requestModal?.addEventListener("click", (e) => {
     if (e.target === requestModal) closeRequestModal();
 });
 reqSendBtn?.addEventListener("click", sendRequestToSupabase);
 
-modalCloseBtn?.addEventListener("click", closeStatusModal);
 modalCloseBtn2?.addEventListener("click", closeStatusModal);
 statusModal?.addEventListener("click", (e) => {
     if (e.target === statusModal) closeStatusModal();

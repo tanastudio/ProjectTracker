@@ -511,15 +511,6 @@ table.excel tbody td:first-child {
     font-size: 12px;
 }
 
-.modal-close {
-    border: 1px solid var(--border);
-    background: #fff;
-    border-radius: 10px;
-    padding: 8px 10px;
-    cursor: pointer;
-    font-weight: 900;
-}
-
 .modal-body {
     padding: 12px 14px;
 }

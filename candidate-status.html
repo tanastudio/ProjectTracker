@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>My Status</title>
     <link rel="stylesheet" href="styles.css" />
@@ -1192,6 +1192,11 @@
 
     </style>
 
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
 <body>
     <!-- Admin Preview Banner -->
@@ -1625,10 +1630,10 @@
 
         const { data: fieldsRaw, error: fErr } = await supabase
             .from("fields")
-            .select("id, key, label, sort_order, field_role")
+            .select("id, key, label, sort_order, field_role, show_in_candidate_status")
             .eq("project_id", rec.project_id)
             .eq("type", "select")
-            .neq("is_active", false)
+            .neq("show_in_candidate_status", false)
             .order("sort_order");
 
         const fields = (fieldsRaw || []).filter(f => !FIXED_ROLES.has(f.field_role));
@@ -1718,9 +1723,15 @@
 
         async function notifyViaEdge(payload) {
             try {
-                await supabase.functions.invoke("ticket-notify", { body: payload });
+                const { data, error } = await supabase.functions.invoke("ticket-notify", { body: payload });
+                if (error) throw error;
+                if (data?.skipped || data?.ok === false) {
+                    throw new Error(data?.reason || "notification skipped");
+                }
+                return { ok: true, data };
             } catch (e) {
                 console.warn("Email notification failed (non-fatal):", e);
+                return { ok: false, error: e };
             }
         }
 
@@ -1821,7 +1832,7 @@
                         const _thread = _item?.querySelector(".ticket-reply-thread");
                         if (_thread) _thread.scrollTop = _thread.scrollHeight;
 
-                        await notifyViaEdge({
+                        const notifyResult = await notifyViaEdge({
                             ticketId:      String(t.id),
                             eventType:     "reply",
                             authorId:      session.user.id,
@@ -1833,6 +1844,7 @@
                             projectName:   projectName,
                             projectId:     rec.project_id || "",
                         });
+                        if (!notifyResult.ok) alert("Reply saved, but email notification failed. Please check notification settings.");
                     } catch (e) {
                         alert("Failed to send reply: " + e.message);
                     } finally {
@@ -1936,15 +1948,10 @@
 
                 if (error) throw new Error(error.message);
 
-                msgEl.className = "modal-msg show ok";
-                msgEl.textContent = "Ticket submitted successfully.";
-
                 TICKETS.unshift(ticket);
                 renderTickets();
 
-                setTimeout(() => el("ticketModal").classList.add("hidden"), 1000);
-
-                await notifyViaEdge({
+                const notifyResult = await notifyViaEdge({
                     ticketId:      String(ticket.id),
                     eventType:     "new_ticket",
                     authorId:      session.user.id,
@@ -1956,6 +1963,15 @@
                     projectName:   projectName,
                     projectId:     rec.project_id || "",
                 });
+
+                if (notifyResult.ok) {
+                    msgEl.className = "modal-msg show ok";
+                    msgEl.textContent = "Ticket submitted successfully.";
+                    setTimeout(() => el("ticketModal").classList.add("hidden"), 1000);
+                } else {
+                    msgEl.className = "modal-msg show error";
+                    msgEl.textContent = "Ticket saved, but email notification failed. Please check notification settings.";
+                }
             } catch (e) {
                 msgEl.className = "modal-msg show error";
                 msgEl.textContent = "Failed: " + e.message;
@@ -1969,3 +1985,4 @@
     </script>
 </body>
 </html>
+

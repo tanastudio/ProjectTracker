@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Project Tickets</title>
     <link rel="stylesheet" href="styles.css" />
@@ -466,8 +466,12 @@
         }
     </style>
 
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
-
 <body>
     <div class="layout">
         <!-- Sidebar (same structure as projects/dashboard) -->
@@ -881,9 +885,15 @@
 
         async function notifyViaEdge(payload) {
             try {
-                await supabase.functions.invoke("ticket-notify", { body: payload });
+                const { data, error } = await supabase.functions.invoke("ticket-notify", { body: payload });
+                if (error) throw error;
+                if (data?.skipped || data?.ok === false) {
+                    throw new Error(data?.reason || "notification skipped");
+                }
+                return { ok: true, data };
             } catch (e) {
                 console.warn("Email notification failed (non-fatal):", e);
+                return { ok: false, error: e };
             }
         }
 
@@ -925,7 +935,7 @@
 
                 // Find the ticket for notification context
                 const ticket = ALL_ITEMS.find((t) => String(t.id) === String(ticketId));
-                await notifyViaEdge({
+                const notifyResult = await notifyViaEdge({
                     ticketId: String(ticketId),
                     eventType: "reply",
                     authorId: SESSION_USER_ID,
@@ -937,6 +947,7 @@
                     projectName: PROJECT_CTX?.project_name || "",
                     projectId: PROJECT_CTX?.project_id || "",
                 });
+                if (!notifyResult.ok) showMsg("Reply saved, but email notification failed. Please check notification settings.", true);
             } catch (e) {
                 showMsg("Failed to send reply: " + e.message, true);
             } finally {
@@ -1448,3 +1459,4 @@
 </body>
 
 </html>
+

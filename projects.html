@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Select Project</title>
     <link rel="stylesheet" href="styles.css" />
@@ -567,8 +567,12 @@
             }
         }
     </style>
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
-
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -710,10 +714,19 @@
             return Math.max(0, Math.min(100, Math.round((c / t) * 100)));
         }
 
+        function isSimulatedEmptyProjectsMode() {
+            const url = new URL(window.location.href);
+            return ["1", "true", "yes"].includes(String(url.searchParams.get("simulate_empty_projects") || "").trim().toLowerCase());
+        }
+
+        function buildProjectsPageUrl() {
+            return isSimulatedEmptyProjectsMode() ? "./projects.html?simulate_empty_projects=1" : "./projects.html";
+        }
+
         function goNeedProject(page) {
             const selectedProjectId = sessionStorage.getItem("selected_project_id");
             if (!selectedProjectId) {
-                window.location.href = "./projects.html";
+                window.location.href = buildProjectsPageUrl();
                 return;
             }
             window.location.href = `./${page}?project=${encodeURIComponent(selectedProjectId)}`;
@@ -748,8 +761,31 @@
             }
         }
 
+        function resolveRole(profileRole, session) {
+            const profileValue = String(profileRole || "").trim().toLowerCase();
+            if (profileValue) return profileValue;
+
+            const metadataRole = String(session?.user?.user_metadata?.role || "").trim().toLowerCase();
+            if (metadataRole) return metadataRole;
+
+            const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+            return cachedRole || "viewer";
+        }
+
+        function wireAdminEmptyState(userRole) {
+            if (userRole !== "admin") return;
+
+            const createBtn = document.getElementById("emptyCreateProjectBtn");
+            if (!createBtn) return;
+
+            createBtn.addEventListener("click", () => {
+                window.location.href = "./create-project.html";
+            });
+        }
+
         let projectIds = [];
         let ticketCountsByProject = new Map();
+        const simulateEmptyProjects = isSimulatedEmptyProjectsMode();
 
         const session = await requireSession();
         if (!session) throw new Error("No session");
@@ -779,18 +815,18 @@
             session.user.user_metadata?.display_name ||
             session.user.email ||
             "User";
-        const userRole = String(prof?.role || "").trim().toLowerCase() || "viewer";
+        const userRole = resolveRole(prof?.role, session);
         const chip = document.getElementById("userChip");
         if (chip) chip.textContent = `${displayName} (${userRole})`;
 
-        if (prof?.role === "candidate") {
+        if (userRole === "candidate") {
             window.location.replace("./candidate-status.html");
             throw new Error("candidate redirected");
         }
 
-        setSidebarAccess(prof?.role);
+        setSidebarAccess(userRole);
 
-        const { data: mem, error } = await supabase
+        const { data: membershipRows, error } = await supabase
             .from("project_members")
             .select("project_id, role, projects(name, status)")
             .eq("user_id", session.user.id);
@@ -801,7 +837,7 @@
         }
 
         el("navProjects").addEventListener("click", () => {
-            window.location.href = "./projects.html";
+            window.location.href = buildProjectsPageUrl();
         });
 
         el("navDashboard").addEventListener("click", () => {
@@ -817,17 +853,62 @@
         });
 
         el("navAdmin").addEventListener("click", () => {
-            window.location.href = "./admin.html";
+            window.location.href = simulateEmptyProjects ? "./admin.html?simulate_empty_projects=1" : "./admin.html";
         });
 
         el("navAccess").addEventListener("click", () => {
             window.location.href = "./admin-access.html";
         });
 
+        let mem = membershipRows || [];
+
+        if (userRole === "admin") {
+            const { data: allProjects, error: projectError } = await supabase
+                .from("projects")
+                .select("id, name, status")
+                .order("name", { ascending: true });
+
+            if (projectError) {
+                el("msg").textContent = "Cannot load projects: " + projectError.message;
+                throw projectError;
+            }
+
+            const membershipByProjectId = new Map(mem.map((row) => [String(row.project_id), row]));
+            mem = (allProjects || []).map((project) => {
+                const membership = membershipByProjectId.get(String(project.id));
+                return {
+                    project_id: project.id,
+                    role: membership?.role || "admin",
+                    projects: {
+                        name: project.name,
+                        status: project.status,
+                    },
+                };
+            });
+        }
+
+        if (simulateEmptyProjects) {
+            sessionStorage.removeItem("selected_project_id");
+            mem = [];
+        }
+
         if (!mem || mem.length === 0) {
-            el("msg").textContent = "No projects assigned. Please contact admin.";
-            el("grid").innerHTML = `<div class="empty">No projects assigned.</div>`;
-            throw new Error("No projects assigned");
+            el("msg").textContent = userRole === "admin"
+                ? (simulateEmptyProjects
+                    ? "Simulated no-project mode is active. Create Project is still available from Admin."
+                    : "No projects found yet. Create the first project from Admin.")
+                : "No projects assigned. Please contact admin.";
+            el("grid").innerHTML = userRole === "admin"
+                ? `
+                    <div class="empty">
+                        <div style="font-weight:700;color:#0f172a;margin-bottom:8px;">${simulateEmptyProjects ? "Simulated no-project state." : "No projects yet."}</div>
+                        <div style="margin-bottom:14px;">${simulateEmptyProjects ? "Real data is unchanged. This view hides projects so you can test the empty admin flow safely." : "Create the first project to start using dashboards, tickets, and email summaries."}</div>
+                        <button class="proj-btn" id="emptyCreateProjectBtn" type="button">Create Project</button>
+                    </div>
+                `
+                : `<div class="empty">No projects assigned.</div>`;
+            wireAdminEmptyState(userRole);
+            throw new Error(userRole === "admin" ? (simulateEmptyProjects ? "Simulated no projects" : "No projects found") : "No projects assigned");
         }
 
         projectIds = mem.map((m) => m.project_id);
@@ -1108,3 +1189,4 @@
     </script>
 </body>
 </html>
+

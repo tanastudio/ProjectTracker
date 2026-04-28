@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';"/>
   <meta name="referrer" content="strict-origin-when-cross-origin"/>
   <title>Create Project</title>
   <link rel="stylesheet" href="styles.css"/>
@@ -210,8 +210,12 @@
     .field-right-item.drag-over-top { border-top: 2px solid #3b82f6; }
     .field-right-item.drag-over-bottom { border-bottom: 2px solid #3b82f6; }
   </style>
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
-
 <body>
 <div class="layout">
   <!-- Sidebar -->
@@ -1063,11 +1067,22 @@ el("createBtn").addEventListener("click", async () => {
       sort_order: 20 + i * 10,
       field_role: "step",
       is_active: true,
+      show_in_candidate_status: true,
+      show_in_dashboard: true,
+      show_in_internal: true,
       visible: true,
       options: f.type === "select" ? STATUS_OPTIONS : null,
     }));
     const allFieldsToInsert = [
-      ...FIXED_FIELDS.map((f, i) => ({ project_id: projectId, ...f, is_active: true, visible: true })),
+      ...FIXED_FIELDS.map((f, i) => ({
+        project_id: projectId,
+        ...f,
+        is_active: true,
+        show_in_candidate_status: true,
+        show_in_dashboard: true,
+        show_in_internal: true,
+        visible: true,
+      })),
       ...customFieldsToInsert,
     ];
     const { error: fieldsErr } = await supabase.from("fields").insert(allFieldsToInsert);
@@ -1122,3 +1137,4 @@ el("createBtn").addEventListener("click", async () => {
 </script>
 </body>
 </html>
+

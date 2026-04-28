@@ -14,9 +14,9 @@ async function resolveUserNames(userIds) {
 }
 
 /* ============================
-   FORM (Supabase) — Dynamic Fields
+   FORM (Supabase) - Dynamic Fields
    - Internal / admin only
-   - Fields loaded from DB (type="select" → dynamic steps)
+   - Fields loaded from DB (type="select" -> dynamic steps)
    - issue / decision are system text fields, required when any step = "Issue"
    ============================ */
 
@@ -285,7 +285,7 @@ let SELECT_FIELDS        = [];   // fields with type="select" excluding overall_
 let OVERALL_STATUS_FIELD = null; // overall_status field (read-only, DB-computed)
 let ISSUE_FIELD          = null; // field with key="issue"
 let DECISION_FIELD       = null; // field with key="decision"
-let STEP_SELECTS         = [];   // [{ field, select }] — top-form dynamic selects
+let STEP_SELECTS         = [];   // [{ field, select }] - top-form dynamic selects
 let overallStatusDisplay = null; // DOM element showing overall status in top form
 
 let GLOBAL_IN_FLIGHT = 0;
@@ -302,7 +302,7 @@ let ROW_ELEMENTS     = new Map();
 async function loadFields(projectId) {
     const { data, error } = await supabase
         .from("fields")
-        .select("id, key, label, type, options, sort_order, field_role, is_active")
+        .select("id, key, label, type, options, sort_order, field_role, is_active, show_in_internal")
         .eq("project_id", projectId)
         .order("sort_order", { ascending: true });
 
@@ -395,7 +395,7 @@ function markDirty(row, key, value) { row._dirty[key] = value; }
 function setGlobalSaveState() {
     if (GLOBAL_IN_FLIGHT > 0) { setSavePill("save-saving", "Saving..."); return; }
     setSavePill(LAST_SAVE_OK ? "save-saved" : "save-failed",
-                LAST_SAVE_OK ? "Saved ✓"   : "Failed (not saved)");
+                LAST_SAVE_OK ? "Saved" : "Failed (not saved)");
 }
 
 async function upsertRecordValue(recordId, fieldKey, value) {
@@ -463,7 +463,7 @@ async function saveRowNow(row) {
         console.error("Save failed (attempt", row._failCount, "):", e?.message || e?.code || e);
         LAST_SAVE_OK = false;
         setSavePill("save-failed", row._failCount >= 3
-            ? "Save failed — reload page to retry"
+            ? "Save failed - reload page to retry"
             : "Failed (check RLS/policies/schema)");
     } finally {
         GLOBAL_IN_FLIGHT = Math.max(0, GLOBAL_IN_FLIGHT - 1);
@@ -505,7 +505,7 @@ function buildCandidatePicker() {
     for (const r of MODEL) {
         if (!String(r.code || "").trim()) continue;
         const opt   = document.createElement("option");
-        opt.value   = `${r.code} — ${r.name || ""}`.trim();
+        opt.value   = `${r.code} | ${r.name || ""}`.trim();
         candidateList.appendChild(opt);
     }
 }
@@ -519,17 +519,17 @@ function buildCandidatePickerFiltered(queryLower) {
         const hay = `${r.code} ${r.name || ""} ${r.email || ""}`.toLowerCase();
         if (q && !hay.includes(q)) continue;
         const opt = document.createElement("option");
-        opt.value = `${r.code} — ${r.name || ""}`.trim();
+        opt.value = `${r.code} | ${r.name || ""}`.trim();
         candidateList.appendChild(opt);
     }
 }
 
 function parseCodeFromPick(text) {
-    return String(text || "").trim().split("—")[0].trim();
+    return String(text || "").trim().split(" | ")[0].trim();
 }
 
 /* ============================================================
-   TOP FORM — DYNAMIC STEP SELECTS
+   TOP FORM - DYNAMIC STEP SELECTS
    ============================================================ */
 
 /** Rebuild the steps-grid UI from SELECT_FIELDS. Call after each field reload. */
@@ -564,7 +564,7 @@ function buildStepSelectsUI() {
         STEP_SELECTS.push({ field: f, select: sel });
     }
 
-    // Overall Status — read-only, computed by DB
+    // Overall Status - read-only, computed by DB
     if (OVERALL_STATUS_FIELD) {
         const wrapper = document.createElement("div");
         const lbl = document.createElement("label");
@@ -572,7 +572,7 @@ function buildStepSelectsUI() {
         lbl.textContent = "Overall Status";
         overallStatusDisplay = document.createElement("div");
         overallStatusDisplay.className = "overall-status-badge";
-        overallStatusDisplay.textContent = "—";
+        overallStatusDisplay.textContent = "-";
         wrapper.appendChild(lbl);
         wrapper.appendChild(overallStatusDisplay);
         stepsGrid.appendChild(wrapper);
@@ -602,7 +602,7 @@ function updateTopFormFromRow(row) {
     if (!row) return;
     TOP_FORM_LOCK = true;
 
-    candPick.value      = row.code ? `${row.code} — ${row.name || ""}`.trim() : "";
+    candPick.value      = row.code ? `${row.code} | ${row.name || ""}`.trim() : "";
     candCode.value      = row.code      || "";
     candName.value      = row.name      || "";
     candEmail.value     = row.email     || "";
@@ -664,7 +664,7 @@ function bindTopFormEvents() {
 }
 
 /* ============================================================
-   TABLE — DYNAMIC HEADER
+   TABLE - DYNAMIC HEADER
    ============================================================ */
 function renderTableHead() {
     const thead = el("thead");
@@ -689,7 +689,7 @@ function renderTableHead() {
         const sortSpan             = document.createElement("span");
         sortSpan.className         = "th-sort";
         sortSpan.dataset.sortIcon  = key;
-        sortSpan.textContent       = "↕";
+        sortSpan.textContent       = "-";
 
         btn.appendChild(textSpan);
         btn.appendChild(sortSpan);
@@ -810,7 +810,7 @@ function applySort(rows) {
 function setSortIcon(key, dir) {
     document.querySelectorAll("[data-sort-icon]").forEach(node => {
         const k          = node.getAttribute("data-sort-icon");
-        node.textContent = (k === key && dir !== 0) ? (dir === 1 ? "↑" : "↓") : "↕";
+        node.textContent = (k === key && dir !== 0) ? (dir === 1 ? "^" : "v") : "-";
         node.style.opacity = (k === key && dir !== 0) ? "1" : "0.75";
     });
 }
@@ -856,7 +856,7 @@ function currentFilteredModel() {
 }
 
 /* ============================================================
-   TABLE — CELL BUILDERS
+   TABLE - CELL BUILDERS
    ============================================================ */
 function makeSelect(field, statusValue, onChange) {
     const sel  = document.createElement("select");
@@ -915,7 +915,7 @@ function scrollToRowUid(uid) {
 }
 
 /* ============================================================
-   TABLE — ROW BUILD / UPDATE
+   TABLE - ROW BUILD / UPDATE
    ============================================================ */
 function buildRow(r) {
     const tr    = document.createElement("tr");
@@ -989,9 +989,9 @@ function buildRow(r) {
     tdDecision.appendChild(inpDecision);
     tr.appendChild(tdDecision);
 
-    // Updated By (read-only — auto-set from session on save)
+    // Updated By (read-only - auto-set from session on save)
     const tdUpd = document.createElement("td");
-    tdUpd.appendChild(makeTextCell(r.updatedBy || "—", { key: "updatedBy" }));
+    tdUpd.appendChild(makeTextCell(r.updatedBy || "-", { key: "updatedBy" }));
     tr.appendChild(tdUpd);
 
     // Active
@@ -1070,7 +1070,7 @@ function updateRowCells(tr, r) {
             continue;
         }
         if (key === "updatedBy") {
-            cell.textContent = r.updatedBy || "—";
+            cell.textContent = r.updatedBy || "-";
             continue;
         }
         if (key === "active") {
@@ -1269,11 +1269,11 @@ async function reloadAll() {
 
         // Derive dynamic field lists from what DB returns
         const isOverall = f => f.key === "overall_status" || f.field_role === "overall_status";
-        const activeFields = FIELDS.list.filter(f => f.is_active !== false);
-        SELECT_FIELDS        = activeFields.filter(f => f.type === "select" && !isOverall(f));
+        const internalFields = FIELDS.list.filter(f => f.show_in_internal !== false);
+        SELECT_FIELDS        = internalFields.filter(f => f.type === "select" && !isOverall(f));
         OVERALL_STATUS_FIELD = FIELDS.list.find(isOverall) ?? null;
-        ISSUE_FIELD          = activeFields.find(f => f.key === "issue")    ?? null;
-        DECISION_FIELD       = activeFields.find(f => f.key === "decision") ?? null;
+        ISSUE_FIELD          = internalFields.find(f => f.key === "issue")    ?? null;
+        DECISION_FIELD       = internalFields.find(f => f.key === "decision") ?? null;
 
         const includeInactive = !!showInactive?.checked;
         const records = await loadRecords(PROJECT_CTX.project_id, includeInactive);
@@ -1361,7 +1361,7 @@ function wireEvents() {
         }
         setEmailHint(false);
 
-        // Pull UI → model
+        // Pull UI -> model
         SELECTED.name      = candName?.value     ?? "";
         SELECTED.email     = candEmail?.value    ?? "";
         SELECTED.issue     = candIssue?.value    ?? "";

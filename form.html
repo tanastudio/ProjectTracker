@@ -1,9 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Update Candidate</title>
 
@@ -34,8 +34,12 @@
             display: flex;
         }
     </style>
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
-
 <body>
     <div class="layout">
         <!-- Sidebar (shared via sidebar.css) -->
@@ -112,9 +116,9 @@
                         <h1 id="formTitle" class="page-title">Update Candidate Status</h1>
                         <p class="page-desc">
                             <span class="muted">Auto-save</span>
-                            <span> • </span>
+                            <span> | </span>
                             <span class="muted small">Status: <span id="saveState" class="save-pill save-idle">Idle</span></span>
-                            <span> • </span>
+                            <span> | </span>
                             <span class="muted small">Last sync: <span id="lastSync">-</span></span>
                         </p>
                     </div>
@@ -260,7 +264,7 @@
                     </div>
 
                     <div class="footnote">
-                        Tips: Edit any cell → auto-save. Deactivate instead of delete. Sorting is UI-only.
+                        Tips: Edit any cell to auto-save. Deactivate instead of delete. Sorting is UI-only.
                     </div>
                 </section>
 
@@ -302,3 +306,4 @@
     </div>
 </body>
 </html>
+

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Admin</title>
 
@@ -208,8 +208,12 @@
             }
         }
     </style>
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
-
 <body>
     <div class="layout">
         <!-- Sidebar -->
@@ -346,7 +350,7 @@
 
                         <div class="tile" id="tileCreateProject">
                             <h3>Create New Project</h3>
-                            <p>Launch the project creation wizard โ€” set fields, members, and upload candidates.</p>
+                            <p>Launch the project creation wizard: set fields, members, and upload candidates.</p>
                         </div>
 
                         <div class="tile" id="tileSettings">
@@ -414,19 +418,44 @@
         }
 
         function getProjectIdFromUrlOrStorage() {
+            if (isSimulatedEmptyProjectsMode()) return "";
             const url = new URL(window.location.href);
             const p = url.searchParams.get("project");
             if (p) return p;
             return sessionStorage.getItem("selected_project_id");
         }
 
+        function isSimulatedEmptyProjectsMode() {
+            const url = new URL(window.location.href);
+            return ["1", "true", "yes"].includes(String(url.searchParams.get("simulate_empty_projects") || "").trim().toLowerCase());
+        }
+
+        function buildProjectsPageUrl() {
+            return isSimulatedEmptyProjectsMode() ? "./projects.html?simulate_empty_projects=1" : "./projects.html";
+        }
+
+        function buildAdminPageUrl() {
+            return isSimulatedEmptyProjectsMode() ? "./admin.html?simulate_empty_projects=1" : "./admin.html";
+        }
+
         function goNeedProject(page) {
             const pid = getProjectIdFromUrlOrStorage();
             if (!pid) {
-                window.location.href = "./projects.html";
+                window.location.href = buildProjectsPageUrl();
                 return;
             }
             window.location.href = `./${page}?project=${encodeURIComponent(pid)}`;
+        }
+
+        function resolveRole(profileRole, session) {
+            const profileValue = String(profileRole || "").trim().toLowerCase();
+            if (profileValue) return profileValue;
+
+            const metadataRole = String(session?.user?.user_metadata?.role || "").trim().toLowerCase();
+            if (metadataRole) return metadataRole;
+
+            const cachedRole = String(sessionStorage.getItem("user_role") || "").trim().toLowerCase();
+            return cachedRole || "viewer";
         }
 
         async function requireAdmin() {
@@ -453,18 +482,20 @@
                 .maybeSingle();
 
             if (profileErr) {
-                showHint("Cannot load profile (RLS?): " + profileErr.message, true);
-                return null;
+                console.warn("admin profile lookup failed, falling back to user metadata:", profileErr.message);
             }
 
-            const role = String(profile?.role || "");
+            const role = resolveRole(profile?.role, session);
             if (role !== "admin") {
                 window.location.replace("./projects.html");
                 return null;
             }
 
+            sessionStorage.setItem("user_role", "admin");
+            document.documentElement.setAttribute("data-user-role", "admin");
+
             const chip = document.getElementById("userChip");
-            if (chip) chip.textContent = `${profile?.display_name || session.user.email || session.user.id} (admin)`;
+            if (chip) chip.textContent = `${profile?.display_name || session.user.user_metadata?.display_name || session.user.email || session.user.id} (admin)`;
 
             return session;
         }
@@ -482,6 +513,10 @@
 
         const session = await requireAdmin();
         if (!session) throw new Error("No access/session");
+        if (isSimulatedEmptyProjectsMode()) {
+            sessionStorage.removeItem("selected_project_id");
+            showHint("Simulated no-project mode is active. Real projects are hidden only in this view.", false);
+        }
         const ticketNavBadge = attachTicketNavBadge({
             supabase,
             navElement: document.getElementById("navTickets"),
@@ -513,7 +548,7 @@
             e.preventDefault();
             const pid = getProjectIdFromUrlOrStorage();
             if (!pid) {
-                window.location.href = "./admin.html";
+                window.location.href = buildAdminPageUrl();
                 return;
             }
             window.location.href = "./admin.html?project=" + encodeURIComponent(pid);
@@ -536,7 +571,7 @@
 
         // Tiles
         el("tileProjects").addEventListener("click", () => {
-            window.location.href = "./projects.html";
+            window.location.href = buildProjectsPageUrl();
         });
 
         el("tileDashboard").addEventListener("click", () => {
@@ -721,3 +756,4 @@
     </script>
 </body>
 </html>
+
