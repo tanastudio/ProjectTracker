@@ -951,7 +951,7 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const cronSecret = Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "";
     const trackerBaseUrl = Deno.env.get("TRACKER_BASE_URL") ?? "https://tracker.mentisglobal.com";
-    const webhookUrl = Deno.env.get("N8N_PROJECT_UPDATE_WEBHOOK_URL") || "";
+    const webhookUrl = Deno.env.get("N8N_PROJECT_UPDATE_WEBHOOK_URL") || Deno.env.get("N8N_WEBHOOK_URL") || "";
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -965,7 +965,7 @@ serve(async (req) => {
     const requestedByCron = req.headers.get("x-project-update-cron-secret") === cronSecret && Boolean(cronSecret);
 
     if (!webhookUrl) {
-      return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
+      return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL or N8N_WEBHOOK_URL is not configured" }, 500);
     }
 
     let manualUser: AuthorizedUser | null = null;

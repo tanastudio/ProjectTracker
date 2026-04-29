@@ -1082,6 +1082,24 @@ function showHint(text, isErr = false) {
 }
 function clearHint() { const h = el("hint"); h.className = "hint"; h.textContent = ""; }
 
+async function getFunctionErrorMessage(error) {
+  const fallback = error?.message || String(error || "Unknown error");
+  const response = error?.context;
+  if (!response || typeof response.clone !== "function") return fallback;
+
+  try {
+    const body = await response.clone().json();
+    return body?.error || body?.message || fallback;
+  } catch {
+    try {
+      const text = await response.clone().text();
+      return text || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+}
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -2036,7 +2054,7 @@ async function sendEmailReportNow(recipientGroup, buttonId, idleText) {
 
   if (error) {
     await loadEmailRunHistory();
-    showHint("Failed to send project update email: " + error.message, true);
+    showHint("Failed to send project update email: " + await getFunctionErrorMessage(error), true);
     return;
   }
 
