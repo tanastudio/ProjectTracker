@@ -549,6 +549,7 @@
 <script type="module">
 import { supabase } from "./supabaseClient.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+import { showToast } from "./lib/toast-notifications.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -594,9 +595,11 @@ function applyDraft(draft) {
 /* ── helpers ── */
 function showHint(text, isErr = false) {
   const h = el("hint");
-  h.className = "hint " + (isErr ? "hint-error" : "hint-ok");
-  h.textContent = text;
-  h.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (h) {
+    h.className = "hint";
+    h.textContent = "";
+  }
+  showToast(text, isErr);
 }
 function clearHint() { const h = el("hint"); h.className = "hint"; h.textContent = ""; }
 

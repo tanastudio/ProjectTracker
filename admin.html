@@ -404,13 +404,17 @@
     <script type="module">
         import { supabase } from "./supabaseClient.js";
         import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+        import { showToast } from "./lib/toast-notifications.js";
 
         const el = (id) => document.getElementById(id);
 
         function showHint(text, isErr = false) {
             const h = el("hint");
-            h.className = "hint " + (isErr ? "hint-error" : "hint-ok");
-            h.textContent = text;
+            if (h) {
+                h.className = "hint";
+                h.textContent = "";
+            }
+            showToast(text, isErr);
         }
 
         function setMsg(text) {
@@ -673,8 +677,11 @@
         const prevMsg = el("previewMsg");
 
         function setPreviewMsg(text, isErr = false) {
-            prevMsg.className = "hint " + (isErr ? "hint-error" : "hint-ok");
-            prevMsg.textContent = text;
+            if (prevMsg) {
+                prevMsg.className = "hint";
+                prevMsg.textContent = "";
+            }
+            showToast(text, isErr);
         }
 
         // Load all projects into dropdown

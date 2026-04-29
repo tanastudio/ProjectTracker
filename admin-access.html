@@ -524,14 +524,18 @@
             <script type="module">
                 import { supabase } from "./supabaseClient.js";
                 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+                import { showToast } from "./lib/toast-notifications.js";
 
                 const el = (id) => document.getElementById(id);
 
                 function showHint(text, isErr = false) {
                     const h = el("hint");
-                    h.className = "hint " + (isErr ? "hint-error" : "hint-ok");
-                    h.textContent = text;
-                    h.style.display = "block";
+                    if (h) {
+                        h.className = "hint";
+                        h.textContent = "";
+                        h.style.display = "none";
+                    }
+                    showToast(text, isErr);
                 }
 
                 function clearHint() {
