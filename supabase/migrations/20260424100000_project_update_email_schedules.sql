@@ -105,6 +105,109 @@ CREATE TABLE IF NOT EXISTS public.project_update_email_runs (
         CHECK (status IN ('queued', 'sent', 'failed', 'skipped'))
 );
 
+CREATE OR REPLACE FUNCTION public.current_profile_role()
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE(
+        (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid()),
+        'viewer'
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.current_candidate_record_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT p.candidate_record_id
+    FROM public.profiles p
+    WHERE p.id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT public.current_profile_role() = 'admin';
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_project_creator(p_project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.projects p
+        WHERE p.id = p_project_id
+          AND p.created_by = auth.uid()
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_project_member(p_project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.project_members pm
+        WHERE pm.project_id = p_project_id
+          AND pm.user_id = auth.uid()
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_edit_project(p_project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT
+        public.is_admin()
+        OR public.is_project_creator(p_project_id)
+        OR EXISTS (
+            SELECT 1
+            FROM public.project_members pm
+            WHERE pm.project_id = p_project_id
+              AND pm.user_id = auth.uid()
+              AND pm.role IN ('admin', 'editor')
+        );
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_access_project(p_project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT
+        public.is_admin()
+        OR public.is_project_member(p_project_id)
+        OR public.is_project_creator(p_project_id)
+        OR EXISTS (
+            SELECT 1
+            FROM public.records r
+            WHERE r.project_id = p_project_id
+              AND r.id = public.current_candidate_record_id()
+        );
+$$;
+
 ALTER TABLE public.project_update_email_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_update_email_runs ENABLE ROW LEVEL SECURITY;
 
