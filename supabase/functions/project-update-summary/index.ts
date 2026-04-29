@@ -845,13 +845,6 @@ function compactHtmlForTransport(html: string) {
     .trim();
 }
 
-function isResendSandboxError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || "");
-  return message.includes('"statusCode":403')
-    || message.toLowerCase().includes("validation_error")
-    || message.toLowerCase().includes("you can only send testing emails");
-}
-
 async function sendEmailBatch(
   webhookUrl: string,
   recipients: Array<{ email: string; name: string }>,
@@ -868,54 +861,13 @@ async function sendEmailBatch(
   const normalizedAuditEmails = recipientGroup === "client"
     ? normalizeEmailList(auditEmails || [])
     : [];
-  const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
-  const notifyFromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") || "";
   const compactHtml = compactHtmlForTransport(html);
 
   if (primaryEmails.length === 0) {
     throw new Error("No deliverable primary recipients.");
   }
-
-  if (resendApiKey && notifyFromEmail) {
-    const fromEmail = notifyFromEmail.includes("<")
-      ? notifyFromEmail
-      : `Mentis Workflows <${notifyFromEmail}>`;
-
-    try {
-      await Promise.all(primaryEmails.map(async (toEmail) => {
-        const payload: Record<string, unknown> = {
-          from: fromEmail,
-          to: [toEmail],
-          subject,
-          html: compactHtml,
-          text,
-        };
-        if (normalizedAuditEmails.length > 0) {
-          payload.bcc = normalizedAuditEmails;
-        }
-
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${resendApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          throw new Error(`resend delivery failed: ${response.status} ${await response.text()}`);
-        }
-      }));
-
-      return {
-        provider: "resend",
-        sent_to: primaryEmails,
-        audit_emails: normalizedAuditEmails,
-      };
-    } catch (error) {
-      if (!webhookUrl || !isResendSandboxError(error)) throw error;
-    }
+  if (!webhookUrl) {
+    throw new Error("N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured.");
   }
 
   const response = await fetch(webhookUrl, {
@@ -1026,7 +978,6 @@ serve(async (req) => {
     const cronSecret = Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "";
     const trackerBaseUrl = Deno.env.get("TRACKER_BASE_URL") ?? "https://tracker.mentisglobal.com";
     const webhookUrl = Deno.env.get("N8N_PROJECT_UPDATE_WEBHOOK_URL") || "";
-    const canSendDirectEmail = Boolean(Deno.env.get("RESEND_API_KEY") && Deno.env.get("NOTIFY_FROM_EMAIL"));
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -1039,8 +990,8 @@ serve(async (req) => {
       : "client";
     const requestedByCron = req.headers.get("x-project-update-cron-secret") === cronSecret && Boolean(cronSecret);
 
-    if (!webhookUrl && !canSendDirectEmail) {
-      return jsonResponse({ error: "RESEND_API_KEY/NOTIFY_FROM_EMAIL or N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
+    if (!webhookUrl) {
+      return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
     }
 
     let manualUser: AuthorizedUser | null = null;
