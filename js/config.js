@@ -16,7 +16,7 @@ const IS_LOCAL =
   window.location.hostname === "";
 
 // ── Local (supabase start) ────────────────────────────────────────────────────
-const LOCAL_URL      = "http://127.0.0.1:54321";
+const LOCAL_URL      = "http://127.0.0.1:55321";
 const LOCAL_ANON_KEY = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
 
 // ── Remote (Supabase cloud) ───────────────────────────────────────────────────

@@ -22,14 +22,59 @@ type NotifyBody = {
   projectId: string;
 };
 
+type EmailPayload = {
+  to: string;
+  subject: string;
+  title: string;
+  body: string;
+  actionUrl: string;
+  actionText: string;
+  eventType: string;
+  authorName: string;
+  authorRole: string;
+  candidateName: string;
+  projectName: string;
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function escapeHtml(value: string): string {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function eventLabel(type: NotifyBody["eventType"]): string {
+  if (type === "reply") return "New Reply";
+  if (type === "status_change") return "Status Changed";
+  if (type === "priority_change") return "Priority Changed";
+  if (type === "new_ticket") return "New Request";
+  return "Ticket Updated";
+}
+
 async function getProfileEmail(
   adminClient: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<string | null> {
   if (!userId) return null;
+
+  const { data: profile } = await adminClient
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profile?.email) return String(profile.email).trim().toLowerCase();
+
   const { data, error } = await adminClient.auth.admin.getUserById(userId);
   if (error || !data?.user?.email) return null;
-  return data.user.email;
+  return data.user.email.trim().toLowerCase();
 }
 
 async function getProjectMemberEmailsByRole(
@@ -37,19 +82,40 @@ async function getProjectMemberEmailsByRole(
   projectId: string,
   roles: string[],
 ): Promise<string[]> {
-  const { data: members } = await adminClient
+  const { data: members, error: membersError } = await adminClient
     .from("project_members")
-    .select("user_id, profiles(role)")
+    .select("user_id")
     .eq("project_id", projectId);
+  if (membersError || !members?.length) return [];
+
+  const userIds = Array.from(
+    new Set(
+      members
+        .map((member) => String(member.user_id || "").trim())
+        .filter(Boolean),
+    ),
+  );
+  if (!userIds.length) return [];
+
+  const { data: profiles, error: profilesError } = await adminClient
+    .from("profiles")
+    .select("id, role")
+    .in("id", userIds);
+  if (profilesError || !profiles?.length) return [];
+
+  const roleByUserId = new Map(
+    profiles.map((profile) => [
+      String(profile.id),
+      String(profile.role ?? "").toLowerCase(),
+    ]),
+  );
 
   const emails: string[] = [];
-  for (const m of members ?? []) {
-    const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-    const role = String(prof?.role ?? "").toLowerCase();
-    if (roles.includes(role)) {
-      const email = await getProfileEmail(adminClient, String(m.user_id));
-      if (email) emails.push(email);
-    }
+  for (const userId of userIds) {
+    const role = roleByUserId.get(userId) ?? "";
+    if (!roles.includes(role)) continue;
+    const email = await getProfileEmail(adminClient, userId);
+    if (email) emails.push(email);
   }
   return emails;
 }
@@ -68,39 +134,109 @@ async function getCandidateEmailForTicket(
   return await getProfileEmail(adminClient, String(prof.id));
 }
 
-function eventLabel(type: NotifyBody["eventType"]): string {
-  if (type === "reply") return "New Reply";
-  if (type === "status_change") return "Status Changed";
-  if (type === "priority_change") return "Priority Changed";
-  if (type === "new_ticket") return "New Request";
-  return "Ticket Updated";
+async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
+  const res = await fetch(n8nWebhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to_emails: [payload.to],
+      email_subject: payload.subject,
+      name: "Team",
+      message_title: payload.title,
+      message_body: payload.body,
+      action_url: payload.actionUrl,
+      action_text: payload.actionText,
+      event_type: payload.eventType,
+      author_name: payload.authorName,
+      author_role: payload.authorRole,
+      candidate_name: payload.candidateName,
+      project_name: payload.projectName,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`n8n ${res.status} ${text}`);
+  }
+}
+
+async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPayload) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
+      <h2 style="margin:0 0 12px">${escapeHtml(payload.title)}</h2>
+      <p style="margin:0 0 12px">${escapeHtml(payload.body).replaceAll("\n", "<br>")}</p>
+      <p style="margin:0 0 12px;color:#475569">
+        ${escapeHtml(payload.eventType)} by ${escapeHtml(payload.authorName || "Unknown")} (${escapeHtml(payload.authorRole || "-")})
+      </p>
+      <p style="margin:0 0 16px;color:#475569">
+        Project: ${escapeHtml(payload.projectName || "-")}<br>
+        Candidate: ${escapeHtml(payload.candidateName || "-")}
+      </p>
+      <a href="${escapeHtml(payload.actionUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px">
+        ${escapeHtml(payload.actionText)}
+      </a>
+    </div>`;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [payload.to],
+      subject: payload.subject,
+      html,
+      text: `${payload.title}\n\n${payload.body}\n\n${payload.actionText}: ${payload.actionUrl}`,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`resend ${res.status} ${text}`);
+  }
+}
+
+async function sendEmail(payload: EmailPayload) {
+  const n8nWebhookUrl = Deno.env.get("N8N_WEBHOOK_URL") ?? "";
+  const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  const notifyFromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") ?? "";
+  const providerErrors: string[] = [];
+
+  if (n8nWebhookUrl) {
+    try {
+      await sendViaN8n(n8nWebhookUrl, payload);
+      return { provider: "n8n" };
+    } catch (err) {
+      providerErrors.push(err instanceof Error ? err.message : String(err));
+    }
+  } else {
+    providerErrors.push("N8N_WEBHOOK_URL is not configured");
+  }
+
+  if (resendApiKey && notifyFromEmail) {
+    try {
+      await sendViaResend(resendApiKey, notifyFromEmail, payload);
+      return { provider: "resend", providerErrors };
+    } catch (err) {
+      providerErrors.push(err instanceof Error ? err.message : String(err));
+    }
+  } else {
+    providerErrors.push("RESEND_API_KEY or NOTIFY_FROM_EMAIL is not configured");
+  }
+
+  throw new Error(providerErrors.join("; "));
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const n8nWebhookUrl = Deno.env.get("N8N_WEBHOOK_URL")!;
     const trackerBaseUrl = Deno.env.get("TRACKER_BASE_URL") ?? "https://tracker.mentisglobal.com";
-
-    if (!n8nWebhookUrl) {
-      console.warn("N8N_WEBHOOK_URL not set — skipping notification");
-      return new Response(JSON.stringify({ ok: true, skipped: true }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -108,117 +244,84 @@ serve(async (req) => {
 
     const body = (await req.json()) as NotifyBody;
     const { ticketId, eventType, authorId, authorRole, projectId } = body;
+    if (!ticketId || !eventType) return json({ error: "ticketId and eventType are required" }, 400);
 
-    if (!ticketId || !eventType) {
-      return new Response(JSON.stringify({ error: "ticketId and eventType are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Load ticket to get record_id and project_id fallback
     const { data: ticket } = await adminClient
       .from("requests")
       .select("id, project_id, created_by, owner_user_id, subject, candidate_name, record_id")
       .eq("id", ticketId)
       .maybeSingle();
-
-    if (!ticket) {
-      return new Response(JSON.stringify({ error: "Ticket not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!ticket) return json({ error: "Ticket not found" }, 404);
 
     const resolvedProjectId = projectId || ticket.project_id;
-
-    // Resolve recipient emails based on author role
     const authorEmail = await getProfileEmail(adminClient, authorId);
     const recipientSet = new Set<string>();
-    const candidateEmailSet = new Set<string>(); // tracks which emails belong to candidates
+    const candidateEmailSet = new Set<string>();
 
     if (authorRole === "candidate") {
       const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["internal", "admin", "client"]);
-      for (const e of emails) recipientSet.add(e);
+      for (const email of emails) recipientSet.add(email);
       if (authorEmail) candidateEmailSet.add(authorEmail);
     } else if (authorRole === "client") {
-      const internalAdminEmails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["internal", "admin"]);
-      for (const e of internalAdminEmails) recipientSet.add(e);
+      const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["internal", "admin"]);
+      for (const email of emails) recipientSet.add(email);
       if (ticket.record_id) {
         const candidateEmail = await getCandidateEmailForTicket(adminClient, ticket.record_id);
-        if (candidateEmail) { recipientSet.add(candidateEmail); candidateEmailSet.add(candidateEmail); }
+        if (candidateEmail) {
+          recipientSet.add(candidateEmail);
+          candidateEmailSet.add(candidateEmail);
+        }
       }
     } else {
-      // internal / admin → notify candidate + clients
       if (ticket.record_id) {
         const candidateEmail = await getCandidateEmailForTicket(adminClient, ticket.record_id);
-        if (candidateEmail) { recipientSet.add(candidateEmail); candidateEmailSet.add(candidateEmail); }
+        if (candidateEmail) {
+          recipientSet.add(candidateEmail);
+          candidateEmailSet.add(candidateEmail);
+        }
       }
-      const clientEmails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["client"]);
-      for (const e of clientEmails) recipientSet.add(e);
+      const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["client"]);
+      for (const email of emails) recipientSet.add(email);
     }
 
-    // Never email the author, except candidates get a copy of their own submission
     if (authorEmail && authorRole !== "candidate") recipientSet.delete(authorEmail);
 
-    const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-    const recipients = Array.from(recipientSet).filter((e) => Boolean(e) && isValidEmail(e));
-
-    if (recipients.length === 0) {
-      return new Response(JSON.stringify({ ok: true, skipped: true, reason: "no recipients" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const recipients = Array.from(recipientSet).filter((email) => Boolean(email) && isValidEmail(email));
+    if (recipients.length === 0) return json({ ok: false, skipped: true, reason: "no recipients" });
 
     const label = eventLabel(eventType);
     const ticketsUrl = `${trackerBaseUrl}/tickets.html?project=${resolvedProjectId}`;
     const candidateUrl = `${trackerBaseUrl}/candidate-status.html`;
 
-    // Send one request per recipient so n8n SES node receives a single email per call
+    const sent: Array<{ email: string; provider: string }> = [];
     const errors: string[] = [];
     for (const recipient of recipients) {
       const actionUrl = candidateEmailSet.has(recipient) ? candidateUrl : ticketsUrl;
-      const n8nPayload = {
-        to_emails: [recipient],
-        email_subject: `[${label}] ${body.ticketSubject} — ${body.projectName}`,
-        name: "Team",
-        message_title: body.ticketSubject,
-        message_body: body.message,
-        action_url: actionUrl,
-        action_text: "View Ticket",
-        event_type: label,
-        author_name: body.authorName,
-        author_role: authorRole,
-        candidate_name: body.candidateName,
-        project_name: body.projectName,
-      };
-
-      const n8nRes = await fetch(n8nWebhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(n8nPayload),
-      });
-
-      if (!n8nRes.ok) {
-        const text = await n8nRes.text();
-        errors.push(`${recipient}: n8n ${n8nRes.status} ${text}`);
+      try {
+        const result = await sendEmail({
+          to: recipient,
+          subject: `[${label}] ${body.ticketSubject} - ${body.projectName}`,
+          title: body.ticketSubject,
+          body: body.message,
+          actionUrl,
+          actionText: "View Ticket",
+          eventType: label,
+          authorName: body.authorName,
+          authorRole,
+          candidateName: body.candidateName,
+          projectName: body.projectName,
+        });
+        sent.push({ email: recipient, provider: result.provider });
+      } catch (err) {
+        errors.push(`${recipient}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
-    if (errors.length > 0) {
-      throw new Error(errors.join("; "));
-    }
-
-    return new Response(JSON.stringify({ ok: true, sent_to: recipients }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (errors.length > 0) throw new Error(errors.join("; "));
+    return json({ ok: true, sent_to: sent.map((item) => item.email), sent });
   } catch (err) {
     console.error("ticket-notify error:", err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unexpected error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return json({ error: err instanceof Error ? err.message : "Unexpected error" }, 500);
   }
 });

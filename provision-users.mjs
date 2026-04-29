@@ -1,10 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-const DEFAULT_SUPABASE_URL = "http://127.0.0.1:54321";
+const DEFAULT_SUPABASE_URL = "http://127.0.0.1:55321";
 const DEFAULT_PASSWORD =
   process.env.TEST_USER_PASSWORD ||
   process.env.DEFAULT_CANDIDATE_PASSWORD;
-const MAIL_NAMESPACE = "r8mt4";
+const MAIL_NAMESPACE = "localtest";
 
 const CLIENT_USERS = [
   { label: "Client A", displayName: "Client A", email: namespaceEmail("client001"), role: "client", memberRole: "viewer" },
@@ -23,6 +23,15 @@ const ADMIN_USERS = [
 
 function namespaceEmail(tag) {
   return `${MAIL_NAMESPACE}.${tag}@inbox.testmail.app`;
+}
+
+function namespacedCandidateEmail(index) {
+  return namespaceEmail(`cand${String(index + 1).padStart(3, "0")}`);
+}
+
+function shouldUseNamespacedCandidateEmails() {
+  const supabaseUrl = String(process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL).toLowerCase();
+  return supabaseUrl.includes("127.0.0.1") || supabaseUrl.includes("localhost");
 }
 
 function createAdminClient() {
@@ -87,10 +96,11 @@ async function ensureAuthUser(supabase, { email, displayName, role, password = D
   return { user: data.user, created: true };
 }
 
-async function ensureProfile(supabase, { id, displayName, role, candidateRecordId = null }) {
+async function ensureProfile(supabase, { id, displayName, email, role, candidateRecordId = null }) {
   const payload = {
     id,
     display_name: displayName,
+    email,
     role,
   };
 
@@ -137,6 +147,7 @@ async function getCandidateRecords(supabase, { projectId } = {}) {
       title,
       project_id,
       record_values!inner (
+        field_id,
         value_text,
         fields!inner (field_role)
       )
@@ -157,6 +168,7 @@ async function getCandidateRecords(supabase, { projectId } = {}) {
       recordId: record.id,
       code: record.code,
       displayName: record.title || record.code || "Candidate",
+      emailFieldId: record.record_values?.[0]?.field_id || null,
       email: record.record_values?.[0]?.value_text || null,
       projectId: record.project_id,
     }))
@@ -187,12 +199,25 @@ async function runCandidatesMode() {
 
   console.log(`Found ${candidates.length} candidate record(s) in project ${projectId}\n`);
 
-  for (const candidate of candidates) {
-    console.log(`Processing ${candidate.code || "(no code)"} - ${candidate.displayName} <${candidate.email}>`);
+  for (const [index, candidate] of candidates.entries()) {
+    const targetEmail = shouldUseNamespacedCandidateEmails()
+      ? namespacedCandidateEmail(index)
+      : candidate.email;
+
+    console.log(`Processing ${candidate.code || "(no code)"} - ${candidate.displayName} <${targetEmail}>`);
 
     try {
+      if (targetEmail !== candidate.email && candidate.emailFieldId) {
+        const { error: emailUpdateError } = await supabase
+          .from("record_values")
+          .update({ value_text: targetEmail })
+          .eq("record_id", candidate.recordId)
+          .eq("field_id", candidate.emailFieldId);
+        if (emailUpdateError) throw new Error(`record_values email update failed for ${candidate.recordId}: ${emailUpdateError.message}`);
+      }
+
       const { user, created } = await ensureAuthUser(supabase, {
-        email: candidate.email,
+        email: targetEmail,
         displayName: candidate.displayName,
         role: "candidate",
       });
@@ -200,6 +225,7 @@ async function runCandidatesMode() {
       await ensureProfile(supabase, {
         id: user.id,
         displayName: candidate.displayName,
+        email: targetEmail,
         role: "candidate",
         candidateRecordId: candidate.recordId,
       });
@@ -230,6 +256,7 @@ async function provisionStaffLikeUsers(supabase, users, projectIds, password) {
     await ensureProfile(supabase, {
       id: authUser.id,
       displayName: user.displayName,
+      email: user.email,
       role: user.role,
     });
 
@@ -256,9 +283,24 @@ async function provisionCandidates(supabase, password) {
   const candidates = await getCandidateRecords(supabase);
   const testUsers = [];
 
-  for (const candidate of candidates) {
+  for (const [index, candidate] of candidates.entries()) {
+    const targetEmail = shouldUseNamespacedCandidateEmails()
+      ? namespacedCandidateEmail(index)
+      : candidate.email;
+
+    if (targetEmail !== candidate.email && candidate.emailFieldId) {
+      const { error: emailUpdateError } = await supabase
+        .from("record_values")
+        .update({ value_text: targetEmail })
+        .eq("record_id", candidate.recordId)
+        .eq("field_id", candidate.emailFieldId);
+      if (emailUpdateError) {
+        throw new Error(`record_values email update failed for ${candidate.recordId}: ${emailUpdateError.message}`);
+      }
+    }
+
     const { user: authUser } = await ensureAuthUser(supabase, {
-      email: candidate.email,
+      email: targetEmail,
       displayName: candidate.displayName,
       role: "candidate",
       password,
@@ -267,6 +309,7 @@ async function provisionCandidates(supabase, password) {
     await ensureProfile(supabase, {
       id: authUser.id,
       displayName: candidate.displayName,
+      email: targetEmail,
       role: "candidate",
       candidateRecordId: candidate.recordId,
     });
@@ -279,7 +322,7 @@ async function provisionCandidates(supabase, password) {
           label: candidate.code || candidate.displayName,
           role: "candidate",
           userId: authUser.id,
-          email: candidate.email,
+          email: targetEmail,
           displayName: candidate.displayName,
         },
         password,

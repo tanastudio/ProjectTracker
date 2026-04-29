@@ -7,6 +7,7 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
     id                  uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     display_name        text,
+    email               text,
     role                text        NOT NULL DEFAULT 'viewer',
     candidate_record_id uuid,                           -- FK added after records table
     created_at          timestamptz NOT NULL DEFAULT now(),
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
     start_date  date,
     end_date    date,
     code_prefix text,
+    related_invoice_number text,
     created_by  uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()

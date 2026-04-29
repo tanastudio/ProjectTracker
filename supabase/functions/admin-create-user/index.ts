@@ -161,7 +161,7 @@ serve(async (req) => {
     if (profReadErr) throw new Error(`[step 2] profiles read failed: ${profReadErr.message}`);
 
     const { error: profErr } = await adminClient.from("profiles").upsert(
-      { id: userId, display_name: displayName, role: "candidate" },
+      { id: userId, display_name: displayName, email, role: "candidate" },
       { onConflict: "id" },
     );
     if (profErr) throw new Error(`[step 2] profiles upsert failed: ${profErr.message}`);
