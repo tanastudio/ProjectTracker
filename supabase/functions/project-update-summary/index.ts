@@ -425,25 +425,30 @@ async function getRecipientsForProjects(
 
   const { data: profiles, error: profileError } = await adminClient
     .from("profiles")
-    .select("id, role, display_name")
+    .select("id, role, display_name, email")
     .in("id", memberIds);
   if (profileError) throw profileError;
 
   const profilesById = new Map((profiles ?? []).map((profile) => [String(profile.id), profile]));
   const allowedRoles = recipientGroup === "internal" ? ["internal", "admin"] : ["client"];
   const recipients: Array<{ email: string; name: string }> = [];
-  for (const member of members ?? []) {
-    const profile = profilesById.get(String(member.user_id));
+  const uniqueMemberIds = [...new Set((members ?? []).map((member) => String(member.user_id)).filter(Boolean))];
+  for (const userId of uniqueMemberIds) {
+    const profile = profilesById.get(userId);
     const role = String(profile?.role || "").trim().toLowerCase();
     if (!allowedRoles.includes(role)) continue;
 
-    const { data: userResult, error: userError } = await adminClient.auth.admin.getUserById(String(member.user_id));
-    if (userError || !userResult?.user?.email) continue;
+    let email = String(profile?.email || "").trim().toLowerCase();
+    if (!email) {
+      const { data: userResult, error: userError } = await adminClient.auth.admin.getUserById(userId);
+      if (userError || !userResult?.user?.email) continue;
+      email = String(userResult.user.email).trim().toLowerCase();
+    }
 
     recipients.push({
-      email: String(userResult.user.email).trim().toLowerCase(),
+      email,
       name: String(
-        profile?.display_name || userResult.user.email || (recipientGroup === "internal" ? "Internal" : "Client"),
+        profile?.display_name || email || (recipientGroup === "internal" ? "Internal" : "Client"),
       ).trim(),
     });
   }
@@ -951,7 +956,7 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const cronSecret = Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "";
     const trackerBaseUrl = Deno.env.get("TRACKER_BASE_URL") ?? "https://tracker.mentisglobal.com";
-    const webhookUrl = Deno.env.get("N8N_PROJECT_UPDATE_WEBHOOK_URL") || Deno.env.get("N8N_WEBHOOK_URL") || "";
+    const webhookUrl = Deno.env.get("N8N_PROJECT_UPDATE_WEBHOOK_URL") || "";
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -965,7 +970,7 @@ serve(async (req) => {
     const requestedByCron = req.headers.get("x-project-update-cron-secret") === cronSecret && Boolean(cronSecret);
 
     if (!webhookUrl) {
-      return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL or N8N_WEBHOOK_URL is not configured" }, 500);
+      return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
     }
 
     let manualUser: AuthorizedUser | null = null;
