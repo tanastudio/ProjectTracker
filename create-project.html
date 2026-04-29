@@ -210,11 +210,11 @@
     .field-right-item.drag-over-top { border-top: 2px solid #3b82f6; }
     .field-right-item.drag-over-bottom { border-bottom: 2px solid #3b82f6; }
   </style>
-    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
-    <link rel="manifest" href="/favicon/site.webmanifest" />
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="favicon/site.webmanifest" />
 </head>
 <body>
 <div class="layout">
@@ -1085,7 +1085,14 @@ el("createBtn").addEventListener("click", async () => {
       })),
       ...customFieldsToInsert,
     ];
-    const { error: fieldsErr } = await supabase.from("fields").insert(allFieldsToInsert);
+    let { error: fieldsErr } = await supabase.from("fields").insert(allFieldsToInsert);
+    if (fieldsErr && String(fieldsErr.message || "").includes("show_in_candidate_status")) {
+      const legacyFields = allFieldsToInsert.map((field) => {
+        const { show_in_candidate_status, show_in_internal, ...legacyField } = field;
+        return legacyField;
+      });
+      ({ error: fieldsErr } = await supabase.from("fields").insert(legacyFields));
+    }
     if (fieldsErr) throw fieldsErr;
 
     // 3. Add members (including admin)

@@ -487,11 +487,11 @@
       .btn-danger-sm { width: 100%; }
     }
   </style>
-    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
-    <link rel="manifest" href="/favicon/site.webmanifest" />
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="favicon/site.webmanifest" />
 </head>
 <body>
 <div class="layout">
@@ -2108,14 +2108,30 @@ el("refreshEmailHistoryBtn").addEventListener("click", async () => {
 ═══════════════════ */
 const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
 const DASHBOARD_TOGGLE_ALLOWED_ROLES = new Set(["email"]);
+let supportsVisibilityChannels = true;
 let fields = [];
 
 async function loadFields() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("fields")
     .select("id, key, label, type, sort_order, field_role, is_active, show_in_dashboard, show_in_candidate_status, show_in_internal")
     .eq("project_id", PROJECT_ID)
     .order("sort_order");
+  if (error && String(error.message || "").includes("show_in_candidate_status")) {
+    supportsVisibilityChannels = false;
+    ({ data, error } = await supabase
+      .from("fields")
+      .select("id, key, label, type, sort_order, field_role, is_active, show_in_dashboard")
+      .eq("project_id", PROJECT_ID)
+      .order("sort_order"));
+    data = (data || []).map((field) => ({
+      ...field,
+      show_in_candidate_status: field.show_in_dashboard !== false,
+      show_in_internal: field.is_active !== false,
+    }));
+  } else {
+    supportsVisibilityChannels = true;
+  }
   if (error) { showHint("Failed to load fields.", true); return; }
   fields = data || [];
   renderFields();
@@ -2287,14 +2303,19 @@ el("saveFieldsBtn").addEventListener("click", async () => {
   el("saveFieldsBtn").disabled    = true;
   el("saveFieldsBtn").textContent = "Saving...";
 
-  const results = await Promise.all(updates.map(u =>
-    supabase.from("fields").update({
+  const results = await Promise.all(updates.map(u => {
+    const payload = supportsVisibilityChannels ? {
       sort_order:               u.sort_order,
       show_in_candidate_status: u.show_in_candidate_status,
       show_in_dashboard:        u.show_in_dashboard,
       show_in_internal:         u.show_in_internal,
-    }).eq("id", u.id)
-  ));
+    } : {
+      sort_order:        u.sort_order,
+      show_in_dashboard: u.show_in_dashboard,
+      is_active:         u.show_in_internal,
+    };
+    return supabase.from("fields").update(payload).eq("id", u.id);
+  }));
 
   el("saveFieldsBtn").disabled    = false;
   el("saveFieldsBtn").textContent = "Save Field Settings";
@@ -2372,7 +2393,7 @@ el("addFieldBtn").addEventListener("click", async () => {
   el("addFieldBtn").disabled    = true;
   el("addFieldBtn").textContent = "Adding...";
 
-  const { error } = await supabase.from("fields").insert({
+  const payload = {
     project_id:       PROJECT_ID,
     key,
     label,
@@ -2384,7 +2405,12 @@ el("addFieldBtn").addEventListener("click", async () => {
     show_in_candidate_status: true,
     show_in_dashboard: true,
     show_in_internal: true,
-  });
+  };
+  if (!supportsVisibilityChannels) {
+    delete payload.show_in_candidate_status;
+    delete payload.show_in_internal;
+  }
+  const { error } = await supabase.from("fields").insert(payload);
 
   el("addFieldBtn").disabled    = false;
   el("addFieldBtn").textContent = "Add Field";

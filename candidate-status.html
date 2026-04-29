@@ -1192,11 +1192,11 @@
 
     </style>
 
-    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
-    <link rel="manifest" href="/favicon/site.webmanifest" />
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="favicon/site.webmanifest" />
 </head>
 <body>
     <!-- Admin Preview Banner -->
@@ -1628,13 +1628,24 @@
 
         const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
 
-        const { data: fieldsRaw, error: fErr } = await supabase
+        let { data: fieldsRaw, error: fErr } = await supabase
             .from("fields")
             .select("id, key, label, sort_order, field_role, show_in_candidate_status")
             .eq("project_id", rec.project_id)
             .eq("type", "select")
             .neq("show_in_candidate_status", false)
             .order("sort_order");
+
+        if (fErr && String(fErr.message || "").includes("show_in_candidate_status")) {
+            ({ data: fieldsRaw, error: fErr } = await supabase
+                .from("fields")
+                .select("id, key, label, sort_order, field_role, is_active, show_in_dashboard")
+                .eq("project_id", rec.project_id)
+                .eq("type", "select")
+                .neq("is_active", false)
+                .neq("show_in_dashboard", false)
+                .order("sort_order"));
+        }
 
         const fields = (fieldsRaw || []).filter(f => !FIXED_ROLES.has(f.field_role));
 

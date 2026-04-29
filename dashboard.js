@@ -278,7 +278,7 @@ navAdmin?.addEventListener("click", () => {
 async function loadFields(projectId) {
     const { data, error } = await supabase
         .from("fields")
-        .select("id, key, label, type, options, sort_order, field_role, visible, show_in_dashboard, show_in_candidate_status, show_in_internal, is_active")
+        .select("id, key, label, type, options, sort_order, field_role, visible, show_in_dashboard, is_active")
         .eq("project_id", projectId)
         .order("sort_order", { ascending: true });
 

@@ -300,11 +300,23 @@ let ROW_ELEMENTS     = new Map();
    FETCH
    ============================================================ */
 async function loadFields(projectId) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("fields")
         .select("id, key, label, type, options, sort_order, field_role, is_active, show_in_internal")
         .eq("project_id", projectId)
         .order("sort_order", { ascending: true });
+
+    if (error && String(error.message || "").includes("show_in_internal")) {
+        ({ data, error } = await supabase
+            .from("fields")
+            .select("id, key, label, type, options, sort_order, field_role, is_active")
+            .eq("project_id", projectId)
+            .order("sort_order", { ascending: true }));
+        data = (data || []).map((field) => ({
+            ...field,
+            show_in_internal: field.is_active !== false,
+        }));
+    }
 
     if (error) throw error;
 
