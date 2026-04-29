@@ -854,6 +854,51 @@ async function sendEmailBatch(
   const normalizedAuditEmails = recipientGroup === "client"
     ? normalizeEmailList(auditEmails || [])
     : [];
+  const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
+  const notifyFromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") || "";
+
+  if (resendApiKey && notifyFromEmail) {
+    const fromEmail = notifyFromEmail.includes("<")
+      ? notifyFromEmail
+      : `Mentis Workflows <${notifyFromEmail}>`;
+    const sentTo: string[] = [];
+    if (primaryEmails.length === 0) {
+      throw new Error("No deliverable primary recipients.");
+    }
+
+    for (const toEmail of primaryEmails) {
+      const payload: Record<string, unknown> = {
+        from: fromEmail,
+        to: [toEmail],
+        subject,
+        html,
+        text,
+      };
+      if (normalizedAuditEmails.length > 0) {
+        payload.bcc = normalizedAuditEmails;
+      }
+
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`resend delivery failed: ${response.status} ${await response.text()}`);
+      }
+      sentTo.push(toEmail);
+    }
+
+    return {
+      provider: "resend",
+      sent_to: sentTo,
+      audit_emails: normalizedAuditEmails,
+    };
+  }
 
   const response = await fetch(webhookUrl, {
     method: "POST",
@@ -883,6 +928,12 @@ async function sendEmailBatch(
   if (!response.ok) {
     throw new Error(`email delivery failed: ${response.status} ${await response.text()}`);
   }
+
+  return {
+    provider: "n8n",
+    sent_to: primaryEmails,
+    audit_emails: normalizedAuditEmails,
+  };
 }
 
 function mapSettingsRow(row: Record<string, unknown>): ProjectSettingsRow {
@@ -957,6 +1008,7 @@ serve(async (req) => {
     const cronSecret = Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "";
     const trackerBaseUrl = Deno.env.get("TRACKER_BASE_URL") ?? "https://tracker.mentisglobal.com";
     const webhookUrl = Deno.env.get("N8N_PROJECT_UPDATE_WEBHOOK_URL") || "";
+    const canSendDirectEmail = Boolean(Deno.env.get("RESEND_API_KEY") && Deno.env.get("NOTIFY_FROM_EMAIL"));
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -969,8 +1021,8 @@ serve(async (req) => {
       : "client";
     const requestedByCron = req.headers.get("x-project-update-cron-secret") === cronSecret && Boolean(cronSecret);
 
-    if (!webhookUrl) {
-      return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
+    if (!webhookUrl && !canSendDirectEmail) {
+      return jsonResponse({ error: "RESEND_API_KEY/NOTIFY_FROM_EMAIL or N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
     }
 
     let manualUser: AuthorizedUser | null = null;
@@ -1093,7 +1145,7 @@ serve(async (req) => {
           const text = renderSummaryText(projectName, summary, scheduleLabel, "Client");
           const html = renderHtmlEmail(projectName, summary, scheduleLabel, dashboardUrl, "Client", snapshotDateLabel);
 
-          await sendEmailBatch(
+          const delivery = await sendEmailBatch(
             webhookUrl,
             recipients,
             channel.audit_emails,
@@ -1118,8 +1170,8 @@ serve(async (req) => {
           if (runId) {
             await finalizeRun(adminClient, runId, {
               status: "sent",
-              recipients: recipients.map((recipient) => recipient.email),
-              cc_emails: channel.audit_emails,
+              recipients: delivery.sent_to,
+              cc_emails: delivery.audit_emails,
               bcc_emails: [],
               summary,
               sent_at: now.toISOString(),
@@ -1131,8 +1183,9 @@ serve(async (req) => {
             project_name: projectName,
             recipient_group: "client",
             status: "sent",
-            sent_to: recipients.map((recipient) => recipient.email),
-            audit_emails: channel.audit_emails,
+            sent_to: delivery.sent_to,
+            audit_emails: delivery.audit_emails,
+            provider: delivery.provider,
             total_candidates: summary.totalCandidates,
             local_date: scheduleCheck.localDate || localClock.dateKey,
           });
@@ -1243,7 +1296,7 @@ serve(async (req) => {
             })),
           };
 
-          await sendEmailBatch(
+          const delivery = await sendEmailBatch(
             webhookUrl,
             recipients,
             [],
@@ -1269,7 +1322,7 @@ serve(async (req) => {
             if (!entry.runId) continue;
             await finalizeRun(adminClient, entry.runId, {
               status: "sent",
-              recipients: recipients.map((recipient) => recipient.email),
+              recipients: delivery.sent_to,
               cc_emails: [],
               bcc_emails: [],
               summary: aggregateSummary,
@@ -1280,7 +1333,8 @@ serve(async (req) => {
           results.push({
             recipient_group: "internal",
             status: "sent",
-            sent_to: recipients.map((recipient) => recipient.email),
+            sent_to: delivery.sent_to,
+            provider: delivery.provider,
             project_count: projectIds.length,
             project_ids: projectIds,
             project_names: rowsForEmail.map((row) => row.project_name || "Project"),
