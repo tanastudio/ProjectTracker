@@ -838,6 +838,20 @@ function renderPortfolioHtmlEmail(
   </html>`;
 }
 
+function compactHtmlForTransport(html: string) {
+  return String(html || "")
+    .replace(/>\s+</g, "><")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function isResendSandboxError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message.includes('"statusCode":403')
+    || message.toLowerCase().includes("validation_error")
+    || message.toLowerCase().includes("you can only send testing emails");
+}
+
 async function sendEmailBatch(
   webhookUrl: string,
   recipients: Array<{ email: string; name: string }>,
@@ -856,48 +870,52 @@ async function sendEmailBatch(
     : [];
   const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
   const notifyFromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") || "";
+  const compactHtml = compactHtmlForTransport(html);
+
+  if (primaryEmails.length === 0) {
+    throw new Error("No deliverable primary recipients.");
+  }
 
   if (resendApiKey && notifyFromEmail) {
     const fromEmail = notifyFromEmail.includes("<")
       ? notifyFromEmail
       : `Mentis Workflows <${notifyFromEmail}>`;
-    const sentTo: string[] = [];
-    if (primaryEmails.length === 0) {
-      throw new Error("No deliverable primary recipients.");
-    }
 
-    for (const toEmail of primaryEmails) {
-      const payload: Record<string, unknown> = {
-        from: fromEmail,
-        to: [toEmail],
-        subject,
-        html,
-        text,
+    try {
+      await Promise.all(primaryEmails.map(async (toEmail) => {
+        const payload: Record<string, unknown> = {
+          from: fromEmail,
+          to: [toEmail],
+          subject,
+          html: compactHtml,
+          text,
+        };
+        if (normalizedAuditEmails.length > 0) {
+          payload.bcc = normalizedAuditEmails;
+        }
+
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`resend delivery failed: ${response.status} ${await response.text()}`);
+        }
+      }));
+
+      return {
+        provider: "resend",
+        sent_to: primaryEmails,
+        audit_emails: normalizedAuditEmails,
       };
-      if (normalizedAuditEmails.length > 0) {
-        payload.bcc = normalizedAuditEmails;
-      }
-
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`resend delivery failed: ${response.status} ${await response.text()}`);
-      }
-      sentTo.push(toEmail);
+    } catch (error) {
+      if (!webhookUrl || !isResendSandboxError(error)) throw error;
     }
-
-    return {
-      provider: "resend",
-      sent_to: sentTo,
-      audit_emails: normalizedAuditEmails,
-    };
   }
 
   const response = await fetch(webhookUrl, {
@@ -913,7 +931,7 @@ async function sendEmailBatch(
       original_cc_emails: normalizeEmailList(auditEmails || []),
       original_bcc_emails: [],
       email_subject: subject,
-      email_html: html,
+      email_html: compactHtml,
       message_title: `${projectName} Update Summary`,
       message_body: text,
       action_url: dashboardUrl,
