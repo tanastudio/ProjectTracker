@@ -15,14 +15,14 @@ AS $$
     );
 $$;
 
-CREATE OR REPLACE FUNCTION public.current_candidate_record_id()
+CREATE OR REPLACE FUNCTION public.current_participant_record_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-    SELECT p.candidate_record_id
+    SELECT p.participant_record_id
     FROM public.profiles p
     WHERE p.id = auth.uid();
 $$;
@@ -94,7 +94,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
     SELECT p_record_id IS NOT NULL
-       AND public.current_candidate_record_id() = p_record_id;
+       AND public.current_participant_record_id() = p_record_id;
 $$;
 
 CREATE OR REPLACE FUNCTION public.can_edit_record(p_record_id uuid)
@@ -114,7 +114,7 @@ AS $$
         );
 $$;
 
--- 1) Explicit assignment map: which client can access which candidate record
+-- 1) Explicit assignment map: which client can access which participant record
 CREATE TABLE IF NOT EXISTS public.client_record_assignments (
     client_user_id uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     record_id      uuid        NOT NULL REFERENCES public.records(id) ON DELETE CASCADE,
@@ -149,7 +149,7 @@ $$;
 -- 3) Narrow record access model:
 --    - admin: all
 --    - internal: project member/creator only
---    - candidate: own record only
+--    - participant: own record only
 --    - client: assigned records only
 CREATE OR REPLACE FUNCTION public.can_access_record(p_record_id uuid)
 RETURNS boolean

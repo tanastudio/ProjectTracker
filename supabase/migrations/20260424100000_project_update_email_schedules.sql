@@ -118,14 +118,14 @@ AS $$
     );
 $$;
 
-CREATE OR REPLACE FUNCTION public.current_candidate_record_id()
+CREATE OR REPLACE FUNCTION public.current_participant_record_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-    SELECT p.candidate_record_id
+    SELECT p.participant_record_id
     FROM public.profiles p
     WHERE p.id = auth.uid();
 $$;
@@ -204,7 +204,7 @@ AS $$
             SELECT 1
             FROM public.records r
             WHERE r.project_id = p_project_id
-              AND r.id = public.current_candidate_record_id()
+              AND r.id = public.current_participant_record_id()
         );
 $$;
 

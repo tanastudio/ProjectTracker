@@ -23,10 +23,10 @@ printed by `npx supabase start` (see step 3).
 
 | Variable | Purpose |
 |---|---|
-| `SUPABASE_URL` | Local API URL (e.g. `http://127.0.0.1:54321`) |
+| `SUPABASE_URL` | Local API URL (e.g. `http://127.0.0.1:55321`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Local service-role JWT (from `supabase start` output) |
 | `PROJECT_ID` | UUID of the project to target in batch scripts |
-| `DEFAULT_CANDIDATE_PASSWORD` | Default password for newly created candidate accounts |
+| `DEFAULT_PARTICIPANT_PASSWORD` | Default password for newly created participant accounts |
 
 > **Never commit `.env`.** It is already listed in `.gitignore`.
 
@@ -42,10 +42,10 @@ On the first run it pulls Docker images (may take a few minutes).
 Once running, the CLI prints your local credentials:
 
 ```
-API URL:   http://127.0.0.1:54321
+API URL:   http://127.0.0.1:55321
 anon key:  eyJ...
 service_role key: eyJ...
-Studio:    http://127.0.0.1:54323
+Studio:    http://127.0.0.1:55323
 ```
 
 Copy the `API URL` and `service_role key` into `.env`.
@@ -72,7 +72,7 @@ Set them with the Supabase CLI before serving functions locally:
 ```bash
 npx supabase secrets set N8N_WEBHOOK_URL=http://your-n8n-host/webhook/...
 npx supabase secrets set TRACKER_BASE_URL=http://127.0.0.1:3000
-npx supabase secrets set DEFAULT_CANDIDATE_PASSWORD=YourLocalPassword!
+npx supabase secrets set DEFAULT_PARTICIPANT_PASSWORD=YourLocalPassword!
 ```
 
 List currently set secrets:
@@ -98,27 +98,27 @@ npm run test:watch # watch mode
 
 ## Batch scripts
 
-To bulk-create candidate auth users from existing records:
+To bulk-create participant auth users from existing records:
 
 ```bash
-node --env-file=.env provision-users.mjs candidates
+node --env-file=.env provision-users.mjs participants
 ```
 
 Requires `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PROJECT_ID`, and
-`DEFAULT_CANDIDATE_PASSWORD` in `.env`.
+`DEFAULT_PARTICIPANT_PASSWORD` in `.env`.
 
-To provision a full local test-user set (admin, internal, client, and candidate):
+To provision a full local test-user set (admin, internal, client, and participant):
 
 ```bash
 node --env-file=.env provision-users.mjs test-users
 ```
 
-This also requires `TEST_USER_PASSWORD` or `DEFAULT_CANDIDATE_PASSWORD` in `.env`.
+This also requires `TEST_USER_PASSWORD` or `DEFAULT_PARTICIPANT_PASSWORD` in `.env`.
 
 The legacy wrappers still work:
 
 ```bash
-node --env-file=.env create-candidate-users.mjs
+node --env-file=.env create-participant-users.mjs
 node --env-file=.env provision-local-test-users.mjs
 ```
 

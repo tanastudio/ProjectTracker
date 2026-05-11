@@ -42,7 +42,7 @@ BEGIN
         RAISE EXCEPTION 'Access denied: ticket not found or insufficient permission';
     END IF;
 
-    -- Minimum role gate: candidate and viewer cannot update
+    -- Minimum role gate: participant and viewer cannot update
     IF v_role NOT IN ('admin', 'internal', 'client') THEN
         RAISE EXCEPTION 'Permission denied: role % cannot update tickets', v_role;
     END IF;

@@ -215,7 +215,7 @@
     .pill-client   { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
     .pill-internal { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
     .pill-admin    { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
-    .pill-candidate{ background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+    .pill-participant{ background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 
     /* Reset password modal */
     .modal-backdrop {
@@ -265,22 +265,22 @@
     .modal-feedback.error { display: block; background: rgba(239,68,68,.08); color: #b91c1c; border: 1px solid rgba(239,68,68,.22); }
     .modal-feedback.ok { display: block; background: rgba(34,197,94,.08); color: #15803d; border: 1px solid rgba(34,197,94,.22); }
 
-    /* Candidates tab */
-    .candidate-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
-    .candidate-table-head,
-    .candidate-row {
+    /* Participants tab */
+    .participant-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+    .participant-table-head,
+    .participant-row {
       display: grid; grid-template-columns: 120px minmax(150px, 1fr) minmax(220px, 1.2fr) 120px;
       gap: 12px; align-items: center;
     }
-    .candidate-table-head {
+    .participant-table-head {
       padding: 0 16px 4px; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase;
     }
-    .candidate-row {
+    .participant-row {
       padding: 8px 12px; background: rgba(248,250,252,.8);
       border: 1px solid rgba(15,23,42,.08); border-radius: 10px;
     }
-    .candidate-name  { font-size: 13px; font-weight: 800; color: #0f172a; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .candidate-email { font-size: 12px; color: #64748b; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .participant-name  { font-size: 13px; font-weight: 800; color: #0f172a; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .participant-email { font-size: 12px; color: #64748b; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .status-active { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
     .status-inactive { background: #f8fafc; color: #64748b; border-color: #cbd5e1; }
 
@@ -454,32 +454,32 @@
       .email-history-grid { grid-template-columns: 1fr; }
       .email-history-head { flex-direction: column; align-items: stretch; }
       .member-table-head { display: none; }
-      .candidate-table-head { display: none; }
+      .participant-table-head { display: none; }
       .member-row,
-      .candidate-row,
+      .participant-row,
       .field-row { align-items: flex-start; }
       .member-row { grid-template-columns: 1fr; }
-      .candidate-row { grid-template-columns: 1fr; }
+      .participant-row { grid-template-columns: 1fr; }
       .member-name::before,
       .member-email::before,
       .member-role-cell::before,
       .member-access-cell::before {
         display: block; margin-bottom: 3px; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase;
       }
-      .candidate-role-cell::before,
-      .candidate-name::before,
-      .candidate-email::before,
-      .candidate-status-cell::before {
+      .participant-role-cell::before,
+      .participant-name::before,
+      .participant-email::before,
+      .participant-status-cell::before {
         display: block; margin-bottom: 3px; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase;
       }
       .member-role-cell::before { content: "Role"; }
       .member-name::before { content: "Name"; }
       .member-email::before { content: "Email"; }
       .member-access-cell::before { content: "Access"; }
-      .candidate-role-cell::before { content: "Role"; }
-      .candidate-name::before { content: "Name"; }
-      .candidate-email::before { content: "Email"; }
-      .candidate-status-cell::before { content: "Status"; }
+      .participant-role-cell::before { content: "Role"; }
+      .participant-name::before { content: "Name"; }
+      .participant-email::before { content: "Email"; }
+      .participant-status-cell::before { content: "Status"; }
       .reset-toolbar { grid-template-columns: 1fr; }
       .reset-row { grid-template-columns: 1fr; }
       .field-row { grid-template-columns: 18px 1fr; }
@@ -587,7 +587,7 @@
         <button class="tab-btn" data-tab="updates">Reports</button>
         <button class="tab-btn" data-tab="fields">Fields</button>
         <button class="tab-btn" data-tab="members">Members</button>
-        <button class="tab-btn" data-tab="candidates">Candidates</button>
+        <button class="tab-btn" data-tab="participants">Participants</button>
       </div>
 
       <!-- Tab: General -->
@@ -868,7 +868,7 @@
       <div class="tab-panel" id="tab-fields">
         <div class="card">
           <div class="card-title">Fields</div>
-          <div class="card-desc">Drag to reorder process steps. Candidate, Client, and Internal toggles control where each field is visible. System fields cannot be moved; email visibility for Client can be toggled.</div>
+          <div class="card-desc">Drag to reorder process steps. Participant, Client, and Internal toggles control where each field is visible. System fields cannot be moved; email visibility for Client can be toggled.</div>
 
           <div class="field-list" id="fieldList">
             <div class="muted">Loading fields...</div>
@@ -881,7 +881,7 @@
 
         <div class="card">
           <div class="card-title">Add New Field</div>
-          <div class="card-desc">Create a custom field for this project. Select-type fields appear as step columns in the candidate form.</div>
+          <div class="card-desc">Create a custom field for this project. Select-type fields appear as step columns in the participant form.</div>
 
           <div class="form-row2">
             <div class="form-group">
@@ -925,14 +925,14 @@
       <div class="tab-panel" id="tab-members">
         <div class="card">
           <div class="card-title">Members</div>
-          <div class="card-desc">Manage who has access to this project. Role controls edit permissions. Candidates are managed separately via CSV upload.</div>
+          <div class="card-desc">Manage who has access to this project. Role controls edit permissions. Participants are managed separately via CSV upload.</div>
 
           <div class="member-toolbar">
             <div class="member-filters" id="memberFilters">
               <label class="filter-chip"><input type="checkbox" data-member-filter="admin" checked>admin</label>
               <label class="filter-chip"><input type="checkbox" data-member-filter="internal" checked>internal</label>
               <label class="filter-chip"><input type="checkbox" data-member-filter="client" checked>client</label>
-              <label class="filter-chip"><input type="checkbox" data-member-filter="candidate">candidate</label>
+              <label class="filter-chip"><input type="checkbox" data-member-filter="participant">participant</label>
             </div>
             <div class="member-summary" id="memberSummary">Loading members...</div>
           </div>
@@ -956,23 +956,23 @@
         </div>
       </div>
 
-      <!-- Tab: Candidates -->
-      <div class="tab-panel" id="tab-candidates">
+      <!-- Tab: Participants -->
+      <div class="tab-panel" id="tab-participants">
         <div class="card">
-          <div class="card-title">Current Candidates</div>
-          <div class="card-desc">Candidates linked to this project. Each candidate has a user account for the assessment portal.</div>
-          <div class="candidate-list" id="candidateList">
-            <div class="muted">Loading candidates...</div>
+          <div class="card-title">Current Participants</div>
+          <div class="card-desc">Participants linked to this project. Each participant has a user account for the assessment portal.</div>
+          <div class="participant-list" id="participantList">
+            <div class="muted">Loading participants...</div>
           </div>
-          <p class="muted small" id="candidateCount" style="margin-top:8px;"></p>
+          <p class="muted small" id="participantCount" style="margin-top:8px;"></p>
         </div>
 
         <div class="card">
-          <div class="card-title">Import More Candidates</div>
+          <div class="card-title">Import More Participants</div>
           <div class="card-desc">Upload a CSV with <code>name</code> and <code>email</code> columns. Existing accounts are reused; new ones are created automatically.</div>
 
           <div style="margin-bottom:14px;">
-            <a href="./candidates-template.csv" download="candidates-template.csv" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:#2563eb; text-decoration:none; padding:8px 14px; border:1px solid #bfdbfe; border-radius:10px; background:#eff6ff; transition:background .15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+            <a href="./participants-template.csv" download="participants-template.csv" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:#2563eb; text-decoration:none; padding:8px 14px; border:1px solid #bfdbfe; border-radius:10px; background:#eff6ff; transition:background .15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download CSV Template
             </a>
@@ -993,7 +993,7 @@
           </div>
 
           <div class="btn-row">
-            <button class="btn-primary" id="importBtn" style="display:none;">Import Candidates</button>
+            <button class="btn-primary" id="importBtn" style="display:none;">Import Participants</button>
           </div>
 
           <div id="importProgress" style="display:none; margin-top:10px;">
@@ -1023,7 +1023,7 @@
           <label class="filter-chip"><input type="checkbox" data-reset-filter="admin" checked>admin</label>
           <label class="filter-chip"><input type="checkbox" data-reset-filter="internal" checked>internal</label>
           <label class="filter-chip"><input type="checkbox" data-reset-filter="client" checked>client</label>
-          <label class="filter-chip"><input type="checkbox" data-reset-filter="candidate" checked>candidate</label>
+          <label class="filter-chip"><input type="checkbox" data-reset-filter="participant" checked>participant</label>
         </div>
       </div>
       <div class="reset-list" id="resetPasswordList">
@@ -2135,10 +2135,10 @@ let fields = [];
 async function loadFields() {
   let { data, error } = await supabase
     .from("fields")
-    .select("id, key, label, type, sort_order, field_role, is_active, show_in_dashboard, show_in_candidate_status, show_in_internal")
+    .select("id, key, label, type, sort_order, field_role, is_active, show_in_dashboard, show_in_participant_status, show_in_internal")
     .eq("project_id", PROJECT_ID)
     .order("sort_order");
-  if (error && String(error.message || "").includes("show_in_candidate_status")) {
+  if (error && String(error.message || "").includes("show_in_participant_status")) {
     supportsVisibilityChannels = false;
     ({ data, error } = await supabase
       .from("fields")
@@ -2147,7 +2147,7 @@ async function loadFields() {
       .order("sort_order"));
     data = (data || []).map((field) => ({
       ...field,
-      show_in_candidate_status: field.show_in_dashboard !== false,
+      show_in_participant_status: field.show_in_dashboard !== false,
       show_in_internal: field.is_active !== false,
     }));
   } else {
@@ -2186,14 +2186,14 @@ function renderFields() {
           </div>
           <span class="field-key">${escapeHtml(f.key)}</span>
         </div>
-        <div class="toggle-wrap" title="Show in Candidate Status">
+        <div class="toggle-wrap" title="Show in Participant Status">
           <label class="toggle">
-            <input type="checkbox" data-toggle-candidate="${escapeHtml(f.id)}"
-              ${f.show_in_candidate_status !== false ? "checked" : ""}
+            <input type="checkbox" data-toggle-participant="${escapeHtml(f.id)}"
+              ${f.show_in_participant_status !== false ? "checked" : ""}
               ${canToggleAudience ? "" : "disabled"}/>
             <span class="toggle-slider"></span>
           </label>
-          <span class="toggle-label">Candidate</span>
+          <span class="toggle-label">Participant</span>
         </div>
         <div class="toggle-wrap" title="Show in Client Dashboard">
           <label class="toggle">
@@ -2309,13 +2309,13 @@ el("saveFieldsBtn").addEventListener("click", async () => {
     const id = row.dataset.fieldId;
     const f  = fields.find(x => x.id === id);
     if (!f) return;
-    const candidateToggle = row.querySelector("[data-toggle-candidate]");
+    const participantToggle = row.querySelector("[data-toggle-participant]");
     const clientToggle    = row.querySelector("[data-toggle-client]");
     const internalToggle  = row.querySelector("[data-toggle-internal]");
     updates.push({
       id,
       sort_order:               (idx + 1) * 10,
-      show_in_candidate_status: candidateToggle ? candidateToggle.checked : (f.show_in_candidate_status !== false),
+      show_in_participant_status: participantToggle ? participantToggle.checked : (f.show_in_participant_status !== false),
       show_in_dashboard:        clientToggle    ? clientToggle.checked    : (f.show_in_dashboard !== false),
       show_in_internal:         internalToggle  ? internalToggle.checked  : (f.show_in_internal !== false),
     });
@@ -2327,7 +2327,7 @@ el("saveFieldsBtn").addEventListener("click", async () => {
   const results = await Promise.all(updates.map(u => {
     const payload = supportsVisibilityChannels ? {
       sort_order:               u.sort_order,
-      show_in_candidate_status: u.show_in_candidate_status,
+      show_in_participant_status: u.show_in_participant_status,
       show_in_dashboard:        u.show_in_dashboard,
       show_in_internal:         u.show_in_internal,
     } : {
@@ -2404,8 +2404,8 @@ el("addFieldBtn").addEventListener("click", async () => {
     .eq("project_id", PROJECT_ID);
   if (recordCount > 0) {
     const ok = confirm(
-      `Warning: This project already has ${recordCount} candidate(s).\n\n` +
-      `Adding a new field now means all existing candidates will have an empty value for "${label}" until filled in manually.\n\n` +
+      `Warning: This project already has ${recordCount} participant(s).\n\n` +
+      `Adding a new field now means all existing participants will have an empty value for "${label}" until filled in manually.\n\n` +
       `Continue?`
     );
     if (!ok) return;
@@ -2423,12 +2423,12 @@ el("addFieldBtn").addEventListener("click", async () => {
     sort_order:       maxSort + 10,
     field_role:       "step",
     is_active:        true,
-    show_in_candidate_status: true,
+    show_in_participant_status: true,
     show_in_dashboard: true,
     show_in_internal: true,
   };
   if (!supportsVisibilityChannels) {
-    delete payload.show_in_candidate_status;
+    delete payload.show_in_participant_status;
     delete payload.show_in_internal;
   }
   const { error } = await supabase.from("fields").insert(payload);
@@ -2838,14 +2838,14 @@ el("addMemberBtn").addEventListener("click", async () => {
 });
 
 /* ═══════════════════
-   CANDIDATES TAB
+   PARTICIPANTS TAB
 ═══════════════════ */
 const EDGE_URL = "http://127.0.0.1:55321/functions/v1/admin-create-user";
 let csvRows = [];
-let candidatesLoaded = false;
+let participantsLoaded = false;
 
-async function loadCandidates() {
-  const list = el("candidateList");
+async function loadParticipants() {
+  const list = el("participantList");
   list.innerHTML = "<div class='muted'>Loading...</div>";
 
   const { data: memberData } = await supabase
@@ -2855,22 +2855,22 @@ async function loadCandidates() {
 
   const ids = (memberData || []).map(m => m.user_id);
   if (ids.length === 0) {
-    list.innerHTML = "<div class='muted'>No candidates yet.</div>";
-    el("candidateCount").textContent = "";
-    candidatesLoaded = true;
+    list.innerHTML = "<div class='muted'>No participants yet.</div>";
+    el("participantCount").textContent = "";
+    participantsLoaded = true;
     return;
   }
 
   const { data: profs, error } = await supabase
     .from("profiles")
-    .select("id, display_name, email, role, candidate_record_id")
+    .select("id, display_name, email, role, participant_record_id")
     .in("id", ids)
-    .eq("role", "candidate");
+    .eq("role", "participant");
 
-  if (error) { list.innerHTML = "<div class='muted'>Failed to load candidates.</div>"; return; }
+  if (error) { list.innerHTML = "<div class='muted'>Failed to load participants.</div>"; return; }
 
-  const candidates = profs || [];
-  const recordIds = candidates.map(c => c.candidate_record_id).filter(Boolean);
+  const participants = profs || [];
+  const recordIds = participants.map(c => c.participant_record_id).filter(Boolean);
   let activeByRecordId = new Map();
   if (recordIds.length > 0) {
     const { data: records, error: recordError } = await supabase
@@ -2878,37 +2878,37 @@ async function loadCandidates() {
       .select("id, active")
       .in("id", recordIds)
       .eq("project_id", PROJECT_ID);
-    if (recordError) { list.innerHTML = "<div class='muted'>Failed to load candidate status.</div>"; return; }
+    if (recordError) { list.innerHTML = "<div class='muted'>Failed to load participant status.</div>"; return; }
     activeByRecordId = new Map((records || []).map(record => [record.id, record.active !== false]));
   }
 
-  el("candidateCount").textContent = `${candidates.length} candidate${candidates.length !== 1 ? "s" : ""} in this project`;
+  el("participantCount").textContent = `${participants.length} participant${participants.length !== 1 ? "s" : ""} in this project`;
 
-  if (candidates.length === 0) {
-    list.innerHTML = "<div class='muted'>No candidates yet.</div>";
-    candidatesLoaded = true;
+  if (participants.length === 0) {
+    list.innerHTML = "<div class='muted'>No participants yet.</div>";
+    participantsLoaded = true;
     return;
   }
 
-  const rowsHtml = candidates.map(c => {
+  const rowsHtml = participants.map(c => {
     const name = c.display_name || c.id;
     const email = c.email || c.id;
-    const isActive = activeByRecordId.get(c.candidate_record_id) === true;
+    const isActive = activeByRecordId.get(c.participant_record_id) === true;
     return `
-      <div class="candidate-row" role="row">
-        <div class="candidate-role-cell" role="cell">
-          <span class="pill pill-candidate">candidate</span>
+      <div class="participant-row" role="row">
+        <div class="participant-role-cell" role="cell">
+          <span class="pill pill-participant">participant</span>
         </div>
-        <div class="candidate-name" role="cell" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-        <div class="candidate-email" role="cell" title="${escapeHtml(email)}">${escapeHtml(email)}</div>
-        <div class="candidate-status-cell" role="cell">
+        <div class="participant-name" role="cell" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+        <div class="participant-email" role="cell" title="${escapeHtml(email)}">${escapeHtml(email)}</div>
+        <div class="participant-status-cell" role="cell">
           <span class="pill ${isActive ? "status-active" : "status-inactive"}">${isActive ? "active" : "inactive"}</span>
         </div>
       </div>`;
   }).join("");
 
   list.innerHTML = `
-    <div class="candidate-table-head" role="row">
+    <div class="participant-table-head" role="row">
       <div>Role</div>
       <div>Name</div>
       <div>Email</div>
@@ -2917,12 +2917,12 @@ async function loadCandidates() {
     ${rowsHtml}
   `;
 
-  candidatesLoaded = true;
+  participantsLoaded = true;
 }
 
-// Load candidates when tab is opened
-document.querySelector('[data-tab="candidates"]').addEventListener("click", () => {
-  if (!candidatesLoaded) loadCandidates();
+// Load participants when tab is opened
+document.querySelector('[data-tab="participants"]').addEventListener("click", () => {
+  if (!participantsLoaded) loadParticipants();
 });
 
 /* CSV handling */
@@ -3027,8 +3027,8 @@ el("importBtn").addEventListener("click", async () => {
 
   const successCount = validRows.length - skipped;
   showHint(`Done — ${successCount} imported, ${skipped} skipped (already exist or error).`, false);
-  candidatesLoaded = false;
-  await loadCandidates();
+  participantsLoaded = false;
+  await loadParticipants();
 });
 
 /* ── init ── */

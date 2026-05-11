@@ -17,7 +17,7 @@ type NotifyBody = {
   authorRole: string;
   message: string;
   ticketSubject: string;
-  candidateName: string;
+  participantName: string;
   projectName: string;
   projectId: string;
 };
@@ -32,7 +32,7 @@ type EmailPayload = {
   eventType: string;
   authorName: string;
   authorRole: string;
-  candidateName: string;
+  participantName: string;
   projectName: string;
 };
 
@@ -120,7 +120,7 @@ async function getProjectMemberEmailsByRole(
   return emails;
 }
 
-async function getCandidateEmailForTicket(
+async function getParticipantEmailForTicket(
   adminClient: ReturnType<typeof createClient>,
   recordId: string,
 ): Promise<string | null> {
@@ -128,7 +128,7 @@ async function getCandidateEmailForTicket(
   const { data: prof } = await adminClient
     .from("profiles")
     .select("id")
-    .eq("candidate_record_id", recordId)
+    .eq("participant_record_id", recordId)
     .maybeSingle();
   if (!prof?.id) return null;
   return await getProfileEmail(adminClient, String(prof.id));
@@ -149,7 +149,7 @@ async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
       event_type: payload.eventType,
       author_name: payload.authorName,
       author_role: payload.authorRole,
-      candidate_name: payload.candidateName,
+      participant_name: payload.participantName,
       project_name: payload.projectName,
     }),
   });
@@ -170,7 +170,7 @@ async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPa
       </p>
       <p style="margin:0 0 16px;color:#475569">
         Project: ${escapeHtml(payload.projectName || "-")}<br>
-        Candidate: ${escapeHtml(payload.candidateName || "-")}
+        Participant: ${escapeHtml(payload.participantName || "-")}
       </p>
       <a href="${escapeHtml(payload.actionUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px">
         ${escapeHtml(payload.actionText)}
@@ -248,7 +248,7 @@ serve(async (req) => {
 
     const { data: ticket } = await adminClient
       .from("requests")
-      .select("id, project_id, created_by, owner_user_id, subject, candidate_name, record_id")
+      .select("id, project_id, created_by, owner_user_id, subject, participant_name, record_id")
       .eq("id", ticketId)
       .maybeSingle();
     if (!ticket) return json({ error: "Ticket not found" }, 404);
@@ -256,35 +256,35 @@ serve(async (req) => {
     const resolvedProjectId = projectId || ticket.project_id;
     const authorEmail = await getProfileEmail(adminClient, authorId);
     const recipientSet = new Set<string>();
-    const candidateEmailSet = new Set<string>();
+    const participantEmailSet = new Set<string>();
 
-    if (authorRole === "candidate") {
+    if (authorRole === "participant") {
       const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["internal", "admin", "client"]);
       for (const email of emails) recipientSet.add(email);
-      if (authorEmail) candidateEmailSet.add(authorEmail);
+      if (authorEmail) participantEmailSet.add(authorEmail);
     } else if (authorRole === "client") {
       const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["internal", "admin"]);
       for (const email of emails) recipientSet.add(email);
       if (ticket.record_id) {
-        const candidateEmail = await getCandidateEmailForTicket(adminClient, ticket.record_id);
-        if (candidateEmail) {
-          recipientSet.add(candidateEmail);
-          candidateEmailSet.add(candidateEmail);
+        const participantEmail = await getParticipantEmailForTicket(adminClient, ticket.record_id);
+        if (participantEmail) {
+          recipientSet.add(participantEmail);
+          participantEmailSet.add(participantEmail);
         }
       }
     } else {
       if (ticket.record_id) {
-        const candidateEmail = await getCandidateEmailForTicket(adminClient, ticket.record_id);
-        if (candidateEmail) {
-          recipientSet.add(candidateEmail);
-          candidateEmailSet.add(candidateEmail);
+        const participantEmail = await getParticipantEmailForTicket(adminClient, ticket.record_id);
+        if (participantEmail) {
+          recipientSet.add(participantEmail);
+          participantEmailSet.add(participantEmail);
         }
       }
       const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["client"]);
       for (const email of emails) recipientSet.add(email);
     }
 
-    if (authorEmail && authorRole !== "candidate") recipientSet.delete(authorEmail);
+    if (authorEmail && authorRole !== "participant") recipientSet.delete(authorEmail);
 
     const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     const recipients = Array.from(recipientSet).filter((email) => Boolean(email) && isValidEmail(email));
@@ -292,12 +292,12 @@ serve(async (req) => {
 
     const label = eventLabel(eventType);
     const ticketsUrl = `${trackerBaseUrl}/tickets.html?project=${resolvedProjectId}`;
-    const candidateUrl = `${trackerBaseUrl}/candidate-status.html`;
+    const participantUrl = `${trackerBaseUrl}/participant-status.html`;
 
     const sent: Array<{ email: string; provider: string }> = [];
     const errors: string[] = [];
     for (const recipient of recipients) {
-      const actionUrl = candidateEmailSet.has(recipient) ? candidateUrl : ticketsUrl;
+      const actionUrl = participantEmailSet.has(recipient) ? participantUrl : ticketsUrl;
       try {
         const result = await sendEmail({
           to: recipient,
@@ -309,7 +309,7 @@ serve(async (req) => {
           eventType: label,
           authorName: body.authorName,
           authorRole,
-          candidateName: body.candidateName,
+          participantName: body.participantName,
           projectName: body.projectName,
         });
         sent.push({ email: recipient, provider: result.provider });

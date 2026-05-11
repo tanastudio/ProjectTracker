@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' http://127.0.0.1:55321 ws://127.0.0.1:55321 http://localhost:55321 ws://localhost:55321 https://vusgsdcozkaumyudqhlu.supabase.co wss://vusgsdcozkaumyudqhlu.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <title>Update Candidate</title>
+    <title>Update Participant</title>
 
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="sidebar.css" />
@@ -113,7 +113,7 @@
             <header class="hero">
                 <div class="hero-inner">
                     <div>
-                        <h1 id="formTitle" class="page-title">Update Candidate Status</h1>
+                        <h1 id="formTitle" class="page-title">Update Participant Status</h1>
                         <p class="page-desc">
                             <span class="muted">Auto-save</span>
                             <span> | </span>
@@ -136,16 +136,16 @@
                     <div class="card form-card">
 
                         <div class="form-grid">
-                            <!-- Left: Candidate -->
+                            <!-- Left: Participant -->
                             <div class="panel-box">
 
                                 <div class="panel-top">
-                                    <button id="newCandidateBtn" class="btn btn-primary btn-full">+ New Candidate</button>
+                                    <button id="newParticipantBtn" class="btn btn-primary btn-full">+ New Participant</button>
                                 </div>
 
-                                <label class="label">Select Candidate (Code / Name / Email)</label>
-                                <input id="candPick" class="input" list="candidateList" placeholder="Type then select..." autocomplete="off" />
-                                <datalist id="candidateList"></datalist>
+                                <label class="label">Select Participant (Code / Name / Email)</label>
+                                <input id="candPick" class="input" list="participantList" placeholder="Type then select..." autocomplete="off" />
+                                <datalist id="participantList"></datalist>
 
                                 <div class="spacer"></div>
 
@@ -155,7 +155,7 @@
                                         <input id="candCode" class="input" placeholder="Enter a unique code..." />
                                     </div>
                                     <div>
-                                        <label class="label">Candidate Name</label>
+                                        <label class="label">Participant Name</label>
                                         <input id="candName" class="input" placeholder="-" />
                                     </div>
                                 </div>
@@ -173,7 +173,7 @@
                                 </div>
 
                                 <div id="newModeHint" class="hint muted small" style="display:none;">
-                                    New Candidate mode: enter a unique Code first. Other fields will save after you leave the field (blur) or change a dropdown.
+                                    New Participant mode: enter a unique Code first. Other fields will save after you leave the field (blur) or change a dropdown.
                                 </div>
 
                                 <div id="dupHint" class="hint hint-error" style="display:none;">
@@ -246,7 +246,7 @@
                         </div>
 
                         <div class="tool tool-right">
-                            <button id="addRowBtn" class="btn" type="button">+ Add Candidate</button>
+                            <button id="addRowBtn" class="btn" type="button">+ Add Participant</button>
                         </div>
                     </div>
 
@@ -268,11 +268,11 @@
                     </div>
                 </section>
 
-                <div id="addCandidateModal" class="modal-overlay" aria-hidden="true">
-                    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="addCandidateTitle">
+                <div id="addParticipantModal" class="modal-overlay" aria-hidden="true">
+                    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="addParticipantTitle">
                         <div class="modal-head">
-                            <h3 id="addCandidateTitle">Add Candidate</h3>
-                            <button id="addCandidateCloseBtn" class="btn btn-ghost" type="button">Close</button>
+                            <h3 id="addParticipantTitle">Add Participant</h3>
+                            <button id="addParticipantCloseBtn" class="btn btn-ghost" type="button">Close</button>
                         </div>
                         <div class="modal-body">
                             <div class="modal-grid">
@@ -281,21 +281,21 @@
                                     <input id="addCandCode" class="input" placeholder="e.g. SAMP-0013" autocomplete="off" />
                                 </div>
                                 <div>
-                                    <label class="label">Candidate Name</label>
+                                    <label class="label">Participant Name</label>
                                     <input id="addCandName" class="input" placeholder="e.g. John Doe" autocomplete="off" />
                                 </div>
                             </div>
                             <div class="modal-grid single">
                                 <div>
                                     <label class="label">Email</label>
-                                    <input id="addCandEmail" class="input" placeholder="candidate@email.com" autocomplete="off" />
+                                    <input id="addCandEmail" class="input" placeholder="participant@email.com" autocomplete="off" />
                                 </div>
                             </div>
                             <div id="addCandError" class="hint hint-error" style="display:none; margin-top:10px;"></div>
                         </div>
                         <div class="modal-foot">
-                            <button id="addCandidateCancelBtn" class="btn btn-ghost" type="button">Cancel</button>
-                            <button id="addCandidateSubmitBtn" class="btn btn-primary" type="button">Create Candidate</button>
+                            <button id="addParticipantCancelBtn" class="btn btn-ghost" type="button">Cancel</button>
+                            <button id="addParticipantSubmitBtn" class="btn btn-primary" type="button">Create Participant</button>
                         </div>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
+const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:55321";
 const SUPABASE_SECRET =
   process.env.SUPABASE_SECRET ||
   process.env.SUPABASE_SERVICE_ROLE_KEY;

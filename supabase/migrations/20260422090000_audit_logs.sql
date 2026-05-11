@@ -166,10 +166,10 @@ BEGIN
         RETURN v_project_id;
     END IF;
 
-    IF p_table_name = 'profiles' AND p_row ? 'candidate_record_id' THEN
+    IF p_table_name = 'profiles' AND p_row ? 'participant_record_id' THEN
         SELECT r.project_id INTO v_project_id
         FROM public.records r
-        WHERE r.id = NULLIF(p_row ->> 'candidate_record_id', '')::uuid;
+        WHERE r.id = NULLIF(p_row ->> 'participant_record_id', '')::uuid;
         RETURN v_project_id;
     END IF;
 

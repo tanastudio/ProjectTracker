@@ -49,15 +49,15 @@ window.TEST_USERS = [
         displayName: "Client C"
     },
     {
-        label: "Candidate SAMP-0001",
-        role: "candidate",
+        label: "Participant SAMP-0001",
+        role: "participant",
         userId: "0aa0a0b3-cb64-4f58-aef6-8c157019a9eb",
         email: "r8mt4.cand001@inbox.testmail.app",
-        displayName: "Sample Candidate"
+        displayName: "Sample Participant"
     },
     {
-        label: "Candidate SAMP-0002",
-        role: "candidate",
+        label: "Participant SAMP-0002",
+        role: "participant",
         userId: "688cfd92-d49a-4928-a18f-3cba50248e4a",
         email: "r8mt4.cand002@inbox.testmail.app",
         displayName: "Alice Johnson"

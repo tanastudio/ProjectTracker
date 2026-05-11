@@ -108,13 +108,13 @@ VALUES
      ARRAY['Not Started','In Progress','Completed','Issue'])
 ON CONFLICT (id) DO NOTHING;
 
--- ── Sample candidate record ───────────────────────────────────
+-- ── Sample participant record ───────────────────────────────────
 INSERT INTO public.records (id, project_id, code, title, active, updated_by)
 VALUES (
     '30000000-0000-0000-0000-000000000001',
     '10000000-0000-0000-0000-000000000001',
     'SAMP-0001',
-    'Sample Candidate',
+    'Sample Participant',
     true,
     '00000000-0000-0000-0000-000000000001'
 ) ON CONFLICT (id) DO NOTHING;
@@ -157,7 +157,7 @@ BEGIN
     END IF;
 END $$;
 
--- ── Additional candidates (varied statuses for dashboard testing) ─
+-- ── Additional participants (varied statuses for dashboard testing) ─
 INSERT INTO public.records (id, project_id, code, title, active, updated_by) VALUES
     ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'SAMP-0002', 'Alice Johnson',      true, '00000000-0000-0000-0000-000000000001'),
     ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'SAMP-0003', 'Bob Smith',          true, '00000000-0000-0000-0000-000000000001'),
@@ -172,7 +172,7 @@ INSERT INTO public.records (id, project_id, code, title, active, updated_by) VAL
     ('30000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000001', 'SAMP-0012', 'Karen Thompson',     true, '00000000-0000-0000-0000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
--- ── Record values for additional candidates ───────────────────
+-- ── Record values for additional participants ───────────────────
 -- Field IDs:
 --   20000000-…-0001 = document_check (select/step)
 --   20000000-…-0002 = email           (text)

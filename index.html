@@ -419,7 +419,7 @@
                         <div class="eyebrow">Project Tracker Workspace</div>
                         <h1 class="hero-title">Project Tracker.</h1>
                         <p class="hero-text">
-                            Access dashboards, update candidate status, and manage project tickets in one place with role-based access.
+                            Access dashboards, update participant status, and manage project tickets in one place with role-based access.
                         </p>
                     </div>
 
@@ -539,8 +539,8 @@
 
             if (error) return false;
 
-            if (profile?.role === "candidate") {
-                window.location.replace("./candidate-status.html");
+            if (profile?.role === "participant") {
+                window.location.replace("./participant-status.html");
                 return true;
             }
 

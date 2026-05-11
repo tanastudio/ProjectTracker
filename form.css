@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Update Candidate Page (Form + Table)
+   Update Participant Page (Form + Table)
    - English UI text and comments only
    - Compact table rows to fit more rows per viewport
    - Refactored and grouped rules for readability
@@ -750,7 +750,7 @@ thead th.sticky-th {
     vertical-align: middle;
 }
 
-/* Add-candidate modal */
+/* Add-participant modal */
 .modal-overlay {
     position: fixed;
     inset: 0;

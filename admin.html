@@ -125,7 +125,7 @@
             display: block;
         }
 
-        /* Candidate Preview Section */
+        /* Participant Preview Section */
         .preview-section {
             margin-top: 14px;
             padding-top: 12px;
@@ -326,7 +326,7 @@
                             <div class="val" id="kpiMembers">0</div>
                         </div>
                         <div class="kpi">
-                            <div class="lbl">Candidates (records)</div>
+                            <div class="lbl">Participants (records)</div>
                             <div class="val" id="kpiRecords">0</div>
                         </div>
                     </div>
@@ -344,13 +344,13 @@
                         </div>
 
                         <div class="tile" id="tileForm">
-                            <h3>Update Candidate Status</h3>
+                            <h3>Update Participant Status</h3>
                             <p>Open the internal/admin editing page for status updates.</p>
                         </div>
 
                         <div class="tile" id="tileCreateProject">
                             <h3>Create New Project</h3>
-                            <p>Launch the project creation wizard: set fields, members, and upload candidates.</p>
+                            <p>Launch the project creation wizard: set fields, members, and upload participants.</p>
                         </div>
 
                         <div class="tile" id="tileSettings">
@@ -365,14 +365,14 @@
 
                         <div class="tile" id="tileAudit">
                             <h3>Audit Logs</h3>
-                            <p>Review who changed projects, users, tickets, and candidate records.</p>
+                            <p>Review who changed projects, users, tickets, and participant records.</p>
                         </div>
                     </div>
 
-                    <!-- Preview Candidate View -->
+                    <!-- Preview Participant View -->
                     <div class="preview-section">
-                        <div class="section-title">Preview Candidate View</div>
-                        <div class="muted small" style="margin-bottom:6px;">Select a project and candidate to preview the candidate-facing status page.</div>
+                        <div class="section-title">Preview Participant View</div>
+                        <div class="muted small" style="margin-bottom:6px;">Select a project and participant to preview the participant-facing status page.</div>
                         <div class="preview-row">
                             <div class="preview-field">
                                 <label for="previewProjectSel">Project</label>
@@ -381,9 +381,9 @@
                                 </select>
                             </div>
                             <div class="preview-field">
-                                <label for="previewCandidateSel">Candidate</label>
-                                <select id="previewCandidateSel" class="preview-select" disabled>
-                                    <option value="">-- Select candidate --</option>
+                                <label for="previewParticipantSel">Participant</label>
+                                <select id="previewParticipantSel" class="preview-select" disabled>
+                                    <option value="">-- Select participant --</option>
                                 </select>
                             </div>
                             <button id="previewViewBtn" class="btn-preview" type="button" disabled>View</button>
@@ -670,9 +670,9 @@
 
         await loadKpis();
 
-        // Preview Candidate View
+        // Preview Participant View
         const projSel = el("previewProjectSel");
-        const candSel = el("previewCandidateSel");
+        const candSel = el("previewParticipantSel");
         const viewBtn = el("previewViewBtn");
         const prevMsg = el("previewMsg");
 
@@ -703,9 +703,9 @@
             setPreviewMsg("Cannot load projects: " + (err?.message || String(err)), true);
         }
 
-        // When project is selected, load its candidates
+        // When project is selected, load its participants
         projSel.addEventListener("change", async () => {
-            candSel.innerHTML = '<option value="">-- Select candidate --</option>';
+            candSel.innerHTML = '<option value="">-- Select participant --</option>';
             candSel.disabled = true;
             viewBtn.disabled = true;
 
@@ -728,7 +728,7 @@
 
                 if (rErr) throw rErr;
 
-            candSel.innerHTML = '<option value="">-- Select candidate --</option>';
+            candSel.innerHTML = '<option value="">-- Select participant --</option>';
                 (recs || []).forEach((r) => {
                     const o = document.createElement("option");
                     o.value = r.id;
@@ -737,14 +737,14 @@
                 });
 
                 if (!recs || recs.length === 0) {
-                    setPreviewMsg("No active candidates in this project.", false);
+                    setPreviewMsg("No active participants in this project.", false);
                 } else {
                     prevMsg.className = "hint";
                     prevMsg.textContent = "";
                 }
             } catch (err) {
-                setPreviewMsg("Cannot load candidates: " + (err?.message || String(err)), true);
-            candSel.innerHTML = '<option value="">-- Select candidate --</option>';
+                setPreviewMsg("Cannot load participants: " + (err?.message || String(err)), true);
+            candSel.innerHTML = '<option value="">-- Select participant --</option>';
             }
         });
 
@@ -756,7 +756,7 @@
             const recordId = candSel.value;
             if (!recordId) return;
             sessionStorage.setItem("admin_preview_record_id", String(recordId));
-            const previewUrl = `./candidate-status.html?preview_record=${encodeURIComponent(recordId)}`;
+            const previewUrl = `./participant-status.html?preview_record=${encodeURIComponent(recordId)}`;
             // Use same-tab navigation for reliability (prevents popup/query-loss issues).
             window.location.href = previewUrl;
         });

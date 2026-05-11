@@ -51,7 +51,7 @@ type DeliveryChannel = {
 };
 
 type ProjectSummary = {
-  totalCandidates: number;
+  totalParticipants: number;
   overallCounts: Record<string, number>;
   processRows: Array<{
     key: string;
@@ -465,7 +465,7 @@ async function buildProjectSummary(
 ): Promise<ProjectSummary> {
   const { data: fields, error: fieldError } = await adminClient
     .from("fields")
-    .select("id, key, label, type, field_role, sort_order, show_in_dashboard, show_in_candidate_status, show_in_internal, is_active")
+    .select("id, key, label, type, field_role, sort_order, show_in_dashboard, show_in_participant_status, show_in_internal, is_active")
     .eq("project_id", projectId)
     .order("sort_order", { ascending: true });
   if (fieldError) throw fieldError;
@@ -538,7 +538,7 @@ async function buildProjectSummary(
   }
 
   return {
-    totalCandidates: (records ?? []).length,
+    totalParticipants: (records ?? []).length,
     overallCounts,
     processRows,
   };
@@ -546,10 +546,10 @@ async function buildProjectSummary(
 
 function aggregateProjectSections(sections: ProjectEmailSection[]) {
   const overallCounts = Object.fromEntries(STATUS_ORDER.map((status) => [status, 0])) as Record<string, number>;
-  let totalCandidates = 0;
+  let totalParticipants = 0;
 
   for (const section of sections) {
-    totalCandidates += section.summary.totalCandidates;
+    totalParticipants += section.summary.totalParticipants;
     for (const status of STATUS_ORDER) {
       overallCounts[status] += Number(section.summary.overallCounts[status] || 0);
     }
@@ -557,7 +557,7 @@ function aggregateProjectSections(sections: ProjectEmailSection[]) {
 
   return {
     totalProjects: sections.length,
-    totalCandidates,
+    totalParticipants,
     overallCounts,
   };
 }
@@ -571,7 +571,7 @@ function renderSummaryText(
   return [
     `${projectName} ${audienceLabel.toLowerCase()} project update`,
     `Schedule: ${scheduleLabel}`,
-    `Total candidates: ${summary.totalCandidates}`,
+    `Total participants: ${summary.totalParticipants}`,
     `Completed: ${summary.overallCounts["Completed"]}`,
     `In Progress: ${summary.overallCounts["In Progress"]}`,
     `Issue: ${summary.overallCounts["Issue"]}`,
@@ -589,14 +589,14 @@ function renderPortfolioSummaryText(
     "Internal portfolio project update",
     `Schedule: ${scheduleLabel}`,
     `Active projects: ${aggregate.totalProjects}`,
-    `Total candidates: ${aggregate.totalCandidates}`,
+    `Total participants: ${aggregate.totalParticipants}`,
     `Completed: ${aggregate.overallCounts["Completed"]}`,
     `In Progress: ${aggregate.overallCounts["In Progress"]}`,
     `Issue: ${aggregate.overallCounts["Issue"]}`,
     `Not Started: ${aggregate.overallCounts["Not Started"]}`,
     "",
     ...sections.map((section) =>
-      `${section.projectName}: ${section.summary.totalCandidates} candidates, `
+      `${section.projectName}: ${section.summary.totalParticipants} participants, `
       + `${section.summary.overallCounts["Completed"]} completed, `
       + `${section.summary.overallCounts["In Progress"]} in progress, `
       + `${section.summary.overallCounts["Issue"]} issue, `
@@ -617,7 +617,7 @@ function renderProgressBar(count: number, total: number, color: string) {
       <div style="height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden;">
         <div style="height:10px;width:${percent}%;background:${color};border-radius:999px;"></div>
       </div>
-      <div style="margin-top:6px;font-size:12px;color:#64748b;">${count} candidates (${percent}%)</div>
+      <div style="margin-top:6px;font-size:12px;color:#64748b;">${count} participants (${percent}%)</div>
     </div>
   `;
 }
@@ -643,8 +643,8 @@ function renderHtmlEmail(
 ) {
   const cards = [
     {
-      label: "Total Candidates",
-      value: String(summary.totalCandidates),
+      label: "Total Participants",
+      value: String(summary.totalParticipants),
       color: "#0f172a",
       bg: "#f8fafc",
       border: "#cbd5e1",
@@ -737,8 +737,8 @@ function renderPortfolioHtmlEmail(
   snapshotDateLabel: string,
 ) {
   const aggregate = aggregateProjectSections(sections);
-  const overallCompletion = aggregate.totalCandidates > 0
-    ? Math.round((Number(aggregate.overallCounts["Completed"] || 0) / aggregate.totalCandidates) * 100)
+  const overallCompletion = aggregate.totalParticipants > 0
+    ? Math.round((Number(aggregate.overallCounts["Completed"] || 0) / aggregate.totalParticipants) * 100)
     : 0;
   const summaryCards = [
     {
@@ -749,8 +749,8 @@ function renderPortfolioHtmlEmail(
       border: "#bfdbfe",
     },
     {
-      label: "Total Candidates",
-      value: String(aggregate.totalCandidates),
+      label: "Total Participants",
+      value: String(aggregate.totalParticipants),
       color: "#0f172a",
       background: "#f8fafc",
       border: "#cbd5e1",
@@ -775,15 +775,15 @@ function renderPortfolioHtmlEmail(
     ? sections.map((section) => `
       ${(() => {
         const completed = Number(section.summary.overallCounts["Completed"] || 0);
-        const percent = section.summary.totalCandidates > 0
-          ? Math.round((completed / section.summary.totalCandidates) * 100)
+        const percent = section.summary.totalParticipants > 0
+          ? Math.round((completed / section.summary.totalParticipants) * 100)
           : 0;
         return `
       <tr>
         <td style="padding:8px;border:1px solid #dbe3f0;font-size:13px;font-weight:700;color:#0f172a;">
           ${escapeHtml(section.projectName)}
         </td>
-        <td style="padding:8px;border:1px solid #dbe3f0;font-size:13px;color:#334155;text-align:center;">${section.summary.totalCandidates}</td>
+        <td style="padding:8px;border:1px solid #dbe3f0;font-size:13px;color:#334155;text-align:center;">${section.summary.totalParticipants}</td>
         <td style="padding:8px;border:1px solid #dbe3f0;font-size:12px;color:#334155;min-width:120px;">
           <div style="font-weight:700;color:#0f172a;margin-bottom:4px;">${percent}%</div>
           <div style="height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden;">
@@ -820,7 +820,7 @@ function renderPortfolioHtmlEmail(
           <thead>
             <tr>
               <th style="padding:7px;border:1px solid #cbd5e1;text-align:left;font-size:11px;background:#f8fafc;">Project</th>
-              <th style="padding:7px;border:1px solid #cbd5e1;text-align:center;font-size:11px;background:#f8fafc;">Candidates</th>
+              <th style="padding:7px;border:1px solid #cbd5e1;text-align:center;font-size:11px;background:#f8fafc;">Participants</th>
               <th style="padding:7px;border:1px solid #cbd5e1;text-align:left;font-size:11px;background:#f8fafc;">Progress</th>
               ${STATUS_ORDER.map((status) => `
                 <th style="padding:7px;border:1px solid #cbd5e1;text-align:center;font-size:11px;background:#f8fafc;">${escapeHtml(status)}</th>
@@ -1155,7 +1155,7 @@ serve(async (req) => {
             sent_to: delivery.sent_to,
             audit_emails: delivery.audit_emails,
             provider: delivery.provider,
-            total_candidates: summary.totalCandidates,
+            total_participants: summary.totalParticipants,
             local_date: scheduleCheck.localDate || localClock.dateKey,
           });
         } catch (error) {
@@ -1260,7 +1260,7 @@ serve(async (req) => {
             projects: sections.map((section) => ({
               project_id: section.projectId,
               project_name: section.projectName,
-              total_candidates: section.summary.totalCandidates,
+              total_participants: section.summary.totalParticipants,
               overall_counts: section.summary.overallCounts,
             })),
           };
@@ -1307,7 +1307,7 @@ serve(async (req) => {
             project_count: projectIds.length,
             project_ids: projectIds,
             project_names: rowsForEmail.map((row) => row.project_name || "Project"),
-            total_candidates: aggregateSummary.totalCandidates,
+            total_participants: aggregateSummary.totalParticipants,
             local_date: localDate,
           });
         } catch (error) {

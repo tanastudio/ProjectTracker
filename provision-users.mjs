@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 const DEFAULT_SUPABASE_URL = "http://127.0.0.1:55321";
 const DEFAULT_PASSWORD =
   process.env.TEST_USER_PASSWORD ||
-  process.env.DEFAULT_CANDIDATE_PASSWORD;
+  process.env.DEFAULT_PARTICIPANT_PASSWORD;
 const MAIL_NAMESPACE = "localtest";
 
 const CLIENT_USERS = [
@@ -25,11 +25,11 @@ function namespaceEmail(tag) {
   return `${MAIL_NAMESPACE}.${tag}@inbox.testmail.app`;
 }
 
-function namespacedCandidateEmail(index) {
+function namespacedParticipantEmail(index) {
   return namespaceEmail(`cand${String(index + 1).padStart(3, "0")}`);
 }
 
-function shouldUseNamespacedCandidateEmails() {
+function shouldUseNamespacedParticipantEmails() {
   const supabaseUrl = String(process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL).toLowerCase();
   return supabaseUrl.includes("127.0.0.1") || supabaseUrl.includes("localhost");
 }
@@ -51,7 +51,7 @@ function createAdminClient() {
 
 function requirePassword() {
   if (!DEFAULT_PASSWORD) {
-    throw new Error("Missing TEST_USER_PASSWORD or DEFAULT_CANDIDATE_PASSWORD");
+    throw new Error("Missing TEST_USER_PASSWORD or DEFAULT_PARTICIPANT_PASSWORD");
   }
 }
 
@@ -96,7 +96,7 @@ async function ensureAuthUser(supabase, { email, displayName, role, password = D
   return { user: data.user, created: true };
 }
 
-async function ensureProfile(supabase, { id, displayName, email, role, candidateRecordId = null }) {
+async function ensureProfile(supabase, { id, displayName, email, role, participantRecordId = null }) {
   const payload = {
     id,
     display_name: displayName,
@@ -104,8 +104,8 @@ async function ensureProfile(supabase, { id, displayName, email, role, candidate
     role,
   };
 
-  if (candidateRecordId) {
-    payload.candidate_record_id = candidateRecordId;
+  if (participantRecordId) {
+    payload.participant_record_id = participantRecordId;
   }
 
   const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
@@ -138,7 +138,7 @@ async function getProjects(supabase) {
   return data || [];
 }
 
-async function getCandidateRecords(supabase, { projectId } = {}) {
+async function getParticipantRecords(supabase, { projectId } = {}) {
   let query = supabase
     .from("records")
     .select(`
@@ -161,13 +161,13 @@ async function getCandidateRecords(supabase, { projectId } = {}) {
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(`Failed to fetch candidate records: ${error.message}`);
+  if (error) throw new Error(`Failed to fetch participant records: ${error.message}`);
 
   return (data || [])
     .map((record) => ({
       recordId: record.id,
       code: record.code,
-      displayName: record.title || record.code || "Candidate",
+      displayName: record.title || record.code || "Participant",
       emailFieldId: record.record_values?.[0]?.field_id || null,
       email: record.record_values?.[0]?.value_text || null,
       projectId: record.project_id,
@@ -186,51 +186,51 @@ function toSummaryUser(user, password) {
   };
 }
 
-async function runCandidatesMode() {
+async function runParticipantsMode() {
   const projectId = process.env.PROJECT_ID;
   if (!projectId) {
-    throw new Error("Missing PROJECT_ID for candidates mode");
+    throw new Error("Missing PROJECT_ID for participants mode");
   }
 
   requirePassword();
 
   const supabase = createAdminClient();
-  const candidates = await getCandidateRecords(supabase, { projectId });
+  const participants = await getParticipantRecords(supabase, { projectId });
 
-  console.log(`Found ${candidates.length} candidate record(s) in project ${projectId}\n`);
+  console.log(`Found ${participants.length} participant record(s) in project ${projectId}\n`);
 
-  for (const [index, candidate] of candidates.entries()) {
-    const targetEmail = shouldUseNamespacedCandidateEmails()
-      ? namespacedCandidateEmail(index)
-      : candidate.email;
+  for (const [index, participant] of participants.entries()) {
+    const targetEmail = shouldUseNamespacedParticipantEmails()
+      ? namespacedParticipantEmail(index)
+      : participant.email;
 
-    console.log(`Processing ${candidate.code || "(no code)"} - ${candidate.displayName} <${targetEmail}>`);
+    console.log(`Processing ${participant.code || "(no code)"} - ${participant.displayName} <${targetEmail}>`);
 
     try {
-      if (targetEmail !== candidate.email && candidate.emailFieldId) {
+      if (targetEmail !== participant.email && participant.emailFieldId) {
         const { error: emailUpdateError } = await supabase
           .from("record_values")
           .update({ value_text: targetEmail })
-          .eq("record_id", candidate.recordId)
-          .eq("field_id", candidate.emailFieldId);
-        if (emailUpdateError) throw new Error(`record_values email update failed for ${candidate.recordId}: ${emailUpdateError.message}`);
+          .eq("record_id", participant.recordId)
+          .eq("field_id", participant.emailFieldId);
+        if (emailUpdateError) throw new Error(`record_values email update failed for ${participant.recordId}: ${emailUpdateError.message}`);
       }
 
       const { user, created } = await ensureAuthUser(supabase, {
         email: targetEmail,
-        displayName: candidate.displayName,
-        role: "candidate",
+        displayName: participant.displayName,
+        role: "participant",
       });
 
       await ensureProfile(supabase, {
         id: user.id,
-        displayName: candidate.displayName,
+        displayName: participant.displayName,
         email: targetEmail,
-        role: "candidate",
-        candidateRecordId: candidate.recordId,
+        role: "participant",
+        participantRecordId: participant.recordId,
       });
 
-      await ensureMemberships(supabase, user.id, [candidate.projectId], "viewer");
+      await ensureMemberships(supabase, user.id, [participant.projectId], "viewer");
       console.log(`  [OK] ${created ? "created" : "updated"} auth user, profile, and membership`);
     } catch (error) {
       console.error(`  [ERROR] ${error.message}`);
@@ -279,51 +279,51 @@ async function provisionStaffLikeUsers(supabase, users, projectIds, password) {
   return created;
 }
 
-async function provisionCandidates(supabase, password) {
-  const candidates = await getCandidateRecords(supabase);
+async function provisionParticipants(supabase, password) {
+  const participants = await getParticipantRecords(supabase);
   const testUsers = [];
 
-  for (const [index, candidate] of candidates.entries()) {
-    const targetEmail = shouldUseNamespacedCandidateEmails()
-      ? namespacedCandidateEmail(index)
-      : candidate.email;
+  for (const [index, participant] of participants.entries()) {
+    const targetEmail = shouldUseNamespacedParticipantEmails()
+      ? namespacedParticipantEmail(index)
+      : participant.email;
 
-    if (targetEmail !== candidate.email && candidate.emailFieldId) {
+    if (targetEmail !== participant.email && participant.emailFieldId) {
       const { error: emailUpdateError } = await supabase
         .from("record_values")
         .update({ value_text: targetEmail })
-        .eq("record_id", candidate.recordId)
-        .eq("field_id", candidate.emailFieldId);
+        .eq("record_id", participant.recordId)
+        .eq("field_id", participant.emailFieldId);
       if (emailUpdateError) {
-        throw new Error(`record_values email update failed for ${candidate.recordId}: ${emailUpdateError.message}`);
+        throw new Error(`record_values email update failed for ${participant.recordId}: ${emailUpdateError.message}`);
       }
     }
 
     const { user: authUser } = await ensureAuthUser(supabase, {
       email: targetEmail,
-      displayName: candidate.displayName,
-      role: "candidate",
+      displayName: participant.displayName,
+      role: "participant",
       password,
     });
 
     await ensureProfile(supabase, {
       id: authUser.id,
-      displayName: candidate.displayName,
+      displayName: participant.displayName,
       email: targetEmail,
-      role: "candidate",
-      candidateRecordId: candidate.recordId,
+      role: "participant",
+      participantRecordId: participant.recordId,
     });
 
-    await ensureMemberships(supabase, authUser.id, [candidate.projectId], "viewer");
+    await ensureMemberships(supabase, authUser.id, [participant.projectId], "viewer");
 
     testUsers.push(
       toSummaryUser(
         {
-          label: candidate.code || candidate.displayName,
-          role: "candidate",
+          label: participant.code || participant.displayName,
+          role: "participant",
           userId: authUser.id,
           email: targetEmail,
-          displayName: candidate.displayName,
+          displayName: participant.displayName,
         },
         password,
       ),
@@ -347,7 +347,7 @@ async function runTestUsersMode() {
   const adminUsers = await provisionStaffLikeUsers(supabase, ADMIN_USERS, projectIds, DEFAULT_PASSWORD);
   const clientUsers = await provisionStaffLikeUsers(supabase, CLIENT_USERS, projectIds, DEFAULT_PASSWORD);
   const internalUsers = await provisionStaffLikeUsers(supabase, INTERNAL_USERS, projectIds, DEFAULT_PASSWORD);
-  const candidateUsers = await provisionCandidates(supabase, DEFAULT_PASSWORD);
+  const participantUsers = await provisionParticipants(supabase, DEFAULT_PASSWORD);
 
   const summary = {
     mode: "test-users",
@@ -357,7 +357,7 @@ async function runTestUsersMode() {
       admins: adminUsers,
       clients: clientUsers,
       internals: internalUsers,
-      candidates: candidateUsers,
+      participants: participantUsers,
     },
   };
 
@@ -365,8 +365,8 @@ async function runTestUsersMode() {
 }
 
 export async function runProvisionUsers(mode) {
-  if (mode === "candidates") {
-    await runCandidatesMode();
+  if (mode === "participants") {
+    await runParticipantsMode();
     return;
   }
 
@@ -390,7 +390,7 @@ if (isDirectExecution()) {
 
   if (!mode || mode === "--help" || mode === "-h") {
     console.log("Usage:");
-    console.log("  node --env-file=.env provision-users.mjs candidates");
+    console.log("  node --env-file=.env provision-users.mjs participants");
     console.log("  node --env-file=.env provision-users.mjs test-users");
     process.exit(mode ? 0 : 1);
   }

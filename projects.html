@@ -658,7 +658,7 @@
                     <div>
                         <h1 class="page-title">Select a project</h1>
                         <p class="page-desc" id="msg">
-                            Choose a workspace to open dashboards, update candidate progress, and manage project tickets with role-based access.
+                            Choose a workspace to open dashboards, update participant progress, and manage project tickets with role-based access.
                         </p>
                     </div>
 
@@ -819,9 +819,9 @@
         const chip = document.getElementById("userChip");
         if (chip) chip.textContent = `${displayName} (${userRole})`;
 
-        if (userRole === "candidate") {
-            window.location.replace("./candidate-status.html");
-            throw new Error("candidate redirected");
+        if (userRole === "participant") {
+            window.location.replace("./participant-status.html");
+            throw new Error("participant redirected");
         }
 
         setSidebarAccess(userRole);
@@ -1027,7 +1027,7 @@
             const role = m.role || "viewer";
 
             const s = summaryByProject.get(String(m.project_id));
-            const total = s?.total_candidates ?? 0;
+            const total = s?.total_participants ?? 0;
             const completed = s?.n_completed ?? 0;
             const inProgress = s?.n_in_progress ?? 0;
             const issue = s?.n_issue ?? 0;
@@ -1114,7 +1114,7 @@
 
             const colTotal = document.createElement("div");
             colTotal.className = "proj-stat-col";
-            colTotal.innerHTML = `<div class="proj-stat-num" style="color:${accent.border}">${total}</div><div class="proj-stat-lbl">Total Candidates</div>`;
+            colTotal.innerHTML = `<div class="proj-stat-num" style="color:${accent.border}">${total}</div><div class="proj-stat-lbl">Total Participants</div>`;
 
             const colPct = document.createElement("div");
             colPct.className = "proj-stat-col";

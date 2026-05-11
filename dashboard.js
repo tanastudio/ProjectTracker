@@ -1,4 +1,4 @@
-﻿import { supabase } from "./supabaseClient.js";
+import { supabase } from "./supabaseClient.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 
 /* ---------- Config ---------- */
@@ -77,7 +77,7 @@ async function requireSession() {
         return null;
     }
 
-    // ✅ Candidate guard must run BEFORE returning session
+    // ✅ Participant guard must run BEFORE returning session
     const user = session.user;
 
     const { data: prof, error: profErr } = await supabase
@@ -86,8 +86,8 @@ async function requireSession() {
         .eq("id", user.id)
         .maybeSingle();
 
-    if (!profErr && prof?.role === "candidate") {
-        window.location.replace("./candidate-status.html");
+    if (!profErr && prof?.role === "participant") {
+        window.location.replace("./participant-status.html");
         return null;
     }
 
@@ -357,7 +357,7 @@ function buildItems(records, recordValues, fieldsById) {
         items.push({
             id: r.id,
             code: r.code || "",
-            candidateName: r.title || "",
+            participantName: r.title || "",
             values: vals, // raw values by field key (for dynamic columns)
 
             // prefer records columns first, fallback to record_values
@@ -428,7 +428,7 @@ function getRequestButtonMarkup(item) {
     return `<button class="${buttonClass}"
             data-id="${escapeHtml(item?.id)}"
             data-code="${escapeHtml(item?.code)}"
-            data-name="${escapeHtml(item?.candidateName)}"
+            data-name="${escapeHtml(item?.participantName)}"
             data-email="${escapeHtml(item?.email)}">
             <span class="ticket-indicator-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -442,25 +442,25 @@ function getRequestButtonMarkup(item) {
 }
 
 function getTicketActivityMeta(ticket, replies) {
-    const candidates = [];
+    const participants = [];
     const createdAt = Date.parse(ticket?.created_at || "");
-    if (Number.isFinite(createdAt)) candidates.push({ at: createdAt, actorId: String(ticket?.created_by || "") });
+    if (Number.isFinite(createdAt)) participants.push({ at: createdAt, actorId: String(ticket?.created_by || "") });
 
     const repliedAt = Date.parse(ticket?.replied_at || "");
-    if (Number.isFinite(repliedAt)) candidates.push({ at: repliedAt, actorId: String(ticket?.replied_by || "") });
+    if (Number.isFinite(repliedAt)) participants.push({ at: repliedAt, actorId: String(ticket?.replied_by || "") });
 
     for (const reply of replies || []) {
         const at = Date.parse(reply?.created_at || "");
         if (!Number.isFinite(at)) continue;
-        candidates.push({ at, actorId: String(reply?.author_id || "") });
+        participants.push({ at, actorId: String(reply?.author_id || "") });
     }
 
-    if (candidates.length === 0) {
+    if (participants.length === 0) {
         return { lastAt: 0, actorId: "" };
     }
 
-    candidates.sort((a, b) => a.at - b.at);
-    return candidates[candidates.length - 1];
+    participants.sort((a, b) => a.at - b.at);
+    return participants[participants.length - 1];
 }
 
 async function loadTicketStats(projectId) {
@@ -549,7 +549,7 @@ function buildHeaderFromFields(fieldsList) {
     headRow.insertAdjacentHTML("beforeend", `
     <th class="sticky-col sticky-col-0">Request</th>
     <th class="sticky-col sticky-col-1">Code</th>
-    <th class="sticky-col sticky-col-2">Candidate Name</th>
+    <th class="sticky-col sticky-col-2">Participant Name</th>
     ${showEmailCol ? '<th style="min-width:180px;">Email</th>' : ""}
     <th style="min-width:120px;">Overall Status</th>
   `);
@@ -609,10 +609,10 @@ function renderTable(items) {
         tdCode.textContent = String(it.code || "");
         tr.appendChild(tdCode);
 
-        // Candidate Name (sticky-2)
+        // Participant Name (sticky-2)
         const tdName = document.createElement("td");
         tdName.className = "sticky-col sticky-col-2";
-        tdName.innerHTML = `<b>${escapeHtml(it.candidateName || "")}</b>`;
+        tdName.innerHTML = `<b>${escapeHtml(it.participantName || "")}</b>`;
         tr.appendChild(tdName);
 
         // Email (toggleable from project settings)
@@ -662,7 +662,7 @@ function getVisibleDashboardFields() {
 
     const columns = [
         { key: "code", label: "Code", getValue: (it) => String(it.code || "") },
-        { key: "candidateName", label: "Candidate Name", getValue: (it) => String(it.candidateName || "") },
+        { key: "participantName", label: "Participant Name", getValue: (it) => String(it.participantName || "") },
     ];
 
     if (showEmailCol) {
@@ -746,7 +746,7 @@ function sanitizeFileNamePart(value, fallback) {
 function buildExportFileBaseName() {
     const projectName = sanitizeFileNamePart(PROJECT_CTX?.project_name, "project");
     const datePart = new Date().toISOString().slice(0, 10);
-    return `${projectName}-candidates-${datePart}`;
+    return `${projectName}-participants-${datePart}`;
 }
 
 function downloadBlob(blob, fileName) {
@@ -766,10 +766,10 @@ function toCsvValue(value) {
     return text;
 }
 
-function exportCandidatesCsv() {
+function exportParticipantsCsv() {
     const { columns, items } = getExportRows();
     if (!items.length) {
-        alert("No candidate rows to export.");
+        alert("No participant rows to export.");
         return;
     }
 
@@ -785,10 +785,10 @@ function exportCandidatesCsv() {
     closeExportMenu();
 }
 
-function exportCandidatesXlsx() {
+function exportParticipantsXlsx() {
     const { columns, rows } = getExportRows();
     if (!rows.length) {
-        alert("No candidate rows to export.");
+        alert("No participant rows to export.");
         return;
     }
 
@@ -802,7 +802,7 @@ function exportCandidatesXlsx() {
     const headerLabels = columns.map((col) => col.label);
     const dataRows = rows.map((row) => headerLabels.map((label) => row[label] ?? ""));
     const metaRows = [
-        [`${PROJECT_CTX?.project_name || "Project"} Candidates Export`],
+        [`${PROJECT_CTX?.project_name || "Project"} Participants Export`],
         ["Project", PROJECT_CTX?.project_name || "-"],
         ["Generated At", generatedAt],
         ["Rows", String(rows.length)],
@@ -839,7 +839,7 @@ function exportCandidatesXlsx() {
         return { wch: Math.min(Math.max(maxLength + 2, 14), 42) };
     });
     const workbook = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Candidates");
+    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Participants");
     window.XLSX.writeFile(workbook, `${buildExportFileBaseName()}.xlsx`);
     closeExportMenu();
 }
@@ -868,27 +868,27 @@ function updateExportButtons() {
 
 /* ---------- Modal (status list) ---------- */
 function openStatusModal(status) {
-    const label = status === "Total" ? "Total Candidates" : status;
+    const label = status === "Total" ? "Total Participants" : status;
 
     const list =
         status === "Total" ? [...CURRENT_ITEMS] : CURRENT_ITEMS.filter((x) => x.overallStatus === status);
 
     list.sort((a, b) => String(a.code || "").localeCompare(String(b.code || "")));
 
-    modalTitle.textContent = `Candidates: ${label}`;
+    modalTitle.textContent = `Participants: ${label}`;
     modalSub.textContent = `Rows: ${list.length}`;
     modalTbody.innerHTML = "";
 
     if (list.length === 0) {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="6" style="color:#6b7280;">No candidates found.</td>`;
+        tr.innerHTML = `<td colspan="6" style="color:#6b7280;">No participants found.</td>`;
         modalTbody.appendChild(tr);
     } else {
         for (const it of list) {
             const tr = document.createElement("tr");
             tr.innerHTML = `
         <td>${escapeHtml(it.code)}</td>
-        <td><b>${escapeHtml(it.candidateName)}</b></td>
+        <td><b>${escapeHtml(it.participantName)}</b></td>
         <td class="issue-cell">${escapeHtml(it.issue)}</td>
         <td class="issue-cell">${escapeHtml(it.decision)}</td>
         <td>
@@ -939,7 +939,7 @@ function openRequestModal(ctx) {
     REQ_CONTEXT = ctx;
 
     reqTitle.textContent = "Request / Comment";
-    reqSub.textContent = `${ctx.code} — ${ctx.candidateName || "-"}`;
+    reqSub.textContent = `${ctx.code} — ${ctx.participantName || "-"}`;
 
     if (reqTo) {
         reqTo.value = String(ctx.email || "").trim();
@@ -981,7 +981,7 @@ async function sendRequestToSupabase() {
             project_id: PROJECT_CTX.project_id,
             record_id: REQ_CONTEXT.recordId,
             code: REQ_CONTEXT.code,
-            candidate_name: REQ_CONTEXT.candidateName,
+            participant_name: REQ_CONTEXT.participantName,
             subject,
             message,
             created_by: __session.user.id,
@@ -1003,7 +1003,7 @@ async function sendRequestToSupabase() {
             authorRole: USER_ROLE,
             message: message,
             ticketSubject: subject,
-            candidateName: REQ_CONTEXT.candidateName || "",
+            participantName: REQ_CONTEXT.participantName || "",
             projectName: PROJECT_CTX.project_name || "",
             projectId: PROJECT_CTX.project_id || "",
         });
@@ -1200,11 +1200,11 @@ function applyDashFilter() {
     const st = dashFilterStatus?.value || "";
 
     return CURRENT_ITEMS.filter(it => {
-        if (q && !`${it.code} ${it.candidateName} ${it.email}`.toLowerCase().includes(q)) return false;
+        if (q && !`${it.code} ${it.participantName} ${it.email}`.toLowerCase().includes(q)) return false;
         if (col && st) {
             const field = FIELD_CACHE?.list?.find(f => f.key === col);
             let val = it.step?.[col] ?? it.values?.[col] ?? "";
-            // For select fields, normalize empty → "Not Started" so candidates
+            // For select fields, normalize empty → "Not Started" so participants
             // with no saved data still match the "Not Started" filter.
             if (field?.type === "select") val = normalizeStatus(val);
             if (val !== st) return false;
@@ -1270,8 +1270,8 @@ dashFilterColumn?.addEventListener("change", () => { rebuildDashStatusOptions();
 dashFilterColumn?.addEventListener("change", updateExportButtons);
 dashFilterStatus?.addEventListener("change", () => renderTable(applyDashFilter()));
 dashFilterStatus?.addEventListener("change", updateExportButtons);
-exportCsvBtn?.addEventListener("click", exportCandidatesCsv);
-exportXlsxBtn?.addEventListener("click", exportCandidatesXlsx);
+exportCsvBtn?.addEventListener("click", exportParticipantsCsv);
+exportXlsxBtn?.addEventListener("click", exportParticipantsXlsx);
 exportMenuBtn?.addEventListener("click", toggleExportMenu);
 
 document.addEventListener("click", (e) => {
@@ -1289,7 +1289,7 @@ statusModal?.addEventListener("click", (e) => {
     openRequestModal({
         recordId: btn.getAttribute("data-id") || "",
         code: btn.getAttribute("data-code") || "",
-        candidateName: btn.getAttribute("data-name") || "",
+        participantName: btn.getAttribute("data-name") || "",
         email: btn.getAttribute("data-email") || "",
     });
 });
@@ -1300,7 +1300,7 @@ tbody?.addEventListener("click", (e) => {
     openRequestModal({
         recordId: btn.getAttribute("data-id") || "",
         code: btn.getAttribute("data-code") || "",
-        candidateName: btn.getAttribute("data-name") || "",
+        participantName: btn.getAttribute("data-name") || "",
         email: btn.getAttribute("data-email") || "",
     });
 });
@@ -1528,11 +1528,11 @@ window.addEventListener("load", () => {
 
 window.addEventListener("resize", () => syncTopScrollbarWidth());
 
-/* ---------- View tabs (Overview / Candidates) ---------- */
+/* ---------- View tabs (Overview / Participants) ---------- */
 function initTabs() {
     const tabs = document.querySelectorAll(".view-tab");
     const viewOverview   = document.getElementById("viewOverview");
-    const viewCandidates = document.getElementById("viewCandidates");
+    const viewParticipants = document.getElementById("viewParticipants");
 
     // Restore last active tab from session
     const saved = sessionStorage.getItem("dashboard_tab") || "overview";
@@ -1550,11 +1550,11 @@ function initTabs() {
         });
 
         if (viewOverview)   viewOverview.style.display   = name === "overview"   ? "" : "none";
-        if (viewCandidates) viewCandidates.style.display = name === "candidates" ? "" : "none";
+        if (viewParticipants) viewParticipants.style.display = name === "participants" ? "" : "none";
 
         // Toggle flex-chain that makes each tab fit the viewport
         document.body.classList.toggle("overview-active",    name === "overview");
-        document.body.classList.toggle("candidates-active",  name === "candidates");
+        document.body.classList.toggle("participants-active",  name === "participants");
 
         sessionStorage.setItem("dashboard_tab", name);
 

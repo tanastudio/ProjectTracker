@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>Project Tracker V3 - Code Explanation TH</title>
+  <style>
+    body {
+      font-family: "TH Sarabun New", "Sarabun", Arial, sans-serif;
+      font-size: 16pt;
+      line-height: 1.5;
+      margin: 36pt;
+      color: #111;
+    }
+    h1, h2, h3 {
+      color: #17324d;
+      margin-bottom: 6pt;
+    }
+    h1 { font-size: 26pt; }
+    h2 { font-size: 20pt; margin-top: 20pt; }
+    h3 { font-size: 16pt; margin-top: 14pt; }
+    p { margin: 0 0 8pt 0; }
+    ul { margin-top: 0; margin-bottom: 10pt; }
+    li { margin-bottom: 4pt; }
+    code {
+      font-family: Consolas, monospace;
+      font-size: 12pt;
+      background: #f3f6f9;
+      padding: 1pt 3pt;
+    }
+    .muted { color: #555; }
+    .block {
+      border: 1px solid #d8e1ea;
+      background: #f8fbfe;
+      padding: 10pt 12pt;
+      margin: 10pt 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>เอกสารอธิบายโค้ด Project Tracker V3</h1>
+  <p class="muted">เอกสารนี้สรุปจากไฟล์โค้ดจริงในโปรเจกต์ โดยเน้นกลุ่ม <code>JavaScript</code>, <code>TypeScript</code>, <code>Supabase</code>, <code>PostgreSQL / SQL</code>, test และไฟล์ตั้งค่าที่เกี่ยวข้อง</p>
+
+  <h2>1. ภาพรวมระบบ</h2>
+  <p>โปรเจกต์นี้เป็นระบบติดตามสถานะผู้สมัครในแต่ละโปรเจกต์ โดยหน้าเว็บฝั่ง browser เรียก Supabase โดยตรงผ่าน <code>supabase-js</code> และใช้ Row Level Security (RLS) ใน PostgreSQL เป็นตัวคุมสิทธิ์การเข้าถึงข้อมูล</p>
+  <ul>
+    <li>Frontend หลักคือ <code>dashboard.js</code> และ <code>form.js</code></li>
+    <li>ฐานข้อมูลเก็บข้อมูลแบบ dynamic field ผ่านตาราง <code>fields</code> และ <code>record_values</code></li>
+    <li>ระบบ ticket/request ใช้ตาราง <code>requests</code>, <code>ticket_replies</code> และ <code>ticket_read_states</code></li>
+    <li>ฝั่งเซิร์ฟเวอร์มี Supabase Edge Functions สำหรับสร้าง user และส่ง notification</li>
+    <li>มี script ฝั่ง Node.js สำหรับ provision user ทดสอบหรือ participant จำนวนมาก</li>
+  </ul>
+
+  <h2>2. ไฟล์ตั้งค่าระบบและ entry ที่สำคัญ</h2>
+
+  <h3>package.json</h3>
+  <p>ไฟล์นี้กำหนดว่าโปรเจกต์ใช้ ES module ผ่าน <code>"type": "module"</code> และมี script หลักดังนี้</p>
+  <ul>
+    <li><code>dev</code> เปิด static server ที่พอร์ต 3000</li>
+    <li><code>users:participants</code> และ <code>users:test</code> เรียก <code>provision-users.mjs</code> ด้วย mode ต่างกัน</li>
+    <li><code>test</code> และ <code>test:watch</code> ใช้ Vitest สำหรับรัน unit test</li>
+  </ul>
+  <p>dependency สำคัญคือ <code>serve</code> สำหรับเปิดหน้าเว็บ, <code>supabase</code> สำหรับ CLI/SDK ที่เกี่ยวข้อง, และ <code>vitest</code> สำหรับ test</p>
+
+  <h3>vitest.config.js</h3>
+  <p>เป็น config ของ test runner กำหนดให้ใช้ environment แบบ <code>node</code> และค้นหา test ที่อยู่ใน <code>tests/**/*.test.js</code> เท่านั้น</p>
+
+  <h3>js/config.js</h3>
+  <p>เป็นตัวเลือก environment อัตโนมัติตาม hostname ของ browser</p>
+  <ul>
+    <li>ถ้าเปิดจาก <code>127.0.0.1</code> หรือ <code>localhost</code> จะใช้ local Supabase</li>
+    <li>ถ้าไม่ใช่ จะใช้ remote Supabase URL และ anon key ฝั่ง production</li>
+  </ul>
+  <p>แนวคิดของไฟล์นี้คือทำให้ frontend ใช้ source เดียวกันได้ทั้ง local และ production โดยไม่ต้อง build แยก environment</p>
+
+  <h3>supabaseClient.js</h3>
+  <p>เป็น wrapper บางมากสำหรับสร้าง Supabase client จากค่าที่ export มาจาก <code>js/config.js</code></p>
+  <div class="block">
+    <p>หน้าที่ของไฟล์นี้คือเป็นจุดรวมเดียวที่ browser ทุกหน้าใช้เชื่อมกับ Supabase เพื่อไม่ต้องสร้าง client ซ้ำหลายที่</p>
+  </div>
+
+  <h3>js/sanitize.js</h3>
+  <p>มีฟังก์ชัน <code>escapeHtml()</code> สำหรับแปลงตัวอักษรพิเศษเช่น <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code>, <code>"</code>, <code>'</code> ให้ปลอดภัยก่อนเอาไปแทรกใน <code>innerHTML</code> หรือ template string</p>
+  <p>จุดประสงค์หลักคือป้องกัน XSS จากข้อมูลที่มาจากผู้ใช้หรือฐานข้อมูล</p>
+
+  <h2>3. Frontend หลัก</h2>
+
+  <h3>dashboard.js</h3>
+  <p>ไฟล์นี้คือโค้ดหลักของหน้า dashboard และเป็นไฟล์ใหญ่ที่สุดไฟล์หนึ่งในโปรเจกต์ หน้าที่หลักคือโหลดข้อมูลผู้สมัคร, สรุป KPI, แสดงกราฟ, กรอง/ค้นหา, export และจัดการ ticket request</p>
+  <ul>
+    <li>เริ่มจากตรวจสอบ session ด้วย <code>requireSession()</code> และกันไม่ให้ role <code>participant</code> เข้าหน้านี้</li>
+    <li>โหลด profile เพื่อเอา role และ display name ไปแสดงบน sidebar ผ่าน <code>hydrateUserChip()</code></li>
+    <li>หาโปรเจกต์ปัจจุบันจาก URL หรือ <code>sessionStorage</code> ผ่าน <code>resolveProjectForUser()</code></li>
+    <li>ผูก navigation และ badge แสดง unread ticket ผ่าน <code>attachTicketNavBadge()</code></li>
+    <li>โหลด field schema, records, record_values จาก Supabase แล้วประกอบเป็น object ใช้งานจริงผ่าน <code>buildItems()</code></li>
+  </ul>
+  <p>โครงสร้างข้อมูลสำคัญคือ participant แต่ละคนจะมี <code>step</code> เป็น object ของสถานะรายขั้นตอน, <code>overallStatus</code>, <code>issue</code>, <code>decision</code> และ <code>values</code> สำหรับข้อมูล dynamic field อื่น ๆ</p>
+  <p>ไฟล์นี้ยังทำงานด้าน UI หนักมาก เช่น</p>
+  <ul>
+    <li>สร้างหัวตารางแบบ dynamic ตาม field ที่เปิดให้แสดงบน dashboard</li>
+    <li>คำนวณ KPI รวม เช่น Completed, In Progress, Issue, Not Started</li>
+    <li>อัปเดตกราฟ pie และ stacked bar ด้วย Chart.js</li>
+    <li>เปิด modal เพื่อดู list ตามสถานะ และ modal สำหรับส่ง request</li>
+    <li>ดึง ticket statistics เพื่อแสดง badge unread/open ต่อ participant แต่ละคน</li>
+    <li>filter และ search ข้อมูลในตารางแบบ client-side</li>
+  </ul>
+  <p>สรุปง่าย ๆ คือ <code>dashboard.js</code> เป็น controller หลักของหน้า overview/participants ที่รวมทั้ง data-loading, access flow, UI rendering และ interaction logic ไว้ในไฟล์เดียว</p>
+
+  <h3>form.js</h3>
+  <p>ไฟล์นี้คือหน้าแก้ไขสถานะผู้สมัครแบบละเอียดสำหรับ internal/admin โดยเน้นการทำงานกับ dynamic fields จากฐานข้อมูล</p>
+  <ul>
+    <li>เริ่มด้วย <code>requireInternalAccess()</code> เพื่อกัน user ที่ไม่ใช่ internal/admin</li>
+    <li>เลือกโปรเจกต์ปัจจุบันด้วย <code>resolveProjectForUser()</code></li>
+    <li>โหลด field schema จากตาราง <code>fields</code> ผ่าน <code>loadFields()</code></li>
+    <li>โหลด record หลักจากตาราง <code>records</code> และค่า field จริงจาก <code>record_values</code></li>
+    <li>แปลงข้อมูลทั้งหมดให้เป็น <code>MODEL</code> ด้วย <code>buildModel()</code></li>
+  </ul>
+  <p>จุดเด่นของไฟล์นี้คือมันไม่ได้ hard-code คอลัมน์ขั้นตอนทั้งหมด แต่ดึง field ที่มี <code>type = 'select'</code> จาก DB มาเป็น step columns แบบ dynamic และแยก field พิเศษอย่าง <code>overall_status</code>, <code>issue</code>, <code>decision</code> ออกมาดูแลเป็นพิเศษ</p>
+  <p>logic สำคัญภายในไฟล์นี้มีดังนี้</p>
+  <ul>
+    <li>validate email และ required field</li>
+    <li>ถ้า step ใดเป็น <code>Issue</code> จะบังคับให้กรอก <code>issue</code> และ <code>decision</code></li>
+    <li>ใช้ <code>markDirty()</code>, <code>scheduleRowSave()</code> และ <code>saveRowNow()</code> เพื่อทำ debounce save</li>
+    <li>ใช้ <code>upsertRecordValue()</code> สำหรับบันทึกค่าของ field แบบ dynamic เข้า <code>record_values</code></li>
+    <li>ใช้ <code>updateRecordBase()</code> สำหรับแก้ข้อมูลพื้นฐานในตาราง <code>records</code> เช่นชื่อผู้สมัคร</li>
+    <li>มีระบบสร้าง participant ใหม่ผ่าน modal แล้ว insert record พร้อมค่า default ของแต่ละ step</li>
+  </ul>
+  <p>อีกจุดที่สำคัญมากคือหน้า form แยก top form กับ table view ออกจากกัน แต่ทั้งสองมองข้อมูลก้อนเดียวกันคือ <code>MODEL</code> ทำให้การคลิกเลือกแถวและอัปเดตฟอร์มด้านบนยัง sync กับตารางด้านล่างได้</p>
+
+  <h3>test-users.js</h3>
+  <p>เป็นไฟล์ข้อมูลคงที่ที่ผูกไว้กับ <code>window.TEST_USERS</code> เพื่อเก็บชุดบัญชีทดสอบ เช่น admin, internal, client และ participant พร้อม role, userId, email, displayName</p>
+  <p>ไฟล์นี้ไม่ได้มี business logic มาก แต่มีประโยชน์ต่อการทดสอบหน้า login หรือสลับ user ใน local environment</p>
+
+  <h2>4. Helper library</h2>
+
+  <h3>lib/form-utils.js</h3>
+  <p>มี logic ที่ถูกแยกออกจาก <code>form.js</code> เพื่อให้ทดสอบได้ง่าย</p>
+  <ul>
+    <li><code>STEP_STATUS</code> กำหนดสถานะมาตรฐาน 4 ค่า</li>
+    <li><code>normalizeStatus(v, options)</code> ใช้ normalize ค่าสถานะให้ตรงกับ option ที่ field อนุญาต</li>
+    <li><code>computeOverall(stepStatuses)</code> สรุปภาพรวมของหลาย step โดยใช้ priority คือ Issue มาก่อน, ถ้าทุกตัว Completed จึงเป็น Completed, ถ้ามี In Progress หรือผสม Completed/Not Started ให้เป็น In Progress</li>
+  </ul>
+
+  <h3>lib/ticket-utils.js</h3>
+  <p>รวม utility ฝั่ง ticket/notification ที่ไม่ผูกกับ browser หรือ Supabase โดยตรง</p>
+  <ul>
+    <li><code>normalizeStatus()</code> ยุบสถานะ ticket หลายรูปแบบให้เหลือ <code>open</code> หรือ <code>done</code></li>
+    <li><code>normalizePriority()</code> บังคับ priority ให้อยู่ในชุดที่รองรับ</li>
+    <li><code>eventLabel()</code> แปลง event type ภายในเป็นข้อความที่มนุษย์อ่านง่าย</li>
+    <li><code>isValidEmail()</code> ตรวจรูปแบบ email แบบง่าย</li>
+    <li><code>shouldFireStatusNotification()</code> และ <code>shouldFirePriorityNotification()</code> ตัดสินใจว่าจะส่ง notification หรือไม่</li>
+  </ul>
+
+  <h3>lib/admin-utils.js</h3>
+  <p>เป็น logic บริสุทธิ์ที่ extract มาจาก edge function <code>admin-create-user</code> เพื่อให้ test ได้ใน Node</p>
+  <ul>
+    <li><code>validateInput()</code> ตรวจ body ของคำขอสร้าง participant</li>
+    <li><code>findAuthUserByEmail()</code> ไล่ pagination ของ <code>supabase.auth.admin.listUsers()</code> เพื่อหา user ด้วย email</li>
+  </ul>
+  <p>เหตุผลที่ต้องไล่ทีละหน้า เพราะ Supabase admin API ตรงนี้ไม่ได้ filter ด้วย email ได้ตรง ๆ</p>
+
+  <h3>lib/ticket-nav-badge.js</h3>
+  <p>ดูแล badge แจ้งเตือน ticket บนเมนู sidebar</p>
+  <ul>
+    <li><code>isTicketUnreadForUser()</code> ตัดสินว่า ticket ยัง unread สำหรับ user ปัจจุบันหรือไม่</li>
+    <li><code>loadUnreadTicketCountsByProject()</code> โหลด ticket, reply และ read state แล้วคำนวณ unread/open count แยกตาม project</li>
+    <li><code>attachTicketNavBadge()</code> สร้าง badge element และคืน method <code>refresh()</code> สำหรับอัปเดต badge ภายหลัง</li>
+  </ul>
+  <p>ไฟล์นี้คือส่วนกลางที่หน้า <code>dashboard</code> และ <code>form</code> reuse ร่วมกันได้</p>
+
+  <h2>5. Test files</h2>
+
+  <h3>tests/form-utils.test.js</h3>
+  <p>ทดสอบว่า constant และฟังก์ชันใน <code>lib/form-utils.js</code> ทำงานตามกติกาที่ต้องการ เช่น normalize ถูกต้อง, custom options ใช้งานได้, และกฎการคำนวณ overall status ไม่ผิดลำดับความสำคัญ</p>
+
+  <h3>tests/ticket-utils.test.js</h3>
+  <p>ทดสอบ utility ของ ticket เช่นการ normalize status/priority, mapping label ของ event, email validation และเงื่อนไขการยิง notification</p>
+
+  <h3>tests/admin-utils.test.js</h3>
+  <p>ทดสอบ input validation และการ pagination หา user ทาง admin API โดยใช้ mock client เพื่อพิสูจน์ว่าโค้ดหยุดเมื่อเจอ user หรือหยุดเมื่อถึงหน้าสุดท้ายจริง</p>
+
+  <h2>6. Node.js provisioning scripts</h2>
+
+  <h3>provision-users.mjs</h3>
+  <p>เป็นสคริปต์หลักสำหรับสร้างหรืออัปเดตบัญชีใช้งานใน Supabase Auth พร้อมสร้าง profile และ project membership ให้สอดคล้องกับระบบจริง</p>
+  <p>โครงสร้างหลักของไฟล์นี้แบ่งเป็น 2 mode</p>
+  <ul>
+    <li><code>participants</code> สร้าง auth user ให้ผู้สมัครที่มี record อยู่ในระบบแล้ว</li>
+    <li><code>test-users</code> สร้างชุด admin/client/internal/participant สำหรับทดสอบทั้งระบบ</li>
+  </ul>
+  <p>ฟังก์ชันสำคัญภายในไฟล์นี้</p>
+  <ul>
+    <li><code>createAdminClient()</code> สร้าง Supabase client ที่ใช้ service role</li>
+    <li><code>listAllUsers()</code> ไล่โหลด user จาก auth admin API ทุกหน้า</li>
+    <li><code>ensureAuthUser()</code> ถ้ามี user อยู่แล้วให้อัปเดต password/metadata ถ้าไม่มีให้สร้างใหม่</li>
+    <li><code>ensureProfile()</code> upsert profile ในตาราง <code>profiles</code></li>
+    <li><code>ensureMemberships()</code> upsert <code>project_members</code></li>
+    <li><code>getParticipantRecords()</code> ดึง participant records ที่มี email field อยู่จริง</li>
+  </ul>
+  <p>ไฟล์นี้สำคัญมากในงาน setup เพราะมันช่วย sync ระหว่าง Supabase Auth และข้อมูลแอปภายในฐานข้อมูลให้ consistent</p>
+
+  <h3>create-participant-users.mjs</h3>
+  <p>เป็น wrapper สั้น ๆ ที่เรียก <code>runProvisionUsers("participants")</code> โดยตรง เพื่อให้ใช้คำสั่งเฉพาะงานสร้าง participant user ได้ง่าย</p>
+
+  <h3>provision-local-test-users.mjs</h3>
+  <p>เป็น wrapper สั้น ๆ เช่นกัน แต่เรียก mode <code>test-users</code> เพื่อสร้าง user ทดสอบครบทุก role</p>
+
+  <h3>cleanup-local-example-users.mjs</h3>
+  <p>เป็นสคริปต์ลบ user ตัวอย่างจาก Supabase Auth ตาม email ที่ระบุไว้ล่วงหน้า เหมาะกับการ cleanup local environment หลังทดสอบหลายรอบ</p>
+  <p>วิธีทำงานคือ list user ทั้งหมด, filter เฉพาะ email เป้าหมาย, ลบทีละคน แล้วสรุปว่าใครถูกลบและใครไม่พบในระบบ</p>
+
+  <h2>7. Supabase Edge Functions (TypeScript)</h2>
+
+  <h3>supabase/functions/admin-create-user/index.ts</h3>
+  <p>ฟังก์ชันนี้เปิด endpoint สำหรับ admin ใช้สร้าง participant user แบบครบ flow ในคำขอเดียว</p>
+  <ul>
+    <li>รองรับ CORS และรับเฉพาะ <code>POST</code></li>
+    <li>ตรวจ token ของ caller ด้วย anon client แล้วเช็ก role ในตาราง <code>profiles</code> ว่าเป็น admin จริง</li>
+    <li>validate body ผ่าน <code>validateInput()</code></li>
+    <li>ตรวจว่า project มีอยู่จริง และพยายามหา email field สำหรับบันทึก email ของ participant</li>
+    <li>ลองสร้าง auth user ก่อน ถ้าชน duplicate จะ fallback ไปหา user เดิมผ่าน <code>findAuthUserByEmail()</code></li>
+    <li>upsert profile role เป็น participant</li>
+    <li>ถ้ายังไม่มี record จะเรียก RPC <code>generate_participant_code</code> แล้วสร้าง participant record ใหม่</li>
+    <li>บันทึก email ลง <code>record_values</code></li>
+    <li>เพิ่ม membership ใน <code>project_members</code> เป็น viewer</li>
+  </ul>
+  <p>แนวคิดสำคัญของไฟล์นี้คือออกแบบให้ idempotent มากที่สุด คือเรียกซ้ำแล้วไม่พังง่าย และหากล้มเหลวกลางทางจะ log <code>partial_failure</code> พร้อม <code>user_id</code> เพื่อให้ซ่อมมือได้</p>
+
+  <h3>supabase/functions/ticket-notify/index.ts</h3>
+  <p>ฟังก์ชันนี้ทำหน้าที่กระจาย notification ทาง email ผ่าน n8n webhook เมื่อมี event เกี่ยวกับ ticket</p>
+  <ul>
+    <li>รับข้อมูล ticket event เช่น reply, status change, priority change หรือ new ticket</li>
+    <li>โหลด ticket จริงจากฐานข้อมูลเพื่อ resolve record/project ที่เกี่ยวข้อง</li>
+    <li>คำนวณ recipient ตาม role ของผู้เขียนข้อความล่าสุด</li>
+    <li>ถ้า author เป็น participant จะส่งหา internal/admin/client</li>
+    <li>ถ้า author เป็น client จะส่งหา internal/admin และ participant ที่เกี่ยวข้อง</li>
+    <li>ถ้า author เป็น internal/admin จะส่งหา participant และ client</li>
+    <li>ตัด author ออกจาก recipient ปกติ ยกเว้น participant ที่ควรได้สำเนาของตัวเอง</li>
+  </ul>
+  <p>หลังจากนั้นจะยิง HTTP request ไปยัง <code>N8N_WEBHOOK_URL</code> ทีละ recipient เพื่อให้ n8n หรือ SES ส่งอีเมลจริงต่ออีกทอดหนึ่ง</p>
+
+  <h3>supabase/functions/admin-create-user/deno.json</h3>
+  <p>เป็น import map สำหรับ edge function ตัวนี้ โดย map แพ็กเกจ <code>@supabase/functions-js</code> ไว้ใช้ใน Deno environment</p>
+
+  <h3>supabase/functions/ticket-notify/deno.json</h3>
+  <p>ไฟล์นี้แทบไม่มี import map เพิ่มเติม เป็นเพียงโครงเปล่าสำหรับ function ตัว <code>ticket-notify</code></p>
+
+  <h2>8. Supabase config และ seed</h2>
+
+  <h3>supabase/config.toml</h3>
+  <p>เป็นไฟล์ config กลางของ Supabase local stack</p>
+  <ul>
+    <li>กำหนดพอร์ตของ API, DB, Studio, Inbucket และ analytics</li>
+    <li>เปิด <code>db.seed</code> ให้ใช้ <code>seed.sql</code> อัตโนมัติหลัง reset</li>
+    <li>กำหนด auth policy ของ local dev เช่น <code>site_url</code>, password requirements, rate limit</li>
+    <li>เปิด edge runtime และประกาศ entrypoint ของ functions <code>ticket-notify</code> และ <code>admin-create-user</code></li>
+  </ul>
+
+  <h3>supabase/seed.sql</h3>
+  <p>ไฟล์นี้สร้างข้อมูลตัวอย่างสำหรับ local development หลัง reset database</p>
+  <ul>
+    <li>insert admin user ลง <code>auth.users</code> และ <code>auth.identities</code></li>
+    <li>สร้าง profile ของ admin</li>
+    <li>สร้าง sample project และ membership</li>
+    <li>สร้าง field มาตรฐาน เช่น step, assessments, email, issue, decision, overall_status</li>
+    <li>สร้าง sample participant records หลายคนเพื่อให้ dashboard มีข้อมูลหลากหลายสถานะ</li>
+    <li>insert <code>record_values</code> ให้แต่ละ participant มี status ไม่เหมือนกัน เช่น Completed, Issue, Not Started</li>
+    <li>ถ้ามี RPC <code>refresh_overall_status_for_project</code> อยู่แล้ว จะเรียก backfill overall status ให้อีกครั้ง</li>
+  </ul>
+  <p>ประโยชน์ของไฟล์นี้คือทำให้เปิด local environment แล้วเห็น dashboard/graph/use-case จริงได้ทันที</p>
+
+  <h2>9. PostgreSQL migrations</h2>
+
+  <h3>20240101000000_initial_schema.sql</h3>
+  <p>เป็น migration ตั้งต้นของระบบและสำคัญที่สุด เพราะสร้าง schema หลักทั้งหมด</p>
+  <ul>
+    <li>สร้างตาราง <code>profiles</code> เก็บบทบาทและ participant record ที่ผูกกับ auth user</li>
+    <li>สร้างตาราง <code>projects</code> และ <code>project_members</code> สำหรับจัดการสิทธิ์ระดับโปรเจกต์</li>
+    <li>สร้างตาราง <code>fields</code> เพื่อให้โครงสร้างฟอร์มเป็นแบบ dynamic</li>
+    <li>สร้างตาราง <code>records</code> สำหรับ participant แต่ละคน</li>
+    <li>สร้างตาราง <code>record_values</code> เพื่อเก็บค่าจริงแยกตาม field</li>
+    <li>สร้างตาราง <code>requests</code> และ <code>ticket_replies</code> สำหรับระบบ ticket</li>
+    <li>สร้าง view <code>project_overall_summary</code> สำหรับสรุปจำนวน participant ต่อสถานะในแต่ละโปรเจกต์</li>
+    <li>สร้างฟังก์ชัน <code>generate_participant_code()</code> เพื่อออก code ผู้สมัครแบบไม่ชนกันใน concurrent case โดยใช้ row lock</li>
+  </ul>
+  <p>ครึ่งหลังของไฟล์นี้คือการเปิด RLS และสร้าง helper function ด้านสิทธิ์ เช่น <code>current_profile_role()</code>, <code>is_admin()</code>, <code>can_access_project()</code>, <code>can_access_record()</code>, <code>can_access_request()</code></p>
+  <p>จากนั้นจึงสร้าง policy ของแต่ละตาราง ทำให้ access model เริ่มต้นเป็นดังนี้</p>
+  <ul>
+    <li>admin เห็นและแก้ไขได้กว้างที่สุด</li>
+    <li>project creator หรือ project member เข้าถึงข้อมูลในโปรเจกต์ของตนได้</li>
+    <li>participant เข้าถึง record ของตัวเองได้ผ่าน <code>participant_record_id</code></li>
+    <li>ticket replies อ่าน/เขียนได้เมื่อ user มีสิทธิ์เห็น ticket นั้น</li>
+  </ul>
+
+  <h3>20260408000000_harden_ticket_update.sql</h3>
+  <p>ไฟล์นี้ทำให้การแก้ไข ticket ปลอดภัยขึ้น โดยยกเลิกการเปิด update ตรง ๆ ให้ project member และบังคับให้ browser ต้องเรียก RPC <code>update_ticket()</code> แทน</p>
+  <p>ภายใน RPC จะตรวจสิทธิ์ระดับคอลัมน์ เช่น</p>
+  <ul>
+    <li><code>status</code> กับ <code>owner_user_id</code> เปลี่ยนได้เฉพาะ admin/internal</li>
+    <li><code>priority</code> เปลี่ยนได้กว้างกว่า คือ admin/internal/client</li>
+  </ul>
+
+  <h3>20260409090000_dynamic_overall_status.sql</h3>
+  <p>migration นี้ย้าย logic การคำนวณ <code>overall_status</code> ไปไว้ที่ฐานข้อมูล เพื่อรองรับ step field แบบ dynamic ที่สร้างใหม่จาก admin ได้เอง</p>
+  <ul>
+    <li><code>compute_overall_status_for_record()</code> คำนวณ overall จากทุก select field ที่ active และไม่ใช่ overall_status</li>
+    <li><code>refresh_overall_status_for_record()</code> เขียนผลลัพธ์กลับเข้า <code>record_values</code> ของ field overall_status</li>
+    <li><code>refresh_overall_status_for_project()</code> ใช้ backfill ทั้งโปรเจกต์</li>
+    <li>มี trigger บน <code>record_values</code>, <code>fields</code> และ <code>records</code> เพื่อให้ overall status สดตลอดเวลา</li>
+  </ul>
+  <p>ผลคือ frontend ไม่ต้องเป็นแหล่งความจริงเรื่อง overall status อีกต่อไป แต่ DB จะเป็นผู้คำนวณหลัก</p>
+
+  <h3>20260409103000_client_assigned_record_access.sql</h3>
+  <p>ไฟล์นี้พยายามปรับ access model ให้ client เห็นเฉพาะ participant record ที่ถูก assign ให้เท่านั้น</p>
+  <ul>
+    <li>สร้างตาราง <code>client_record_assignments</code> สำหรับ map ระหว่าง client กับ record</li>
+    <li>สร้าง helper <code>is_client_assigned_record()</code></li>
+    <li>แก้ <code>can_access_record()</code> และ <code>can_access_request()</code> ให้ client เห็นเฉพาะงานที่ถูก assign</li>
+    <li>ปรับ policy การ insert request ให้สอดคล้องกับโมเดลใหม่นี้</li>
+    <li>สร้าง RLS ของ assignment table ให้ admin/internal จัดการ assignment ได้</li>
+  </ul>
+
+  <h3>20260409110000_client_members_full_project_access.sql</h3>
+  <p>เป็น migration ปรับแก้จากแนวทางก่อนหน้า โดยเปลี่ยนใจให้ client ที่เป็น member ของ project สามารถเห็นทุก record/ticket ใน project นั้นได้ ไม่ต้องใช้ assignment-only อีกต่อไป</p>
+  <p>พูดง่าย ๆ คือเป็นการขยายสิทธิ์ client จากแบบแคบกลับมาเป็นแบบ project-wide</p>
+
+  <h3>20260409114000_restore_assessments_field.sql</h3>
+  <p>เป็น migration ซ่อมข้อมูลให้ทุกโปรเจกต์มี field ชื่อ <code>assessments</code> ถ้ายังไม่มี</p>
+  <p>มีการเช็กชนิดของคอลัมน์ <code>fields.options</code> ก่อนว่าปัจจุบันเป็น <code>jsonb</code> หรือ <code>text[]</code> แล้วจึง insert ข้อมูลให้ตรงชนิด เป็น migration ที่ออกแบบมาเพื่อรองรับ schema หลายเวอร์ชัน</p>
+
+  <h3>20260416093000_ticket_read_states.sql</h3>
+  <p>ไฟล์นี้เพิ่มความสามารถเรื่อง unread/read ticket ต่อ user</p>
+  <ul>
+    <li>สร้างตาราง <code>ticket_read_states</code> เก็บว่า user คนไหนอ่าน ticket ใดล่าสุดเมื่อไร</li>
+    <li>เปิด RLS ให้ user เห็น/แก้เฉพาะแถวของตัวเองและต้องเข้าถึง ticket นั้นได้จริง</li>
+    <li>สร้าง RPC <code>mark_project_tickets_seen(project_id)</code> เพื่อ mark ticket ทั้งโปรเจกต์ว่าอ่านแล้ว</li>
+  </ul>
+
+  <h3>20260416101500_fix_ticket_seen_rpc_access.sql</h3>
+  <p>เป็น migration แก้บั๊กจากไฟล์ก่อนหน้า โดยเปลี่ยน <code>mark_project_tickets_seen()</code> ไม่ให้พึ่งพา <code>can_access_project()</code> ซึ่งอาจไม่มีในฐานข้อมูลบางชุดที่ถูก upgrade มา</p>
+  <p>แทนที่จะเรียก helper เดียว มันตรวจสิทธิ์จากหลายเงื่อนไขตรง ๆ เช่น admin, project creator, project member หรือผู้ที่เข้าถึง request ในโปรเจกต์นั้นได้</p>
+
+  <h2>10. ความสัมพันธ์ของไฟล์ทั้งหมด</h2>
+  <ul>
+    <li><code>dashboard.js</code> และ <code>form.js</code> เป็นตัวใช้ข้อมูลจริงจาก Supabase ใน browser</li>
+    <li><code>lib/*.js</code> แยก logic ที่ต้องทดสอบได้ออกจากไฟล์ UI ใหญ่</li>
+    <li><code>tests/*.test.js</code> ยืนยันกติกาของ helper หลัก</li>
+    <li><code>supabase/migrations/*.sql</code> นิยามโครงสร้างข้อมูล, function, trigger และ policy ทั้งระบบ</li>
+    <li><code>supabase/functions/*.ts</code> ทำงานที่ไม่ควรอยู่ใน frontend เช่นสร้าง user และยิง notification</li>
+    <li><code>provision-users.mjs</code> ช่วยจัดเตรียม user จำนวนมากและเชื่อม auth กับข้อมูลแอปให้ตรงกัน</li>
+  </ul>
+
+  <h2>11. สรุปเชิงสถาปัตยกรรม</h2>
+  <p>สถาปัตยกรรมของโปรเจกต์นี้มีจุดเด่นอยู่ที่การเก็บ participant data แบบ dynamic ผ่าน <code>fields</code> + <code>record_values</code> ทำให้เพิ่ม field/process ใหม่ได้โดยไม่ต้องแก้ schema หลักบ่อย ๆ ฝั่ง frontend จึงต้องมี logic แปล schema เป็น UI แบบ dynamic ส่วนสิทธิ์การเข้าถึงถูกผลักไปไว้ที่ PostgreSQL RLS และ helper functions เป็นหลัก</p>
+  <p>ถ้าจะศึกษาต่อให้เข้าใจระบบเร็วที่สุด แนะนำลำดับนี้</p>
+  <ul>
+    <li>อ่าน <code>supabase/migrations/20240101000000_initial_schema.sql</code> เพื่อเข้าใจ data model</li>
+    <li>อ่าน <code>supabase/migrations/20260409090000_dynamic_overall_status.sql</code> เพื่อเข้าใจ overall status</li>
+    <li>อ่าน <code>form.js</code> เพื่อเข้าใจการแก้ไข participant แบบ dynamic</li>
+    <li>อ่าน <code>dashboard.js</code> เพื่อเข้าใจภาพรวมหน้าใช้งานจริง</li>
+    <li>อ่าน edge functions และ provisioning scripts เป็นลำดับถัดไป</li>
+  </ul>
+
+  <p class="muted">หมายเหตุ: เอกสารนี้ตั้งใจอธิบายเฉพาะไฟล์โค้ดหลักของระบบ ไม่รวม <code>node_modules</code> และไฟล์ static HTML/CSS ที่ไม่ได้ถูกขอเป็นแกนหลัก</p>
+</body>
+</html>

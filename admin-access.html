@@ -683,15 +683,15 @@
                 let MEMBERSHIPS = [];
 
                 function roleSelectHtml(currentRole, userId) {
-                    const roles = ["admin", "internal", "client", "candidate"];
-                    const isCandidate = String(currentRole || "") === "candidate";
+                    const roles = ["admin", "internal", "client", "participant"];
+                    const isParticipant = String(currentRole || "") === "participant";
 
                     const opts = roles.map((r) => {
                         const selected = String(currentRole) === r ? "selected" : "";
                         return `<option value="${r}" ${selected}>${r}</option>`;
                     }).join("");
 
-                    if (isCandidate) {
+                    if (isParticipant) {
                         return `
             <select data-role-select="${escapeHtml(userId)}" disabled>
                 ${opts}
@@ -705,15 +705,15 @@
                 function nameInputHtml(currentName, userId, role) {
                     const safeName = escapeHtml(currentName || "");
                     const safeUserId = escapeHtml(userId);
-                    const isCandidate = String(role || "") === "candidate";
+                    const isParticipant = String(role || "") === "participant";
 
-                    if (isCandidate) {
+                    if (isParticipant) {
                         return `
                             <input
                                 class="name-input"
                                 data-name-input="${safeUserId}"
                                 value="${safeName}"
-                                placeholder="Synced from candidate record"
+                                placeholder="Synced from participant record"
                                 readonly
                             />
                         `;
@@ -734,7 +734,7 @@
 
                     const { data, error } = await supabase
                         .from("profiles")
-                        .select("id, role, display_name, candidate_record_id, created_at")
+                        .select("id, role, display_name, participant_record_id, created_at")
                         .order("created_at", { ascending: false });
 
                     if (error) throw error;
@@ -779,7 +779,7 @@
                             p.id,
                             p.role,
                             p.display_name,
-                            p.candidate_record_id
+                            p.participant_record_id
                         ].map((x) => String(x || "").toLowerCase()).join(" | ");
 
                         return hay.includes(q);

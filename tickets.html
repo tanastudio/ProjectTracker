@@ -565,7 +565,7 @@
                         <div class="tool">
                             <label class="label" for="searchInput">Search</label>
                             <input id="searchInput" class="input" type="text"
-                                   placeholder="Search by code / candidate / subject / message / created by / owner" />
+                                   placeholder="Search by code / participant / subject / message / created by / owner" />
                         </div>
 
                         <div class="tool">
@@ -596,7 +596,7 @@
                             <thead>
                                 <tr>
                                     <th style="width:96px;">Code</th>
-                                    <th style="width:128px;">Candidate</th>
+                                    <th style="width:128px;">Participant</th>
                                     <th>Subject</th>
                                     <th style="width:92px;">Status</th>
                                     <th style="width:92px;">Priority</th>
@@ -943,7 +943,7 @@
                     authorRole: PROFILE_ROLE || "viewer",
                     message: message.trim(),
                     ticketSubject: ticket?.subject || "",
-                    candidateName: ticket?.candidate_name || "",
+                    participantName: ticket?.participant_name || "",
                     projectName: PROJECT_CTX?.project_name || "",
                     projectId: PROJECT_CTX?.project_id || "",
                 });
@@ -1014,7 +1014,7 @@
                 if (q) {
                     const hay = [
                         row.code,
-                        row.candidate_name,
+                        row.participant_name,
                         row.subject,
                         row.message,
                         row.reply_message,
@@ -1064,7 +1064,7 @@
                     ${isUnread ? `<span class="unread-dot" aria-hidden="true"></span>` : ""}
                     <span class="expand-chevron">&#9656;</span>${escapeHtml(row.code || "-")}
                   </div></td>
-                  <td>${escapeHtml(row.candidate_name || "-")}</td>
+                  <td>${escapeHtml(row.participant_name || "-")}</td>
                   <td>
                     <div class="subject-row">
                       <div class="subject">${escapeHtml(row.subject || "-")}</div>
@@ -1208,7 +1208,7 @@
                         // Re-fetch the updated row
                         const { data, error: fetchError } = await supabase
                             .from("requests")
-                            .select("id, project_id, record_id, code, candidate_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
+                            .select("id, project_id, record_id, code, participant_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
                             .eq("id", requestId)
                             .single();
                         if (fetchError) throw new Error(fetchError.message);
@@ -1233,7 +1233,7 @@
                                 authorName:    DISPLAY_NAME,
                                 authorRole:    PROFILE_ROLE || "viewer",
                                 ticketSubject: savedTicket.subject || "",
-                                candidateName: savedTicket.candidate_name || "",
+                                participantName: savedTicket.participant_name || "",
                                 projectName:   PROJECT_CTX?.project_name || "",
                                 projectId:     savedTicket.project_id || "",
                             };
@@ -1282,7 +1282,7 @@
 
             const { data, error } = await supabase
                 .from("requests")
-                .select("id, project_id, record_id, code, candidate_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
+                .select("id, project_id, record_id, code, participant_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
                 .eq("project_id", PROJECT_CTX.project_id)
                 .order("created_at", { ascending: false });
 

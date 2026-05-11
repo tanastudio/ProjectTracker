@@ -9,10 +9,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     display_name        text,
     email               text,
     role                text        NOT NULL DEFAULT 'viewer',
-    candidate_record_id uuid,                           -- FK added after records table
+    participant_record_id uuid,                           -- FK added after records table
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT profiles_role_check CHECK (role IN ('admin','internal','client','candidate','viewer'))
+    CONSTRAINT profiles_role_check CHECK (role IN ('admin','internal','client','participant','viewer'))
 );
 
 -- ── Projects ─────────────────────────────────────────────────
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS public.fields (
     UNIQUE (project_id, key)
 );
 
--- ── Records (candidates) ──────────────────────────────────────
+-- ── Records (participants) ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.records (
     id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id uuid        NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
@@ -73,8 +73,8 @@ CREATE TABLE IF NOT EXISTS public.records (
 
 -- Back-fill FK now that records exists
 ALTER TABLE public.profiles
-    ADD CONSTRAINT profiles_candidate_record_id_fkey
-    FOREIGN KEY (candidate_record_id) REFERENCES public.records(id) ON DELETE SET NULL
+    ADD CONSTRAINT profiles_participant_record_id_fkey
+    FOREIGN KEY (participant_record_id) REFERENCES public.records(id) ON DELETE SET NULL
     NOT VALID;
 
 -- ── Record values ─────────────────────────────────────────────
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS public.requests (
     project_id     uuid        NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
     record_id      uuid        REFERENCES public.records(id) ON DELETE SET NULL,
     code           text,                               -- denormalised copy from record
-    candidate_name text,
+    participant_name text,
     subject        text        NOT NULL,
     message        text        NOT NULL,
     created_by     uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -121,8 +121,8 @@ CREATE TABLE IF NOT EXISTS public.ticket_replies (
 );
 
 -- ── Project overall summary view ──────────────────────────────
--- Used by projects.html to show per-project candidate status counts.
--- Columns: project_id, total_candidates, n_completed, n_in_progress, n_issue, n_not_started
+-- Used by projects.html to show per-project participant status counts.
+-- Columns: project_id, total_participants, n_completed, n_in_progress, n_issue, n_not_started
 CREATE OR REPLACE VIEW public.project_overall_summary
 WITH (security_invoker = true) AS
 WITH overall AS (
@@ -136,7 +136,7 @@ WITH overall AS (
 )
 SELECT
     r.project_id,
-    COUNT(r.id)                                                                               AS total_candidates,
+    COUNT(r.id)                                                                               AS total_participants,
     COUNT(r.id) FILTER (WHERE o.status = 'Completed')                                        AS n_completed,
     COUNT(r.id) FILTER (WHERE o.status = 'In Progress')                                      AS n_in_progress,
     COUNT(r.id) FILTER (WHERE o.status = 'Issue')                                            AS n_issue,
@@ -147,10 +147,10 @@ LEFT JOIN overall o ON o.record_id = r.id
 WHERE r.active IS NOT FALSE
 GROUP BY r.project_id;
 
--- ── Idempotent candidate-code generator ──────────────────────
+-- ── Idempotent participant-code generator ──────────────────────
 -- Uses a row-level lock on the project to prevent concurrent
 -- requests from generating the same code.
-CREATE OR REPLACE FUNCTION public.generate_candidate_code(p_project_id uuid)
+CREATE OR REPLACE FUNCTION public.generate_participant_code(p_project_id uuid)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -210,14 +210,14 @@ AS $$
     );
 $$;
 
-CREATE OR REPLACE FUNCTION public.current_candidate_record_id()
+CREATE OR REPLACE FUNCTION public.current_participant_record_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-    SELECT p.candidate_record_id
+    SELECT p.participant_record_id
     FROM public.profiles p
     WHERE p.id = auth.uid();
 $$;
@@ -299,7 +299,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
     SELECT p_record_id IS NOT NULL
-       AND public.current_candidate_record_id() = p_record_id;
+       AND public.current_participant_record_id() = p_record_id;
 $$;
 
 CREATE OR REPLACE FUNCTION public.can_access_project(p_project_id uuid)
@@ -317,7 +317,7 @@ AS $$
             SELECT 1
             FROM public.records r
             WHERE r.project_id = p_project_id
-              AND r.id = public.current_candidate_record_id()
+              AND r.id = public.current_participant_record_id()
         );
 $$;
 

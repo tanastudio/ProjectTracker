@@ -5,7 +5,7 @@
 -- Keep role model aligned with user expectation:
 -- admin: all
 -- internal/client: all records + tickets in projects where they are member/creator
--- candidate: own record only
+-- participant: own record only
 
 CREATE OR REPLACE FUNCTION public.can_access_record(p_record_id uuid)
 RETURNS boolean

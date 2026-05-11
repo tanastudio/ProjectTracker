@@ -197,17 +197,17 @@
 
         /* Shared: both tabs prevent outer page scroll */
         body.overview-active,
-        body.candidates-active {
+        body.participants-active {
             overflow: hidden;
         }
 
         body.overview-active .layout,
-        body.candidates-active .layout {
+        body.participants-active .layout {
             height: 100vh;
         }
 
         body.overview-active .page-shell,
-        body.candidates-active .page-shell {
+        body.participants-active .page-shell {
             display: flex;
             flex-direction: column;
             height: 100%;
@@ -216,12 +216,12 @@
         }
 
         body.overview-active .hero,
-        body.candidates-active .hero {
+        body.participants-active .hero {
             flex: 0 0 auto;
         }
 
         body.overview-active .dashboard-wrap,
-        body.candidates-active .dashboard-wrap {
+        body.participants-active .dashboard-wrap {
             flex: 1 1 0;
             min-height: 0;
             min-width: 0;
@@ -232,12 +232,12 @@
         }
 
         body.overview-active .view-tabs,
-        body.candidates-active .view-tabs {
+        body.participants-active .view-tabs {
             flex: 0 0 auto;
         }
 
         body.overview-active main.container,
-        body.candidates-active main.container {
+        body.participants-active main.container {
             flex: 1 1 0;
             min-height: 0;
             min-width: 0;
@@ -249,8 +249,8 @@
             padding-bottom: 0;
         }
 
-        /* Candidates tab: table fills remaining space */
-        body.candidates-active #viewCandidates {
+        /* Participants tab: table fills remaining space */
+        body.participants-active #viewParticipants {
             flex: 1 1 0;
             min-height: 0;
             min-width: 0;
@@ -258,7 +258,7 @@
             flex-direction: column;
         }
 
-        body.candidates-active #viewCandidates > .card {
+        body.participants-active #viewParticipants > .card {
             flex: 1 1 0;
             min-height: 0;
             min-width: 0;       /* prevents card from stretching beyond viewport */
@@ -268,10 +268,10 @@
             /* Do not hide overflow because it would clip the table's bottom scrollbar. */
         }
 
-        body.candidates-active .table-toolbar { flex: 0 0 auto; }
-        body.candidates-active .footnote      { flex: 0 0 auto; }
+        body.participants-active .table-toolbar { flex: 0 0 auto; }
+        body.participants-active .footnote      { flex: 0 0 auto; }
 
-        body.candidates-active .table-wrap.dashboard-table {
+        body.participants-active .table-wrap.dashboard-table {
             flex: 1 1 0;
             min-height: 0;
             min-width: 0;
@@ -481,14 +481,14 @@
                         </svg>
                         Overview
                     </button>
-                    <button class="view-tab" type="button" data-tab="candidates" role="tab" aria-selected="false" aria-controls="viewCandidates">
+                    <button class="view-tab" type="button" data-tab="participants" role="tab" aria-selected="false" aria-controls="viewParticipants">
                         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                             <circle cx="9" cy="7" r="4"></circle>
                             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                         </svg>
-                        Candidates
+                        Participants
                     </button>
                 </div>
 
@@ -511,7 +511,7 @@
 
                                 <div class="kpi-mini-grid kpi-5">
                                     <div class="kpi-mini kpi-total kpi-span-2 kpi-click" data-status="Total">
-                                        <div class="kpi-mini-title">Total Candidates</div>
+                                        <div class="kpi-mini-title">Total Participants</div>
                                         <div id="kpiTotal" class="kpi-mini-value">0</div>
                                     </div>
 
@@ -549,8 +549,8 @@
                     </section>
                     </div><!-- /viewOverview -->
 
-                    <!-- Candidates tab -->
-                    <div id="viewCandidates" role="tabpanel" aria-labelledby="tab-candidates" style="display:none">
+                    <!-- Participants tab -->
+                    <div id="viewParticipants" role="tabpanel" aria-labelledby="tab-participants" style="display:none">
                     <section class="card">
                         <div class="table-toolbar">
                             <div class="tool tool-grow">
@@ -583,7 +583,7 @@
                                     <tr id="dashboardHeadRow">
                                         <th class="sticky-col sticky-col-0">Request</th>
                                         <th class="sticky-col sticky-col-1">Code</th>
-                                        <th class="sticky-col sticky-col-2">Candidate Name</th>
+                                        <th class="sticky-col sticky-col-2">Participant Name</th>
                                         <th style="min-width:180px;">Email</th>
                                         <th style="min-width:120px;">Overall Status</th>
                                     </tr>
@@ -594,7 +594,7 @@
 
                         <div class="footnote">Powered by Mentis @2026</div>
                     </section>
-                    </div><!-- /viewCandidates -->
+                    </div><!-- /viewParticipants -->
 
                 </main>
             </div>
@@ -605,7 +605,7 @@
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
             <div class="modal-head">
                 <div>
-                    <div id="modalTitle" class="modal-title">Candidates</div>
+                    <div id="modalTitle" class="modal-title">Participants</div>
                     <div id="modalSub" class="modal-sub">-</div>
                 </div>
             </div>
@@ -616,7 +616,7 @@
                         <thead>
                             <tr>
                                 <th style="width:180px;">Code</th>
-                                <th style="width:220px;">Candidate Name</th>
+                                <th style="width:220px;">Participant Name</th>
                                 <th style="min-width:220px;">Issue</th>
                                 <th style="min-width:220px;">Decision</th>
                             </tr>
@@ -645,7 +645,7 @@
                 <div class="req-grid">
                     <div>
                         <div class="req-label">To</div>
-                        <input id="reqTo" class="req-input" type="email" placeholder="candidate@email.com" />
+                        <input id="reqTo" class="req-input" type="email" placeholder="participant@email.com" />
                     </div>
                     <div>
                         <div class="req-label">Subject</div>

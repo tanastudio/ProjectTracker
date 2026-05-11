@@ -135,7 +135,7 @@
     .pill-client { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
     .pill-internal { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
     .pill-admin { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
-    .pill-candidate { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+    .pill-participant { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 
     /* Summary */
     .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
@@ -299,7 +299,7 @@
       <div class="hero-inner">
         <div>
           <h1 class="page-title">Create New Project</h1>
-          <p class="page-desc">Set up project info, define process fields, assign members, and upload candidates.</p>
+          <p class="page-desc">Set up project info, define process fields, assign members, and upload participants.</p>
         </div>
       </div>
     </header>
@@ -331,7 +331,7 @@
         <div class="step-line" id="line3"></div>
         <div class="step-item">
           <div class="step-dot" id="dot4">4</div>
-          <div class="step-label" id="lbl4">Candidates</div>
+          <div class="step-label" id="lbl4">Participants</div>
         </div>
         <div class="step-line" id="line4"></div>
         <div class="step-item">
@@ -445,7 +445,7 @@
       <div class="step-panel" id="panel3">
         <div class="card">
           <div class="card-title">Assign Members</div>
-          <div class="card-desc">Select which users can access this project. Clients and internal staff only — candidates are added via CSV upload.</div>
+          <div class="card-desc">Select which users can access this project. Clients and internal staff only — participants are added via CSV upload.</div>
 
           <div class="section-title">Available Users</div>
           <div id="membersList" class="user-list">
@@ -455,19 +455,19 @@
 
           <div class="btn-row">
             <button class="btn-ghost" id="step3Back">← Back</button>
-            <button class="btn-primary" id="step3Next">Next: Upload Candidates →</button>
+            <button class="btn-primary" id="step3Next">Next: Upload Participants →</button>
           </div>
         </div>
       </div>
 
-      <!-- Step 4: Candidates CSV -->
+      <!-- Step 4: Participants CSV -->
       <div class="step-panel" id="panel4">
         <div class="card">
-          <div class="card-title">Upload Candidates</div>
-          <div class="card-desc">Upload a CSV file. Required columns: <code>name</code> and <code>email</code>. A temporary password will be auto-generated for each candidate.</div>
+          <div class="card-title">Upload Participants</div>
+          <div class="card-desc">Upload a CSV file. Required columns: <code>name</code> and <code>email</code>. A temporary password will be auto-generated for each participant.</div>
 
           <div style="margin-bottom:14px;">
-            <a href="./candidates-template.csv" download="candidates-template.csv" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#2563eb;text-decoration:none;padding:8px 14px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;transition:background .15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+            <a href="./participants-template.csv" download="participants-template.csv" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#2563eb;text-decoration:none;padding:8px 14px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;transition:background .15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download CSV Template
             </a>
@@ -488,7 +488,7 @@
           </div>
 
           <div class="muted small" style="margin-top:12px;">
-            Tip: You can skip this step and upload candidates later from the project admin page.
+            Tip: You can skip this step and upload participants later from the project admin page.
           </div>
 
           <div class="btn-row">
@@ -527,8 +527,8 @@
           <div class="section-title">Members</div>
           <div id="sumMembers" class="muted small">No members selected.</div>
 
-          <div class="section-title" style="margin-top:14px;">Candidates</div>
-          <div id="sumCandidates" class="muted small">No CSV uploaded.</div>
+          <div class="section-title" style="margin-top:14px;">Participants</div>
+          <div id="sumParticipants" class="muted small">No CSV uploaded.</div>
 
           <div class="btn-row">
             <button class="btn-ghost" id="step5Back">← Back</button>
@@ -1017,7 +1017,7 @@ function buildSummary() {
     return u ? `${u.display_name || uid} (${selectedMembers.get(uid)})` : uid;
   });
   el("sumMembers").textContent = memNames.length ? memNames.join(", ") : "No members selected.";
-  el("sumCandidates").textContent = csvRows.length ? `${csvRows.filter(r=>!r.hasError).length} valid candidates ready to import` : "No CSV uploaded — skip for now.";
+  el("sumParticipants").textContent = csvRows.length ? `${csvRows.filter(r=>!r.hasError).length} valid participants ready to import` : "No CSV uploaded — skip for now.";
 }
 
 el("step5Back").addEventListener("click", () => { clearHint(); setStep(4); });
@@ -1070,7 +1070,7 @@ el("createBtn").addEventListener("click", async () => {
       sort_order: 20 + i * 10,
       field_role: "step",
       is_active: true,
-      show_in_candidate_status: true,
+      show_in_participant_status: true,
       show_in_dashboard: true,
       show_in_internal: true,
       visible: true,
@@ -1081,7 +1081,7 @@ el("createBtn").addEventListener("click", async () => {
         project_id: projectId,
         ...f,
         is_active: true,
-        show_in_candidate_status: true,
+        show_in_participant_status: true,
         show_in_dashboard: true,
         show_in_internal: true,
         visible: true,
@@ -1089,9 +1089,9 @@ el("createBtn").addEventListener("click", async () => {
       ...customFieldsToInsert,
     ];
     let { error: fieldsErr } = await supabase.from("fields").insert(allFieldsToInsert);
-    if (fieldsErr && String(fieldsErr.message || "").includes("show_in_candidate_status")) {
+    if (fieldsErr && String(fieldsErr.message || "").includes("show_in_participant_status")) {
       const legacyFields = allFieldsToInsert.map((field) => {
-        const { show_in_candidate_status, show_in_internal, ...legacyField } = field;
+        const { show_in_participant_status, show_in_internal, ...legacyField } = field;
         return legacyField;
       });
       ({ error: fieldsErr } = await supabase.from("fields").insert(legacyFields));
@@ -1109,22 +1109,22 @@ el("createBtn").addEventListener("click", async () => {
       .upsert(membersToInsert, { onConflict: "user_id,project_id" });
     if (memErr) throw memErr;
 
-    // 4. Import candidates from CSV
+    // 4. Import participants from CSV
     const validRows = csvRows.filter(r => !r.hasError);
     if (validRows.length > 0) {
-      setProgress(55, `Importing ${validRows.length} candidates...`);
+      setProgress(55, `Importing ${validRows.length} participants...`);
       let done = 0;
       for (const row of validRows) {
         try {
           const { error: fnErr } = await supabase.functions.invoke("admin-create-user", {
             body: { email: row.email, display_name: row.name, project_id: projectId },
           });
-          if (fnErr) console.warn("Failed to import candidate:", row.email, fnErr);
+          if (fnErr) console.warn("Failed to import participant:", row.email, fnErr);
         } catch (e) {
-          console.warn("Failed to import candidate:", row.email, e);
+          console.warn("Failed to import participant:", row.email, e);
         }
         done++;
-        setProgress(55 + Math.round((done / validRows.length) * 35), `Imported ${done}/${validRows.length} candidates...`);
+        setProgress(55 + Math.round((done / validRows.length) * 35), `Imported ${done}/${validRows.length} participants...`);
       }
     }
 

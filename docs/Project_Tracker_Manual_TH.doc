@@ -89,12 +89,12 @@
 
   <h1>1. วัตถุประสงค์เอกสาร</h1>
   <p>เอกสารนี้รวม 2 ส่วนไว้ในไฟล์เดียว คือ คู่มือการใช้งานสำหรับผู้ใช้แต่ละ role และคู่มือภาพรวมว่าระบบ Project Tracker ทำอะไรได้บ้าง เพื่อให้สามารถนำไปใช้เป็น user manual, system guide หรือเอกสารประกอบการอบรมได้ทันที</p>
-  <p>กลุ่มผู้ใช้งานหลักของระบบมี 4 กลุ่ม ได้แก่ Admin, Internal, Client และ Candidate โดยแต่ละกลุ่มจะเห็นเมนูและข้อมูลไม่เท่ากันตามสิทธิ์ที่กำหนดไว้ในระบบ</p>
+  <p>กลุ่มผู้ใช้งานหลักของระบบมี 4 กลุ่ม ได้แก่ Admin, Internal, Client และ Participant โดยแต่ละกลุ่มจะเห็นเมนูและข้อมูลไม่เท่ากันตามสิทธิ์ที่กำหนดไว้ในระบบ</p>
 
   <h1>2. ภาพรวมระบบ</h1>
   <p>Project Tracker เป็นระบบติดตามสถานะผู้สมัครหรือผู้เข้าร่วมโครงการแบบ role-based โดยใช้ Supabase เป็น backend สำหรับ authentication, database และ row-level security เพื่อจำกัดการมองเห็นข้อมูลตามสิทธิ์ของแต่ละคน</p>
   <p>โมดูลหลักของระบบประกอบด้วยหน้า Login, เปลี่ยนรหัสผ่าน, รายการโปรเจกต์, Dashboard, หน้าอัปเดตสถานะผู้สมัคร, ระบบ Tickets, หน้าผู้สมัครดูสถานะของตนเอง, หน้า Admin, หน้าจัดการสิทธิ์การเข้าถึง, หน้าสร้างโปรเจกต์ และหน้าตั้งค่าโปรเจกต์</p>
-  <p>ระบบยังมีความสามารถฝั่งหลังบ้านเพิ่มเติม เช่น สร้าง candidate account อัตโนมัติจากไฟล์ CSV, สร้าง candidate code อัตโนมัติ, คำนวณ overall status จากขั้นตอนในโปรเจกต์ และส่งอีเมลแจ้งเตือนเมื่อมีการเปิดหรืออัปเดต ticket</p>
+  <p>ระบบยังมีความสามารถฝั่งหลังบ้านเพิ่มเติม เช่น สร้าง participant account อัตโนมัติจากไฟล์ CSV, สร้าง participant code อัตโนมัติ, คำนวณ overall status จากขั้นตอนในโปรเจกต์ และส่งอีเมลแจ้งเตือนเมื่อมีการเปิดหรืออัปเดต ticket</p>
 
   <h1>3. โครงสร้างสิทธิ์ผู้ใช้</h1>
   <h2>3.1 System Role</h2>
@@ -119,7 +119,7 @@
         <td>ใช้งานโปรเจกต์ที่ตนได้รับสิทธิ์ เห็น dashboard และ tickets ของโปรเจกต์ที่เป็นสมาชิก แต่ไม่มีเมนูอัปเดตสถานะหรือ admin</td>
       </tr>
       <tr>
-        <td>Candidate</td>
+        <td>Participant</td>
         <td>เห็นเฉพาะหน้าสถานะของตนเอง ดูความคืบหน้า และเปิดหรือตอบ ticket ของตัวเองได้</td>
       </tr>
     </tbody>
@@ -128,7 +128,7 @@
   <h2>3.2 Project Member Role</h2>
   <p>นอกจาก system role แล้ว ระบบยังมี role ระดับโปรเจกต์ในตาราง <code>project_members</code> ได้แก่ <code>admin</code>, <code>editor</code> และ <code>viewer</code> ซึ่งใช้ควบคุมสิทธิ์ภายในโปรเจกต์นั้น ๆ</p>
   <ul>
-    <li><strong>viewer</strong> เหมาะกับผู้ใช้ที่ต้องการสิทธิ์ดูข้อมูลเป็นหลัก เช่น client หรือ candidate ที่ถูกผูกกับโปรเจกต์</li>
+    <li><strong>viewer</strong> เหมาะกับผู้ใช้ที่ต้องการสิทธิ์ดูข้อมูลเป็นหลัก เช่น client หรือ participant ที่ถูกผูกกับโปรเจกต์</li>
     <li><strong>editor</strong> เหมาะกับผู้ใช้ที่ต้องแก้ไขข้อมูลหรืออัปเดตงาน เช่น internal หรือ admin ที่ลงมาดูแลโปรเจกต์</li>
     <li><strong>admin</strong> ในระดับโปรเจกต์ใช้สำหรับบริหารสิทธิ์และการจัดการโครงการในเชิงลึก หากองค์กรต้องการแยกผู้ดูแลโปรเจกต์เฉพาะงาน</li>
   </ul>
@@ -144,18 +144,18 @@
     <tbody>
       <tr>
         <td>Admin</td>
-        <td>เข้าใช้งานทุกหน้าของระบบ, สร้างโปรเจกต์ใหม่, ตั้งค่าโปรเจกต์, จัดการ user access, preview มุมมอง candidate, ดู dashboard, export CSV/XLSX, เปิดและตอบ ticket, อัปเดตสถานะ candidate</td>
+        <td>เข้าใช้งานทุกหน้าของระบบ, สร้างโปรเจกต์ใหม่, ตั้งค่าโปรเจกต์, จัดการ user access, preview มุมมอง participant, ดู dashboard, export CSV/XLSX, เปิดและตอบ ticket, อัปเดตสถานะ participant</td>
       </tr>
       <tr>
         <td>Internal</td>
-        <td>เข้าใช้โปรเจกต์ที่ตนเป็นสมาชิก, ดู dashboard, ใช้หน้า Update Status, เปิดและตอบ ticket, ดูข้อมูล candidate ในโปรเจกต์ที่ได้รับสิทธิ์</td>
+        <td>เข้าใช้โปรเจกต์ที่ตนเป็นสมาชิก, ดู dashboard, ใช้หน้า Update Status, เปิดและตอบ ticket, ดูข้อมูล participant ในโปรเจกต์ที่ได้รับสิทธิ์</td>
       </tr>
       <tr>
         <td>Client</td>
         <td>เข้าใช้โปรเจกต์ที่ตนเป็นสมาชิก, ดู dashboard, ดูและตอบ ticket ภายในขอบเขตโปรเจกต์ที่ได้รับอนุญาต</td>
       </tr>
       <tr>
-        <td>Candidate</td>
+        <td>Participant</td>
         <td>ดูสถานะของตนเอง, ดูความคืบหน้าแต่ละขั้นตอน, เปิด Request Support, ตอบกลับ ticket ของตนเอง</td>
       </tr>
     </tbody>
@@ -167,7 +167,7 @@
 
   <h2>5.1 Login</h2>
   <p>หน้าล็อกอินใช้สำหรับกรอก email และ password เพื่อเข้าสู่ระบบ</p>
-  <p>หลังล็อกอินสำเร็จ candidate จะถูก redirect ไปหน้า <code>candidate-status</code> ทันที ส่วน role อื่นจะไปหน้า <code>projects</code></p>
+  <p>หลังล็อกอินสำเร็จ participant จะถูก redirect ไปหน้า <code>participant-status</code> ทันที ส่วน role อื่นจะไปหน้า <code>projects</code></p>
   <p>หากผู้ใช้ยังไม่มีบัญชี ต้องติดต่อผู้ดูแลระบบเพื่อสร้างสิทธิ์ใช้งาน</p>
   <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพหน้าจอ Login พร้อมคำอธิบายช่อง Email, Password และปุ่ม Sign In</div>
 
@@ -184,42 +184,42 @@
   <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพการ์ดโปรเจกต์และปุ่ม action</div>
 
   <h2>5.4 Dashboard</h2>
-  <p>Dashboard แสดงภาพรวม candidate ในโปรเจกต์ เช่น จำนวนทั้งหมด แยกตามสถานะ กราฟ และตารางรายชื่อผู้สมัคร</p>
-  <p>มี view tabs สำหรับสลับมุมมองภาพรวมกับรายชื่อ candidates</p>
-  <p>รองรับการค้นหา filter เปิดดู candidate ตามสถานะ และ export รายการออกเป็น CSV หรือ XLSX</p>
-  <p>จาก dashboard ผู้ใช้ยังสามารถเปิด ticket ใหม่สำหรับ candidate ที่เลือกได้</p>
+  <p>Dashboard แสดงภาพรวม participant ในโปรเจกต์ เช่น จำนวนทั้งหมด แยกตามสถานะ กราฟ และตารางรายชื่อผู้สมัคร</p>
+  <p>มี view tabs สำหรับสลับมุมมองภาพรวมกับรายชื่อ participants</p>
+  <p>รองรับการค้นหา filter เปิดดู participant ตามสถานะ และ export รายการออกเป็น CSV หรือ XLSX</p>
+  <p>จาก dashboard ผู้ใช้ยังสามารถเปิด ticket ใหม่สำหรับ participant ที่เลือกได้</p>
   <p>คอลัมน์ที่แสดงใน dashboard ถูกกำหนดจาก field settings ของโปรเจกต์ โดย field ที่ปิด <code>show_in_dashboard</code> จะไม่แสดง</p>
-  <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพหน้า Dashboard overview และ candidate table</div>
+  <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพหน้า Dashboard overview และ participant table</div>
 
   <h2>5.5 Update Status</h2>
   <p>หน้า Update Status ใช้สำหรับ internal และ admin ในการแก้ไขข้อมูลผู้สมัครและสถานะกระบวนการ</p>
-  <p>ฟังก์ชันหลักของหน้านี้ ได้แก่ เลือก candidate, เพิ่ม candidate ใหม่, แก้ code, ชื่อ, email, issue, decision และอัปเดต step status แบบ auto-save</p>
-  <p>มีตารางด้านล่างสำหรับค้นหา filter แสดง inactive records และเพิ่ม candidate ได้จากทั้งปุ่ม New Candidate และ Add Candidate</p>
-  <p>ระบบรองรับการ deactivate candidate แทนการลบข้อมูลออกถาวร</p>
+  <p>ฟังก์ชันหลักของหน้านี้ ได้แก่ เลือก participant, เพิ่ม participant ใหม่, แก้ code, ชื่อ, email, issue, decision และอัปเดต step status แบบ auto-save</p>
+  <p>มีตารางด้านล่างสำหรับค้นหา filter แสดง inactive records และเพิ่ม participant ได้จากทั้งปุ่ม New Participant และ Add Participant</p>
+  <p>ระบบรองรับการ deactivate participant แทนการลบข้อมูลออกถาวร</p>
   <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพส่วนบนของฟอร์ม และภาพตารางแก้ไขข้อมูล</div>
 
   <h2>5.6 Tickets</h2>
-  <p>หน้า Tickets ใช้สำหรับติดตามและสื่อสารเรื่องคำขอหรือปัญหาที่ผูกกับ candidate และโปรเจกต์</p>
+  <p>หน้า Tickets ใช้สำหรับติดตามและสื่อสารเรื่องคำขอหรือปัญหาที่ผูกกับ participant และโปรเจกต์</p>
   <p>ผู้ใช้สามารถค้นหาและ filter ticket ตาม priority, status หรือ keyword ได้</p>
   <p>เมื่อเปิด ticket จะเห็นรายละเอียด message เดิม, reply thread, ช่องตอบกลับ และตัวเลือกเปลี่ยนสถานะหรือ priority ตามสิทธิ์ที่มี</p>
   <p>ระบบมี priority หลัก 4 ระดับ คือ low, normal, high และ urgent</p>
   <p>เมื่อมีการ reply หรือเปลี่ยนสถานะ ระบบสามารถเรียก edge function เพื่อส่งอีเมลแจ้งเตือนไปยังผู้เกี่ยวข้อง</p>
   <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพ list ticket และภาพ detail/reply section</div>
 
-  <h2>5.7 Candidate Status</h2>
-  <p>หน้า Candidate Status เป็นหน้าที่ candidate ใช้ดูความคืบหน้าของตนเอง</p>
+  <h2>5.7 Participant Status</h2>
+  <p>หน้า Participant Status เป็นหน้าที่ participant ใช้ดูความคืบหน้าของตนเอง</p>
   <p>หน้าจอแสดงสรุปจำนวนขั้นตอนที่ completed, in progress, remaining และ overall status พร้อมรายการ step ทั้งหมด</p>
-  <p>candidate สามารถกด Request Support เพื่อเปิด ticket ใหม่ และสามารถตอบ reply ใน ticket เดิมได้</p>
-  <p>admin สามารถเข้าหน้านี้ในโหมด preview เพื่อดูมุมมองที่ candidate จะเห็นจริง โดยระบบจะแสดงแถบ ADMIN PREVIEW ด้านบน</p>
+  <p>participant สามารถกด Request Support เพื่อเปิด ticket ใหม่ และสามารถตอบ reply ใน ticket เดิมได้</p>
+  <p>admin สามารถเข้าหน้านี้ในโหมด preview เพื่อดูมุมมองที่ participant จะเห็นจริง โดยระบบจะแสดงแถบ ADMIN PREVIEW ด้านบน</p>
   <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพ hero card, progress section และ support ticket modal</div>
 
   <h2>5.8 Admin</h2>
   <p>หน้า Admin เป็นหน้า shortcut และ system overview สำหรับผู้ดูแลระบบ</p>
   <p>มีปุ่มลัดไปยัง project list, dashboard, update status, create project, project settings และ admin access</p>
   <p>มี KPI ภาพรวม เช่น จำนวน projects, users, memberships และ records</p>
-  <p>รองรับ candidate preview โดยเลือก project และ candidate เพื่อเปิดหน้า candidate-status ในโหมด preview</p>
+  <p>รองรับ participant preview โดยเลือก project และ participant เพื่อเปิดหน้า participant-status ในโหมด preview</p>
   <p>หากผู้ใช้ไม่ใช่ admin ระบบจะ redirect ออกจากหน้านี้ไป projects โดยอัตโนมัติ</p>
-  <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพ admin tiles, KPI และ candidate preview section</div>
+  <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพ admin tiles, KPI และ participant preview section</div>
 
   <h2>5.9 Admin Access</h2>
   <p>หน้า Admin Access ใช้จัดการสิทธิ์ผู้ใช้ทั้งระบบ</p>
@@ -234,19 +234,19 @@
     <li>Project Info: กรอกชื่อโปรเจกต์, code prefix, description, start date, end date และ status</li>
     <li>Fields: กำหนด fields ของโปรเจกต์ เลือก field library เพิ่ม custom fields จัดลำดับ และกำหนดประเภทข้อมูล</li>
     <li>Members: เลือก internal/client ที่จะเข้าถึงโปรเจกต์ และกำหนด role ระดับโปรเจกต์</li>
-    <li>Candidates: อัปโหลด CSV ที่มีคอลัมน์ <code>name</code> และ <code>email</code> เพื่อสร้าง candidate แบบ batch โดยระบบจะสร้าง temporary password ให้อัตโนมัติ</li>
+    <li>Participants: อัปโหลด CSV ที่มีคอลัมน์ <code>name</code> และ <code>email</code> เพื่อสร้าง participant แบบ batch โดยระบบจะสร้าง temporary password ให้อัตโนมัติ</li>
     <li>Review: ตรวจสอบสรุปทั้งหมดก่อนกดสร้างโปรเจกต์จริง</li>
   </ol>
   <p>ระบบมี draft auto-save ใน localStorage เพื่อให้กลับมาทำต่อได้หากปิดหน้าไปก่อน</p>
   <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพ stepper แต่ละขั้น และภาพ CSV preview</div>
 
   <h2>5.11 Project Settings</h2>
-  <p>หน้า Project Settings ใช้ปรับแก้โปรเจกต์ที่มีอยู่แล้ว แบ่งออกเป็น 4 tab ได้แก่ General, Fields, Members และ Candidates</p>
+  <p>หน้า Project Settings ใช้ปรับแก้โปรเจกต์ที่มีอยู่แล้ว แบ่งออกเป็น 4 tab ได้แก่ General, Fields, Members และ Participants</p>
   <ul>
     <li><strong>General:</strong> แก้ชื่อโปรเจกต์, code prefix, description, วันที่เริ่ม-สิ้นสุด และสถานะ active, draft, archived</li>
     <li><strong>Fields:</strong> เปลี่ยนชื่อ field, ลำดับ field, เปิดปิด field และกำหนดว่าจะให้ field แสดงบน dashboard หรือไม่</li>
     <li><strong>Members:</strong> ดูสมาชิกปัจจุบัน เปลี่ยน member role เพิ่มสมาชิกใหม่ หรือลบสมาชิกออกจากโปรเจกต์</li>
-    <li><strong>Candidates:</strong> อัปโหลด CSV เพิ่ม candidate ได้อีกภายหลัง โดยระบบจะ reuse บัญชีเดิมถ้ามีอยู่แล้ว หรือสร้างใหม่ให้อัตโนมัติ</li>
+    <li><strong>Participants:</strong> อัปโหลด CSV เพิ่ม participant ได้อีกภายหลัง โดยระบบจะ reuse บัญชีเดิมถ้ามีอยู่แล้ว หรือสร้างใหม่ให้อัตโนมัติ</li>
   </ul>
   <p>มีปุ่ม Archive Project สำหรับซ่อนโปรเจกต์ออกจาก project list โดยยังสามารถเปลี่ยนกลับเป็น active ได้ในภายหลัง</p>
   <div class="note">ตำแหน่งแทรกรูปแนะนำ: ภาพแต่ละ tab ใน Project Settings</div>
@@ -263,7 +263,7 @@
     <li>หากต้องการจัดการผู้ใช้ ให้เข้า Admin Access แล้วค้นหาผู้ใช้ที่ต้องการ</li>
     <li>หากต้องการติดตามภาพรวม ให้เข้า Dashboard และใช้ export เมื่อจำเป็น</li>
     <li>หากต้องการแก้สถานะผู้สมัคร ให้เข้า Update Status</li>
-    <li>หากต้องการดูประสบการณ์ฝั่ง candidate ให้ใช้ candidate preview จากหน้า Admin</li>
+    <li>หากต้องการดูประสบการณ์ฝั่ง participant ให้ใช้ participant preview จากหน้า Admin</li>
   </ol>
 
   <h2>6.2 Internal</h2>
@@ -271,23 +271,23 @@
     <li>ล็อกอินเข้าสู่ระบบ</li>
     <li>เลือกโปรเจกต์ที่ได้รับมอบหมาย</li>
     <li>เปิด Dashboard เพื่อดูภาพรวมผู้สมัครและกรองรายชื่อที่ต้องติดตาม</li>
-    <li>เปิด Update Status เพื่อแก้ไขสถานะขั้นตอน issue หรือ decision ของ candidate</li>
-    <li>ใช้ Tickets เพื่อติดตามคำถามหรือปัญหาจาก candidate หรือ client และตอบกลับใน thread</li>
+    <li>เปิด Update Status เพื่อแก้ไขสถานะขั้นตอน issue หรือ decision ของ participant</li>
+    <li>ใช้ Tickets เพื่อติดตามคำถามหรือปัญหาจาก participant หรือ client และตอบกลับใน thread</li>
   </ol>
 
   <h2>6.3 Client</h2>
   <ol>
     <li>ล็อกอินเข้าสู่ระบบ</li>
     <li>เลือกโปรเจกต์ที่ได้รับสิทธิ์</li>
-    <li>ดู Dashboard เพื่อดูความคืบหน้ารวมของ candidate</li>
+    <li>ดู Dashboard เพื่อดูความคืบหน้ารวมของ participant</li>
     <li>เปิด Tickets เพื่อดูคำขอ ติดตามสถานะ และตอบกลับเมื่อจำเป็น</li>
     <li>หากไม่พบโปรเจกต์ที่ต้องการ ให้ติดต่อ admin เพื่อตรวจสอบ membership</li>
   </ol>
 
-  <h2>6.4 Candidate</h2>
+  <h2>6.4 Participant</h2>
   <ol>
     <li>ล็อกอินด้วยบัญชีของตนเอง</li>
-    <li>ระบบจะเปิดหน้า Candidate Status อัตโนมัติ</li>
+    <li>ระบบจะเปิดหน้า Participant Status อัตโนมัติ</li>
     <li>ตรวจสอบสถานะรวมและแต่ละขั้นตอนจากหน้าเดียวกัน</li>
     <li>หากมีคำถามหรือพบปัญหา ให้กด Request Support</li>
     <li>หากมี ticket เดิมอยู่แล้ว สามารถเปิดอ่านและตอบกลับใน thread ได้</li>
@@ -296,24 +296,24 @@
 
   <h1>7. ฟังก์ชันอัตโนมัติและกติกาการทำงานของระบบ</h1>
   <ul>
-    <li>ระบบคำนวณ overall status จาก step fields ในโปรเจกต์ ทำให้ dashboard และ candidate-status สะท้อนสถานะล่าสุดโดยอัตโนมัติ</li>
+    <li>ระบบคำนวณ overall status จาก step fields ในโปรเจกต์ ทำให้ dashboard และ participant-status สะท้อนสถานะล่าสุดโดยอัตโนมัติ</li>
     <li>หน้า Update Status และหลายส่วนของระบบใช้ auto-save เพื่อลดการกดบันทึกซ้ำ</li>
-    <li>เมื่อ admin import candidate จาก CSV ระบบจะสร้าง auth user, profile, record, email value และ project membership ให้อัตโนมัติผ่าน edge function <code>admin-create-user</code></li>
-    <li>ระบบ ticket เรียก edge function <code>ticket-notify</code> เพื่อส่งอีเมลแจ้งเตือนไปยัง candidate, client, internal หรือ admin ตามเหตุการณ์และผู้ที่เป็นคนตอบ</li>
+    <li>เมื่อ admin import participant จาก CSV ระบบจะสร้าง auth user, profile, record, email value และ project membership ให้อัตโนมัติผ่าน edge function <code>admin-create-user</code></li>
+    <li>ระบบ ticket เรียก edge function <code>ticket-notify</code> เพื่อส่งอีเมลแจ้งเตือนไปยัง participant, client, internal หรือ admin ตามเหตุการณ์และผู้ที่เป็นคนตอบ</li>
     <li>ระบบใช้ row-level security ในฐานข้อมูลเพื่อบังคับสิทธิ์การเห็นข้อมูลจริง ไม่ได้อาศัยเพียงการซ่อนเมนูที่หน้าจอ</li>
   </ul>
 
   <h1>8. ข้อควรรู้และข้อแนะนำในการใช้งาน</h1>
   <ul>
     <li>หากผู้ใช้ internal หรือ client ไม่มี project membership ระบบอาจพาออกจากหน้าโปรเจกต์หรือไม่แสดงข้อมูลที่ต้องการ</li>
-    <li>candidate ไม่ควรใช้เมนูภายในองค์กร เพราะระบบออกแบบให้ใช้งานผ่านหน้า candidate-status เป็นหลัก</li>
+    <li>participant ไม่ควรใช้เมนูภายในองค์กร เพราะระบบออกแบบให้ใช้งานผ่านหน้า participant-status เป็นหลัก</li>
     <li>การ archive project เป็นการซ่อนโปรเจกต์ออกจาก project list ไม่ใช่การลบข้อมูลถาวร</li>
     <li>การ import CSV ต้องมีคอลัมน์ <code>name</code> และ <code>email</code> และแถวที่รูปแบบไม่ถูกต้องจะถูกข้ามหรือแสดงเป็น error ใน preview</li>
     <li>หากต้องการให้ dashboard แสดงหรือซ่อนคอลัมน์ใด ให้ปรับที่ Project Settings &gt; Fields &gt; show in dashboard</li>
   </ul>
 
   <h1>9. ข้อเสนอแนะสำหรับการใส่ภาพประกอบ</h1>
-  <p>เพื่อให้คู่มือสมบูรณ์ยิ่งขึ้น แนะนำให้เพิ่มภาพหน้าจอตามลำดับดังนี้ Login, Projects, Dashboard, Update Status, Tickets, Candidate Status, Admin, Admin Access, Create Project และ Project Settings</p>
+  <p>เพื่อให้คู่มือสมบูรณ์ยิ่งขึ้น แนะนำให้เพิ่มภาพหน้าจอตามลำดับดังนี้ Login, Projects, Dashboard, Update Status, Tickets, Participant Status, Admin, Admin Access, Create Project และ Project Settings</p>
   <p>หากต้องการเวอร์ชันสำหรับผู้บริหาร สามารถย่อเอกสารฉบับนี้โดยคงไว้เฉพาะส่วนภาพรวมระบบ ตาราง role และ workflow หลัก</p>
 
   <h1>จบเอกสาร</h1>

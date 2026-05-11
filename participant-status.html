@@ -598,7 +598,7 @@
             border: 1px solid #bfdbfe;
         }
 
-        .t-reply-candidate {
+        .t-reply-participant {
             background: #f0fdf4;
             border: 1px solid #bbf7d0;
         }
@@ -1203,7 +1203,7 @@
     <div id="adminPreviewBar" class="admin-preview-bar hidden">
         <div class="admin-preview-bar-left">
             <span class="admin-preview-badge">ADMIN PREVIEW</span>
-            <span class="admin-preview-text">Viewing as candidate: <span id="adminPreviewName" class="admin-preview-name">—</span></span>
+            <span class="admin-preview-text">Viewing as participant: <span id="adminPreviewName" class="admin-preview-name">—</span></span>
         </div>
         <button id="adminPreviewBackBtn" class="admin-preview-back" type="button">&#8592; Back to Admin</button>
     </div>
@@ -1213,7 +1213,7 @@
         <section class="hero-card">
             <div class="hero-top">
                 <div class="hero-copy">
-                    <div class="eyebrow" id="heroUserEmail">candidate@example.com</div>
+                    <div class="eyebrow" id="heroUserEmail">participant@example.com</div>
                     <h1 class="hero-title">Complete your steps and keep your application moving</h1>
                     <p class="hero-subtitle">
                         Stay on track by finishing each task below. The more steps you complete, the faster your process moves forward.
@@ -1500,7 +1500,7 @@
 
         const { data: profile, error: pErr } = await supabase
             .from("profiles")
-            .select("role, candidate_record_id, display_name")
+            .select("role, participant_record_id, display_name")
             .eq("id", session.user.id)
             .maybeSingle();
 
@@ -1537,8 +1537,8 @@
             if (profile.role !== "admin") {
                 failAccess(
                     "Access denied",
-                    "Only admins can open candidate preview links.",
-                    profile.role === "candidate" ? "./candidate-status.html" : "./dashboard.html"
+                    "Only admins can open participant preview links.",
+                    profile.role === "participant" ? "./participant-status.html" : "./dashboard.html"
                 );
                 throw new Error("Non-admin preview blocked");
             }
@@ -1546,7 +1546,7 @@
             if (!PREVIEW_RECORD_SAFE_PAT.test(previewRecordIdRaw)) {
                 failAccess(
                     "Invalid preview link",
-                    "The preview record ID is invalid. Please reopen the candidate from the admin page.",
+                    "The preview record ID is invalid. Please reopen the participant from the admin page.",
                     "./admin.html"
                 );
                 throw new Error("Invalid preview_record");
@@ -1565,24 +1565,24 @@
                 } else {
                     failAccess(
                         "Preview record required",
-                        "Open a candidate from the admin page to preview their status.",
+                        "Open a participant from the admin page to preview their status.",
                         "./admin.html"
                     );
                     throw new Error("Admin preview missing preview_record");
                 }
             } else {
-                if (profile.role !== "candidate") {
+                if (profile.role !== "participant") {
                     window.location.replace("./dashboard.html");
-                    throw new Error("Not a candidate");
+                    throw new Error("Not a participant");
                 }
 
-                if (!profile.candidate_record_id) {
-                    el("summary").textContent = "Candidate record not linked";
-                    el("steps").innerHTML = `<p class="error-text">Your account is not linked to a candidate record yet. Please contact admin.</p>`;
-                    throw new Error("candidate_record_id is null");
+                if (!profile.participant_record_id) {
+                    el("summary").textContent = "Participant record not linked";
+                    el("steps").innerHTML = `<p class="error-text">Your account is not linked to a participant record yet. Please contact admin.</p>`;
+                    throw new Error("participant_record_id is null");
                 }
 
-                recordToLoad = profile.candidate_record_id;
+                recordToLoad = profile.participant_record_id;
             }
         }
 
@@ -1612,8 +1612,8 @@
             const bar = el("adminPreviewBar");
             bar.classList.remove("hidden");
             el("adminPreviewName").textContent = `${rec.title || ""}${rec.code ? " (" + rec.code + ")" : ""}`;
-            el("heroUserEmail").textContent = rec.title || rec.code || "Candidate";
-            // Hide ticket submit button — admin shouldn't send tickets on candidate's behalf
+            el("heroUserEmail").textContent = rec.title || rec.code || "Participant";
+            // Hide ticket submit button — admin shouldn't send tickets on participant's behalf
             document.querySelector(".open-ticket-btn")?.style.setProperty("display", "none");
             // Wire back button
             const pid = rec.project_id;
@@ -1630,13 +1630,13 @@
 
         let { data: fieldsRaw, error: fErr } = await supabase
             .from("fields")
-            .select("id, key, label, sort_order, field_role, show_in_candidate_status")
+            .select("id, key, label, sort_order, field_role, show_in_participant_status")
             .eq("project_id", rec.project_id)
             .eq("type", "select")
-            .neq("show_in_candidate_status", false)
+            .neq("show_in_participant_status", false)
             .order("sort_order");
 
-        if (fErr && String(fErr.message || "").includes("show_in_candidate_status")) {
+        if (fErr && String(fErr.message || "").includes("show_in_participant_status")) {
             ({ data: fieldsRaw, error: fErr } = await supabase
                 .from("fields")
                 .select("id, key, label, sort_order, field_role, is_active, show_in_dashboard")
@@ -1717,8 +1717,8 @@
             }
             return replies.map((r) => {
                 const role = String(r.author_role || "").trim().toLowerCase();
-                const isStaff = role && role !== "candidate";
-                const cls = isStaff ? "t-reply-staff" : "t-reply-candidate";
+                const isStaff = role && role !== "participant";
+                const cls = isStaff ? "t-reply-staff" : "t-reply-participant";
                 const name = escapeHtmlT(r.author_name || r.author_id || "Unknown");
                 return `
                   <div class="t-reply-item ${cls}">
@@ -1813,7 +1813,7 @@
                             .insert({
                                 ticket_id:   t.id,
                                 author_id:   session.user.id,
-                                author_role: "candidate",
+                                author_role: "participant",
                                 author_name: DISPLAY_NAME,
                                 message:     msg,
                             })
@@ -1848,10 +1848,10 @@
                             eventType:     "reply",
                             authorId:      session.user.id,
                             authorName:    DISPLAY_NAME,
-                            authorRole:    "candidate",
+                            authorRole:    "participant",
                             message:       msg,
                             ticketSubject: t.subject || "",
-                            candidateName: rec.title || "",
+                            participantName: rec.title || "",
                             projectName:   projectName,
                             projectId:     rec.project_id || "",
                         });
@@ -1948,7 +1948,7 @@
                         project_id:     rec.project_id,
                         record_id:      rec.id,
                         code:           rec.code,
-                        candidate_name: rec.title,
+                        participant_name: rec.title,
                         subject,
                         message,
                         created_by:     session.user.id,
@@ -1967,10 +1967,10 @@
                     eventType:     "new_ticket",
                     authorId:      session.user.id,
                     authorName:    DISPLAY_NAME,
-                    authorRole:    "candidate",
+                    authorRole:    "participant",
                     message:       message,
                     ticketSubject: subject,
-                    candidateName: rec.title || "",
+                    participantName: rec.title || "",
                     projectName:   projectName,
                     projectId:     rec.project_id || "",
                 });

@@ -16,6 +16,9 @@ Thumbs.db
 .vs/
 .claude/
 
+# Private QA handoff files with credentials
+docs/private/
+
 # Supabase local state
 supabase/.temp/
 supabase/.branches/

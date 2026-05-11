@@ -80,7 +80,7 @@ serve(async (req) => {
   const supabaseUrl     = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const anonKey         = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const defaultPassword = Deno.env.get("DEFAULT_CANDIDATE_PASSWORD") ?? "Mentis2026!";
+  const defaultPassword = Deno.env.get("DEFAULT_PARTICIPANT_PASSWORD") ?? "Mentis2026!";
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -116,7 +116,7 @@ serve(async (req) => {
     return json({ error: `Project not found: ${projectId}` }, 404);
   }
 
-  // ── Validate email field exists (required for storing candidate email) ────
+  // ── Validate email field exists (required for storing participant email) ────
   const { data: emailField } = await adminClient
     .from("fields").select("id")
     .eq("project_id", projectId).eq("field_role", "email").maybeSingle();
@@ -134,7 +134,7 @@ serve(async (req) => {
     email,
     password: defaultPassword,
     email_confirm: true,
-    user_metadata: { display_name: displayName, role: "candidate" },
+    user_metadata: { display_name: displayName, role: "participant" },
   });
 
   if (!createErr) {
@@ -157,18 +157,18 @@ serve(async (req) => {
   try {
     // Step 2: upsert profile
     const { data: existingProfile, error: profReadErr } = await adminClient
-      .from("profiles").select("candidate_record_id").eq("id", userId).maybeSingle();
+      .from("profiles").select("participant_record_id").eq("id", userId).maybeSingle();
     if (profReadErr) throw new Error(`[step 2] profiles read failed: ${profReadErr.message}`);
 
     const { error: profErr } = await adminClient.from("profiles").upsert(
-      { id: userId, display_name: displayName, email, role: "candidate" },
+      { id: userId, display_name: displayName, email, role: "participant" },
       { onConflict: "id" },
     );
     if (profErr) throw new Error(`[step 2] profiles upsert failed: ${profErr.message}`);
     console.log(`admin-create-user [step 2]: profile ok`);
 
     // Step 3: find or create record for this project
-    let recordId: string | null = existingProfile?.candidate_record_id ?? null;
+    let recordId: string | null = existingProfile?.participant_record_id ?? null;
 
     // Verify the linked record actually belongs to the requested project
     if (recordId) {
@@ -180,7 +180,7 @@ serve(async (req) => {
     if (!recordId) {
       // Generate collision-free code via DB function (uses FOR UPDATE row lock)
       const { data: generatedCode, error: codeErr } = await adminClient
-        .rpc("generate_candidate_code", { p_project_id: projectId });
+        .rpc("generate_participant_code", { p_project_id: projectId });
       if (codeErr) throw new Error(`[step 3] code generation failed: ${codeErr.message}`);
 
       const { data: rec, error: recErr } = await adminClient.from("records").insert({
@@ -195,8 +195,8 @@ serve(async (req) => {
 
       // Link profile → record
       const { error: linkErr } = await adminClient
-        .from("profiles").update({ candidate_record_id: recordId }).eq("id", userId);
-      if (linkErr) throw new Error(`[step 3] profiles update (candidate_record_id) failed: ${linkErr.message}`);
+        .from("profiles").update({ participant_record_id: recordId }).eq("id", userId);
+      if (linkErr) throw new Error(`[step 3] profiles update (participant_record_id) failed: ${linkErr.message}`);
     }
     console.log(`admin-create-user [step 3]: record ${recordId}`);
 
@@ -228,10 +228,10 @@ serve(async (req) => {
       table_name: "auth.users",
       entity_id: userId,
       project_id: projectId,
-      summary: `Provisioned candidate user ${email}`,
+      summary: `Provisioned participant user ${email}`,
       metadata: {
         source: "admin-create-user",
-        candidate_email: email,
+        participant_email: email,
         display_name: displayName,
         record_id: recordId,
       },

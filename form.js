@@ -32,17 +32,17 @@ const saveState       = el("saveState");
 const lastSync        = el("lastSync");
 const reloadBtn       = el("reloadBtn");
 const saveTopBtn      = el("saveTopBtn");
-const newCandidateBtn = el("newCandidateBtn");
+const newParticipantBtn = el("newParticipantBtn");
 
 const searchInput  = el("searchInput");
 const filterColumn = el("filterColumn");
 const filterStatus = el("filterStatus");
 const showInactive = el("showInactive");
 const addRowBtn    = el("addRowBtn");
-const addCandidateModal = el("addCandidateModal");
-const addCandidateCloseBtn = el("addCandidateCloseBtn");
-const addCandidateCancelBtn = el("addCandidateCancelBtn");
-const addCandidateSubmitBtn = el("addCandidateSubmitBtn");
+const addParticipantModal = el("addParticipantModal");
+const addParticipantCloseBtn = el("addParticipantCloseBtn");
+const addParticipantCancelBtn = el("addParticipantCancelBtn");
+const addParticipantSubmitBtn = el("addParticipantSubmitBtn");
 const addCandCode = el("addCandCode");
 const addCandName = el("addCandName");
 const addCandEmail = el("addCandEmail");
@@ -55,7 +55,7 @@ const hscrollTop      = el("hscrollTop");
 const hscrollTopInner = el("hscrollTopInner");
 
 const candPick      = el("candPick");
-const candidateList = el("candidateList");
+const participantList = el("participantList");
 const candCode      = el("candCode");
 const candName      = el("candName");
 const candEmail     = el("candEmail");
@@ -86,8 +86,8 @@ async function requireInternalAccess() {
 
     const role = (!error && profile?.role) ? String(profile.role) : "external";
 
-    if (role === "candidate" || role === "external") {
-        window.location.replace("./candidate-status.html");
+    if (role === "participant" || role === "external") {
+        window.location.replace("./participant-status.html");
         return null;
     }
 
@@ -269,8 +269,8 @@ await ticketNavBadge.refresh();
 (() => {
     const name = PROJECT_CTX?.project_name || "Project";
     const h1   = document.getElementById("formTitle");
-    if (h1) h1.textContent = `Update Candidate Status - ${name}`;
-    document.title = `Update Candidate - ${name}`;
+    if (h1) h1.textContent = `Update Participant Status - ${name}`;
+    document.title = `Update Participant - ${name}`;
 })();
 
 /* ============================================================
@@ -494,7 +494,7 @@ function scheduleRowSave(row) {
 }
 
 /* ============================================================
-   CANDIDATE PICKER
+   PARTICIPANT PICKER
    ============================================================ */
 function enableDatalistOpenOnFocus(inputEl) {
     if (!inputEl) return;
@@ -511,28 +511,28 @@ function enableDatalistOpenOnFocus(inputEl) {
 }
 enableDatalistOpenOnFocus(candPick);
 
-function buildCandidatePicker() {
-    if (!candidateList) return;
-    candidateList.innerHTML = "";
+function buildParticipantPicker() {
+    if (!participantList) return;
+    participantList.innerHTML = "";
     for (const r of MODEL) {
         if (!String(r.code || "").trim()) continue;
         const opt   = document.createElement("option");
         opt.value   = `${r.code} | ${r.name || ""}`.trim();
-        candidateList.appendChild(opt);
+        participantList.appendChild(opt);
     }
 }
 
-function buildCandidatePickerFiltered(queryLower) {
-    if (!candidateList) return;
+function buildParticipantPickerFiltered(queryLower) {
+    if (!participantList) return;
     const q = String(queryLower || "").trim();
-    candidateList.innerHTML = "";
+    participantList.innerHTML = "";
     for (const r of MODEL) {
         if (!String(r.code || "").trim()) continue;
         const hay = `${r.code} ${r.name || ""} ${r.email || ""}`.toLowerCase();
         if (q && !hay.includes(q)) continue;
         const opt = document.createElement("option");
         opt.value = `${r.code} | ${r.name || ""}`.trim();
-        candidateList.appendChild(opt);
+        participantList.appendChild(opt);
     }
 }
 
@@ -668,7 +668,7 @@ function bindTopFormEvents() {
         if (key === "decision")  { SELECTED.decision = v; validateRequiredFields(SELECTED); }
         markDirty(SELECTED, key, v);
         renderTable();
-        buildCandidatePicker();
+        buildParticipantPicker();
     };
 
     candIssue?.addEventListener("blur",    updateLocal("issue",    () => candIssue.value));
@@ -711,7 +711,7 @@ function renderTableHead() {
 
     // Fixed columns
     tr.appendChild(makeSortTh("code",  "Code",           null,    "sticky-col sticky-col-1 sticky-th"));
-    tr.appendChild(makeSortTh("name",  "Candidate Name", null,    "sticky-col sticky-col-2 sticky-th"));
+    tr.appendChild(makeSortTh("name",  "Participant Name", null,    "sticky-col sticky-col-2 sticky-th"));
     tr.appendChild(makeSortTh("email", "Email",          "240px", null));
 
     // Dynamic select columns (from DB)
@@ -1171,9 +1171,9 @@ function bindHorizontalScrollSync() {
 /* ============================================================
    ACTIONS
    ============================================================ */
-async function createNewCandidate(seed = {}) {
+async function createNewParticipant(seed = {}) {
     try {
-        setSavePill("save-saving", "Creating new candidate...");
+        setSavePill("save-saving", "Creating new participant...");
         const nextCode = String(seed.code || "").trim();
         const nextName = String(seed.name || "").trim();
         const nextEmail = String(seed.email || "").trim();
@@ -1209,7 +1209,7 @@ async function createNewCandidate(seed = {}) {
         MODEL.push(row);
         SELECTED       = row;
         LAST_ADDED_UID = row._uid;
-        buildCandidatePicker();
+        buildParticipantPicker();
         renderTable();
         if (candPick) updateTopFormFromRow(row);
         setSavePill("save-idle", "Idle");
@@ -1220,8 +1220,8 @@ async function createNewCandidate(seed = {}) {
     }
 }
 
-function openAddCandidateModal() {
-    if (!addCandidateModal) return;
+function openAddParticipantModal() {
+    if (!addParticipantModal) return;
     if (addCandCode) addCandCode.value = "";
     if (addCandName) addCandName.value = "";
     if (addCandEmail) addCandEmail.value = "";
@@ -1229,18 +1229,18 @@ function openAddCandidateModal() {
         addCandError.style.display = "none";
         addCandError.textContent = "";
     }
-    addCandidateModal.classList.add("open");
-    addCandidateModal.setAttribute("aria-hidden", "false");
+    addParticipantModal.classList.add("open");
+    addParticipantModal.setAttribute("aria-hidden", "false");
     addCandCode?.focus();
 }
 
-function closeAddCandidateModal() {
-    if (!addCandidateModal) return;
-    addCandidateModal.classList.remove("open");
-    addCandidateModal.setAttribute("aria-hidden", "true");
+function closeAddParticipantModal() {
+    if (!addParticipantModal) return;
+    addParticipantModal.classList.remove("open");
+    addParticipantModal.setAttribute("aria-hidden", "true");
 }
 
-async function submitAddCandidateModal() {
+async function submitAddParticipantModal() {
     const code = String(addCandCode?.value || "").trim();
     const name = String(addCandName?.value || "").trim();
     const email = String(addCandEmail?.value || "").trim();
@@ -1253,15 +1253,15 @@ async function submitAddCandidateModal() {
     };
 
     if (!code) return fail("Code is required.");
-    if (!name) return fail("Candidate name is required.");
+    if (!name) return fail("Participant name is required.");
     if (email && !validateEmail(email)) return fail("Email format is invalid.");
 
     const dup = MODEL.some(r => String(r.code || "").trim().toLowerCase() === code.toLowerCase());
     if (dup) return fail("This code already exists.");
 
     try {
-        await createNewCandidate({ code, name, email });
-        closeAddCandidateModal();
+        await createNewParticipant({ code, name, email });
+        closeAddParticipantModal();
     } catch (e) {
         const msg = String(e?.message || e || "");
         if (msg.toLowerCase().includes("duplicate")) fail("This code already exists.");
@@ -1303,10 +1303,10 @@ async function reloadAll() {
         buildStepSelectsUI();
         bindTopFormStepEvents();
         renderTableHead();
-        buildCandidatePicker();
+        buildParticipantPicker();
         buildFilterControls();
         bindSortButtons();
-        buildCandidatePickerFiltered(String(searchInput?.value || "").trim().toLowerCase());
+        buildParticipantPickerFiltered(String(searchInput?.value || "").trim().toLowerCase());
 
         if (!SELECTED && MODEL.length) {
             SELECTED = MODEL[0];
@@ -1329,7 +1329,7 @@ async function reloadAll() {
         MODEL          = [];
         buildStepSelectsUI();
         renderTableHead();
-        buildCandidatePicker();
+        buildParticipantPicker();
         buildFilterControls();
         renderTable();
     }
@@ -1340,23 +1340,23 @@ async function reloadAll() {
    ============================================================ */
 function wireEvents() {
     searchInput?.addEventListener("input", () => {
-        buildCandidatePickerFiltered(String(searchInput.value || "").trim().toLowerCase());
+        buildParticipantPickerFiltered(String(searchInput.value || "").trim().toLowerCase());
         renderTable();
     });
     showInactive?.addEventListener("change", () => reloadAll());
     filterColumn?.addEventListener("change", () => { rebuildStatusOptions(); renderTable(); });
     filterStatus?.addEventListener("change", renderTable);
     reloadBtn?.addEventListener("click",      () => reloadAll());
-    addRowBtn?.addEventListener("click",      () => openAddCandidateModal());
-    newCandidateBtn?.addEventListener("click",() => openAddCandidateModal());
-    addCandidateCloseBtn?.addEventListener("click", () => closeAddCandidateModal());
-    addCandidateCancelBtn?.addEventListener("click", () => closeAddCandidateModal());
-    addCandidateSubmitBtn?.addEventListener("click", () => submitAddCandidateModal().catch(console.error));
-    addCandidateModal?.addEventListener("click", (e) => {
-        if (e.target === addCandidateModal) closeAddCandidateModal();
+    addRowBtn?.addEventListener("click",      () => openAddParticipantModal());
+    newParticipantBtn?.addEventListener("click",() => openAddParticipantModal());
+    addParticipantCloseBtn?.addEventListener("click", () => closeAddParticipantModal());
+    addParticipantCancelBtn?.addEventListener("click", () => closeAddParticipantModal());
+    addParticipantSubmitBtn?.addEventListener("click", () => submitAddParticipantModal().catch(console.error));
+    addParticipantModal?.addEventListener("click", (e) => {
+        if (e.target === addParticipantModal) closeAddParticipantModal();
     });
     const submitOnEnter = (e) => {
-        if (e.key === "Enter") submitAddCandidateModal().catch(console.error);
+        if (e.key === "Enter") submitAddParticipantModal().catch(console.error);
     };
     addCandCode?.addEventListener("keydown", submitOnEnter);
     addCandName?.addEventListener("keydown", submitOnEnter);
