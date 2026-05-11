@@ -1062,6 +1062,7 @@
 
 <script type="module">
 import { supabase } from "./supabaseClient.js";
+import { SUPABASE_URL } from "./js/config.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 import { showToast } from "./lib/toast-notifications.js";
 import {
@@ -2840,9 +2841,48 @@ el("addMemberBtn").addEventListener("click", async () => {
 /* ═══════════════════
    PARTICIPANTS TAB
 ═══════════════════ */
-const EDGE_URL = "http://127.0.0.1:55321/functions/v1/admin-create-user";
+const EDGE_URL = `${SUPABASE_URL}/functions/v1/admin-create-user`;
 let csvRows = [];
 let participantsLoaded = false;
+
+async function readHttpErrorMessage(response) {
+  try {
+    const body = await response.clone().json();
+    return body?.error || body?.message || response.statusText || "Unknown import error";
+  } catch {
+    try {
+      return await response.clone().text() || response.statusText || "Unknown import error";
+    } catch {
+      return response.statusText || "Unknown import error";
+    }
+  }
+}
+
+function getImportErrorMessage(error) {
+  const message = error?.message || String(error || "Unknown import error");
+  if (message === "Failed to fetch") {
+    return `admin-create-user function is unreachable at ${EDGE_URL}`;
+  }
+  return message;
+}
+
+async function importParticipant(row, token) {
+  const resp = await fetch(EDGE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+    body: JSON.stringify({ email: row.email, display_name: row.name, project_id: PROJECT_ID }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(await readHttpErrorMessage(resp));
+  }
+
+  const body = await resp.json().catch(() => ({}));
+  if (body?.error) {
+    throw new Error(body.error);
+  }
+  return body;
+}
 
 async function loadParticipants() {
   const list = el("participantList");
@@ -2997,36 +3037,39 @@ el("importBtn").addEventListener("click", async () => {
   };
 
   const token = session.access_token;
-  let done = 0, skipped = 0;
+  let done = 0, imported = 0;
+  const failures = [];
 
   for (const row of validRows) {
     try {
-      const resp = await fetch(EDGE_URL, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-        body:    JSON.stringify({ email: row.email, display_name: row.name, project_id: PROJECT_ID }),
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        console.warn("Failed to import:", row.email, err);
-        skipped++;
-      }
+      await importParticipant(row, token);
+      imported++;
     } catch (e) {
       console.warn("Failed to import:", row.email, e);
-      skipped++;
+      failures.push({ email: row.email, message: getImportErrorMessage(e) });
     }
     done++;
-    setProgress(Math.round((done / validRows.length) * 100), `Imported ${done}/${validRows.length}...`);
+    setProgress(Math.round((done / validRows.length) * 100), `Imported ${imported}/${validRows.length}...`);
   }
 
   el("importBtn").disabled = false;
   el("importProgress").style.display = "none";
+
+  if (failures.length > 0) {
+    const firstFailure = failures[0];
+    showHint(`Import failed: ${imported}/${validRows.length} imported, ${failures.length} failed. First failure: ${firstFailure.email} - ${firstFailure.message}`, true);
+    if (imported > 0) {
+      participantsLoaded = false;
+      await loadParticipants();
+    }
+    return;
+  }
+
   csvRows = [];
   el("csvPreviewWrap").style.display = "none";
   el("importBtn").style.display = "none";
 
-  const successCount = validRows.length - skipped;
-  showHint(`Done — ${successCount} imported, ${skipped} skipped (already exist or error).`, false);
+  showHint(`Done — ${imported} participant${imported !== 1 ? "s" : ""} imported.`, false);
   participantsLoaded = false;
   await loadParticipants();
 });

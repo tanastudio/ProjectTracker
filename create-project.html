@@ -548,10 +548,12 @@
 
 <script type="module">
 import { supabase } from "./supabaseClient.js";
+import { SUPABASE_URL } from "./js/config.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 import { showToast } from "./lib/toast-notifications.js";
 
 const el = (id) => document.getElementById(id);
+const ADMIN_CREATE_USER_URL = `${SUPABASE_URL}/functions/v1/admin-create-user`;
 
 /* ── Draft (localStorage) ── */
 const DRAFT_KEY = "create_project_draft";
@@ -602,6 +604,44 @@ function showHint(text, isErr = false) {
   showToast(text, isErr);
 }
 function clearHint() { const h = el("hint"); h.className = "hint"; h.textContent = ""; }
+
+async function readFunctionResponseMessage(response) {
+  try {
+    const body = await response.clone().json();
+    return body?.error || body?.message || response.statusText || "Unknown function error";
+  } catch {
+    try {
+      return await response.clone().text() || response.statusText || "Unknown function error";
+    } catch {
+      return response.statusText || "Unknown function error";
+    }
+  }
+}
+
+async function importParticipantUser(row, projectId, accessToken) {
+  const response = await fetch(ADMIN_CREATE_USER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + accessToken,
+    },
+    body: JSON.stringify({
+      email: row.email,
+      display_name: row.name,
+      project_id: projectId,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readFunctionResponseMessage(response));
+  }
+
+  const result = await response.json().catch(() => ({}));
+  if (result?.error) {
+    throw new Error(result.error);
+  }
+  return result;
+}
 
 function slugify(str) {
   return str.trim().toLowerCase()
@@ -1023,10 +1063,18 @@ function buildSummary() {
 el("step5Back").addEventListener("click", () => { clearHint(); setStep(4); });
 
 /* ── Create Project ── */
+let createdProjectIdForRecovery = null;
+
 el("createBtn").addEventListener("click", async () => {
+  if (createdProjectIdForRecovery) {
+    window.location.href = `./project-settings.html?project=${encodeURIComponent(createdProjectIdForRecovery)}`;
+    return;
+  }
+
   clearHint();
   el("createBtn").disabled = true;
   el("createProgress").style.display = "block";
+  let createdProjectId = null;
 
   const setProgress = (pct, msg) => {
     el("progressBar").style.width = pct + "%";
@@ -1051,6 +1099,7 @@ el("createBtn").addEventListener("click", async () => {
       .single();
     if (projErr) throw projErr;
     const projectId = proj.id;
+    createdProjectId = projectId;
 
     // 2. Insert fields
     setProgress(25, "Creating fields...");
@@ -1113,18 +1162,25 @@ el("createBtn").addEventListener("click", async () => {
     const validRows = csvRows.filter(r => !r.hasError);
     if (validRows.length > 0) {
       setProgress(55, `Importing ${validRows.length} participants...`);
-      let done = 0;
+      let done = 0, imported = 0;
+      const failures = [];
       for (const row of validRows) {
         try {
-          const { error: fnErr } = await supabase.functions.invoke("admin-create-user", {
-            body: { email: row.email, display_name: row.name, project_id: projectId },
-          });
-          if (fnErr) console.warn("Failed to import participant:", row.email, fnErr);
+          await importParticipantUser(row, projectId, session.access_token);
+          imported++;
         } catch (e) {
           console.warn("Failed to import participant:", row.email, e);
+          failures.push({ email: row.email, message: e?.message || String(e) });
         }
         done++;
-        setProgress(55 + Math.round((done / validRows.length) * 35), `Imported ${done}/${validRows.length} participants...`);
+        setProgress(55 + Math.round((done / validRows.length) * 35), `Imported ${imported}/${validRows.length} participants...`);
+      }
+      if (failures.length) {
+        const firstFailure = failures[0];
+        const err = new Error(`Imported ${imported}/${validRows.length} participants. Failed ${failures.length}; first failure: ${firstFailure.email} - ${firstFailure.message}`);
+        err.projectId = projectId;
+        err.importFailures = failures;
+        throw err;
       }
     }
 
@@ -1139,9 +1195,22 @@ el("createBtn").addEventListener("click", async () => {
 
   } catch (err) {
     console.error(err);
-    showHint("Error: " + (err?.message || String(err)), true);
-    el("createBtn").disabled = false;
-    el("createProgress").style.display = "none";
+    const projectId = err?.projectId || createdProjectId;
+    if (projectId) {
+      createdProjectIdForRecovery = projectId;
+      sessionStorage.setItem("selected_project_id", projectId);
+      const messagePrefix = err?.importFailures?.length
+        ? "Project was created, but participant import failed. "
+        : "Project was created, but setup did not finish. ";
+      showHint(messagePrefix + (err?.message || String(err)), true);
+      setProgress(100, "Project created, setup needs attention.");
+      el("createBtn").textContent = "Open Project Settings";
+      el("createBtn").disabled = false;
+    } else {
+      showHint("Error: " + (err?.message || String(err)), true);
+      el("createBtn").disabled = false;
+      el("createProgress").style.display = "none";
+    }
   }
 });
 </script>
