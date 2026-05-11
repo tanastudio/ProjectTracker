@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    BOOKING_TIMEZONES,
     bookingMapKey,
     formatDateKeyInTimezone,
     formatSlotDateTime,
@@ -40,6 +41,8 @@ describe("date and time helpers", () => {
     it("formats timezone labels and converted slot times", () => {
         const slot = { slot_date: "2026-05-21", start_time: "09:00", end_time: "10:00", timezone: "Asia/Bangkok" };
         expect(formatTimezoneLabel("Asia/Dubai", new Date(Date.UTC(2026, 4, 21, 9, 52)))).toBe("Dubai Time (13:52)");
+        expect(BOOKING_TIMEZONES).toContainEqual({ value: "Asia/Riyadh", label: "Jeddah / KSA Time" });
+        expect(formatTimezoneLabel("Asia/Riyadh", new Date(Date.UTC(2026, 4, 21, 9, 52)))).toBe("Jeddah / KSA Time (12:52)");
         expect(formatDateKeyInTimezone(slot, "Asia/Dubai")).toBe("2026-05-21");
         expect(formatSlotTimeInTimezone(slot, "Asia/Dubai")).toBe("06:00 - 07:00");
     });
