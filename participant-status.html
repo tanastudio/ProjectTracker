@@ -371,6 +371,209 @@
                 border-color: rgba(118,169,250,.18);
             }
 
+        .task-row.booking-task {
+            display: block;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .booking-task-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 6px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .booking-expand-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #4f6f95;
+            background: #f2f7fd;
+            border: 1px solid rgba(80,110,150,.08);
+            font-size: 12px;
+            font-weight: 900;
+            transition: transform .15s ease;
+            flex-shrink: 0;
+        }
+
+        .task-row.booking-task.is-expanded .booking-expand-icon {
+            transform: rotate(90deg);
+        }
+
+        .booking-task-body {
+            display: none;
+            padding: 0 14px 14px 56px;
+        }
+
+        .task-row.booking-task.is-expanded .booking-task-body {
+            display: block;
+        }
+
+        .booking-confirmed-box,
+        .booking-calendar-box {
+            border: 1px solid rgba(80,110,150,.10);
+            border-radius: 12px;
+            background: #fff;
+            padding: 12px;
+        }
+
+        .booking-confirmed-title {
+            margin: 0 0 4px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #17365d;
+        }
+
+        .booking-confirmed-date {
+            font-size: 13px;
+            color: #3f9a70;
+            font-weight: 800;
+        }
+
+        .booking-calendar-title {
+            margin: 0 0 12px;
+            text-align: center;
+            font-size: 20px;
+            line-height: 1.15;
+            font-weight: 800;
+            color: #082644;
+        }
+
+        .booking-calendar-layout {
+            display: grid;
+            grid-template-columns: minmax(220px, .85fr) minmax(220px, 1.15fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .booking-month-head {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            margin-bottom: 14px;
+        }
+
+        .booking-month-label,
+        .booking-selected-label {
+            font-size: 15px;
+            font-weight: 700;
+            color: #17365d;
+        }
+
+        .booking-nav-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            border: none;
+            background: #eff6ff;
+            color: #0d6efd;
+            font-size: 25px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .booking-weekdays,
+        .booking-day-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .booking-weekday {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 800;
+            color: #17365d;
+            text-transform: uppercase;
+        }
+
+        .booking-day-grid {
+            margin-top: 10px;
+        }
+
+        .booking-day-cell {
+            min-height: 36px;
+        }
+
+        .booking-day-btn {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            min-height: 36px;
+            border: none;
+            border-radius: 999px;
+            background: transparent;
+            color: #737373;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: default;
+            position: relative;
+        }
+
+        .booking-day-btn.available {
+            background: #eef5ff;
+            color: #0d6efd;
+            cursor: pointer;
+        }
+
+        .booking-day-btn.selected {
+            background: #0d6efd;
+            color: #fff;
+            box-shadow: 0 8px 18px rgba(13,110,253,.24);
+        }
+
+        .booking-day-btn.today::after {
+            content: "";
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: currentColor;
+            transform: translateX(-50%);
+        }
+
+        .booking-time-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .booking-time-btn {
+            min-height: 52px;
+            border-radius: 4px;
+            border: 1px solid #6ea2ff;
+            background: #fff;
+            color: #0066ff;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .booking-time-btn:hover {
+            background: #eff6ff;
+        }
+
+        .booking-empty,
+        .booking-message {
+            margin: 12px 0 0;
+            font-size: 13px;
+            line-height: 1.45;
+            color: var(--muted);
+        }
+
+        .booking-message.error {
+            color: #c65b5b;
+        }
+
         .task-left {
             display: flex;
             align-items: center;
@@ -796,6 +999,18 @@
             .task-row {
                 flex-direction: column;
                 align-items: stretch;
+            }
+
+            .booking-task-head {
+                align-items: stretch;
+            }
+
+            .booking-task-body {
+                padding: 0 10px 12px;
+            }
+
+            .booking-calendar-layout {
+                grid-template-columns: 1fr;
             }
 
             .hero-stats {
@@ -1323,6 +1538,13 @@
     <script type="module">
         import { supabase } from "./supabaseClient.js";
         import { escapeHtml } from "./js/sanitize.js";
+        import {
+            formatBookingDateTime,
+            formatSlotTime,
+            getTodayKey,
+            isBookingField,
+            normalizeTimeText,
+        } from "./lib/booking-utils.js";
 
 
         const STEP_STATUS = ["Not Started", "In Progress", "Completed", "Issue"];
@@ -1437,16 +1659,306 @@
             el("encouragementText").textContent = getEncouragement(completed, inProgress, issues, total);
         }
 
+        let AVAILABLE_SLOTS = [];
+        let BOOKINGS_BY_FIELD = new Map();
+        const BOOKING_CALENDAR_STATE = new Map();
+
+        function getAvailableSlotsByDate() {
+            const today = getTodayKey();
+            const byDate = new Map();
+            for (const slot of AVAILABLE_SLOTS || []) {
+                if (slot.is_booked) continue;
+                const dateKey = String(slot.slot_date || "");
+                if (!dateKey || dateKey < today) continue;
+                if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+                byDate.get(dateKey).push(slot);
+            }
+            for (const slots of byDate.values()) {
+                slots.sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
+            }
+            return byDate;
+        }
+
+        function getBookingCalendarState(fieldId) {
+            const key = String(fieldId || "");
+            const slotsByDate = getAvailableSlotsByDate();
+            const firstDateKey = [...slotsByDate.keys()].sort()[0] || getTodayKey();
+            const firstDate = parseDateKeyLocal(firstDateKey);
+            const fallbackMonth = firstDate || new Date();
+            const existing = BOOKING_CALENDAR_STATE.get(key);
+            if (existing) {
+                if (!slotsByDate.has(existing.selectedDateKey) && firstDateKey) existing.selectedDateKey = firstDateKey;
+                return existing;
+            }
+            const state = {
+                month: new Date(fallbackMonth.getFullYear(), fallbackMonth.getMonth(), 1),
+                selectedDateKey: firstDateKey,
+            };
+            BOOKING_CALENDAR_STATE.set(key, state);
+            return state;
+        }
+
+        function parseDateKeyLocal(dateKey) {
+            const [year, month, day] = String(dateKey || "").split("-").map(Number);
+            if (!year || !month || !day) return null;
+            return new Date(year, month - 1, day);
+        }
+
+        function dateKeyFromParts(year, monthIndex, day) {
+            return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        }
+
+        function formatDateLong(dateKey) {
+            const date = parseDateKeyLocal(dateKey);
+            if (!date) return String(dateKey || "");
+            return new Intl.DateTimeFormat("en-US", {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+            }).format(date);
+        }
+
+        function renderBookingCalendar(container, step) {
+            const slotsByDate = getAvailableSlotsByDate();
+            const state = getBookingCalendarState(step.id);
+            const selectedSlots = slotsByDate.get(state.selectedDateKey) || [];
+
+            container.innerHTML = "";
+            const box = document.createElement("div");
+            box.className = "booking-calendar-box";
+
+            const title = document.createElement("h3");
+            title.className = "booking-calendar-title";
+            title.textContent = "Select a Date & Time";
+            box.appendChild(title);
+
+            if (!slotsByDate.size) {
+                const empty = document.createElement("p");
+                empty.className = "booking-empty";
+                empty.textContent = "No available slots are open yet. Please check again later or contact the team.";
+                box.appendChild(empty);
+                container.appendChild(box);
+                return;
+            }
+
+            const layout = document.createElement("div");
+            layout.className = "booking-calendar-layout";
+
+            const calendar = document.createElement("div");
+            const monthHead = document.createElement("div");
+            monthHead.className = "booking-month-head";
+
+            const prev = document.createElement("button");
+            prev.className = "booking-nav-btn";
+            prev.type = "button";
+            prev.textContent = "‹";
+            prev.addEventListener("click", (event) => {
+                event.stopPropagation();
+                state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1);
+                renderBookingCalendar(container, step);
+            });
+
+            const label = document.createElement("div");
+            label.className = "booking-month-label";
+            label.textContent = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(state.month);
+
+            const next = document.createElement("button");
+            next.className = "booking-nav-btn";
+            next.type = "button";
+            next.textContent = "›";
+            next.addEventListener("click", (event) => {
+                event.stopPropagation();
+                state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1);
+                renderBookingCalendar(container, step);
+            });
+
+            monthHead.appendChild(prev);
+            monthHead.appendChild(label);
+            monthHead.appendChild(next);
+            calendar.appendChild(monthHead);
+
+            const weekdays = document.createElement("div");
+            weekdays.className = "booking-weekdays";
+            for (const dayName of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) {
+                const day = document.createElement("div");
+                day.className = "booking-weekday";
+                day.textContent = dayName;
+                weekdays.appendChild(day);
+            }
+            calendar.appendChild(weekdays);
+
+            const grid = document.createElement("div");
+            grid.className = "booking-day-grid";
+            const year = state.month.getFullYear();
+            const monthIndex = state.month.getMonth();
+            const firstDay = new Date(year, monthIndex, 1);
+            const mondayStartOffset = (firstDay.getDay() + 6) % 7;
+            const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+            const todayKey = getTodayKey();
+
+            for (let i = 0; i < mondayStartOffset; i++) {
+                const cell = document.createElement("div");
+                cell.className = "booking-day-cell";
+                grid.appendChild(cell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateKey = dateKeyFromParts(year, monthIndex, day);
+                const hasSlots = slotsByDate.has(dateKey);
+                const cell = document.createElement("div");
+                cell.className = "booking-day-cell";
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = [
+                    "booking-day-btn",
+                    hasSlots ? "available" : "",
+                    state.selectedDateKey === dateKey ? "selected" : "",
+                    todayKey === dateKey ? "today" : "",
+                ].filter(Boolean).join(" ");
+                btn.textContent = String(day);
+                btn.disabled = !hasSlots;
+                if (hasSlots) {
+                    btn.addEventListener("click", (event) => {
+                        event.stopPropagation();
+                        state.selectedDateKey = dateKey;
+                        renderBookingCalendar(container, step);
+                    });
+                }
+                cell.appendChild(btn);
+                grid.appendChild(cell);
+            }
+
+            calendar.appendChild(grid);
+            layout.appendChild(calendar);
+
+            const times = document.createElement("div");
+            const selectedLabel = document.createElement("div");
+            selectedLabel.className = "booking-selected-label";
+            selectedLabel.textContent = formatDateLong(state.selectedDateKey);
+            times.appendChild(selectedLabel);
+
+            const timeList = document.createElement("div");
+            timeList.className = "booking-time-list";
+            if (!selectedSlots.length) {
+                const empty = document.createElement("p");
+                empty.className = "booking-empty";
+                empty.textContent = "No available times for this date.";
+                timeList.appendChild(empty);
+            } else {
+                for (const slot of selectedSlots) {
+                    const btn = document.createElement("button");
+                    btn.className = "booking-time-btn";
+                    btn.type = "button";
+                    btn.textContent = normalizeTimeText(slot.start_time) || formatSlotTime(slot);
+                    btn.addEventListener("click", (event) => {
+                        event.stopPropagation();
+                        bookAvailabilitySlot(step, slot, box).catch(console.error);
+                    });
+                    timeList.appendChild(btn);
+                }
+            }
+            times.appendChild(timeList);
+
+            const message = document.createElement("p");
+            message.className = "booking-message";
+            message.dataset.bookingMessage = "true";
+            times.appendChild(message);
+
+            layout.appendChild(times);
+            box.appendChild(layout);
+            container.appendChild(box);
+        }
+
+        async function bookAvailabilitySlot(step, slot, box) {
+            const buttons = box.querySelectorAll("button");
+            const message = box.querySelector("[data-booking-message]");
+            buttons.forEach((button) => { button.disabled = true; });
+            if (message) {
+                message.className = "booking-message";
+                message.textContent = "Saving booking...";
+            }
+
+            const { data: bookingId, error } = await supabase.rpc("book_project_availability_slot", {
+                p_record_id: rec.id,
+                p_field_id: step.id,
+                p_slot_id: slot.id,
+            });
+
+            if (error) {
+                if (message) {
+                    message.className = "booking-message error";
+                    message.textContent = error.message || "This slot is no longer available.";
+                }
+                buttons.forEach((button) => { button.disabled = false; });
+                return;
+            }
+
+            if (message) {
+                message.className = "booking-message";
+                message.textContent = "Booking saved. Sending confirmation email...";
+            }
+
+            const notifyResult = await notifyBookingViaEdge(bookingId);
+            if (message) {
+                message.className = notifyResult.ok ? "booking-message" : "booking-message error";
+                message.textContent = notifyResult.ok
+                    ? "Booking confirmed. Refreshing status..."
+                    : "Booking saved, but email notification failed. Refreshing status...";
+            }
+            setTimeout(() => window.location.reload(), 700);
+        }
+
+        async function notifyBookingViaEdge(bookingId) {
+            try {
+                const { data, error } = await supabase.functions.invoke("booking-notify", { body: { bookingId } });
+                if (error) throw error;
+                if (data?.ok === false && !data?.skipped) throw new Error(data?.reason || "notification failed");
+                return { ok: true, data };
+            } catch (error) {
+                console.warn("Booking email notification failed:", error);
+                return { ok: false, error };
+            }
+        }
+
+        function renderBookingBody(container, step) {
+            container.innerHTML = "";
+            if (step.booking) {
+                const box = document.createElement("div");
+                box.className = "booking-confirmed-box";
+                const title = document.createElement("p");
+                title.className = "booking-confirmed-title";
+                title.textContent = "Booking confirmed";
+                const date = document.createElement("div");
+                date.className = "booking-confirmed-date";
+                date.textContent = formatBookingDateTime(step.booking) || "Date confirmed";
+                box.appendChild(title);
+                box.appendChild(date);
+                container.appendChild(box);
+                return;
+            }
+            renderBookingCalendar(container, step);
+        }
+
         function renderSteps(steps) {
             const stepsEl = el("steps");
             stepsEl.innerHTML = "";
 
             steps.forEach((step, index) => {
                 const row = document.createElement("div");
-                row.className = "task-row";
+                const isBookingStep = !!step.isBooking;
+                row.className = isBookingStep ? "task-row booking-task is-expanded" : "task-row";
 
                 const taskLeft = document.createElement("div");
                 taskLeft.className = "task-left";
+
+                let expandIcon = null;
+                if (isBookingStep) {
+                    expandIcon = document.createElement("div");
+                    expandIcon.className = "booking-expand-icon";
+                    expandIcon.textContent = "›";
+                    taskLeft.appendChild(expandIcon);
+                }
 
                 const taskIndex = document.createElement("div");
                 taskIndex.className = "task-index";
@@ -1461,7 +1973,9 @@
 
                 const taskNote = document.createElement("p");
                 taskNote.className = "task-note";
-                taskNote.textContent = getTaskNote(step.status);
+                taskNote.textContent = step.booking
+                    ? `Booked for ${formatBookingDateTime(step.booking)}`
+                    : getTaskNote(step.status);
 
                 taskCopy.appendChild(taskName);
                 taskCopy.appendChild(taskNote);
@@ -1472,8 +1986,26 @@
                 statusPill.className = `status-pill ${getStatusClass(step.status)}`;
                 statusPill.textContent = step.status;
 
-                row.appendChild(taskLeft);
-                row.appendChild(statusPill);
+                if (isBookingStep) {
+                    const head = document.createElement("div");
+                    head.className = "booking-task-head";
+                    head.appendChild(taskLeft);
+                    head.appendChild(statusPill);
+                    head.addEventListener("click", () => {
+                        row.classList.toggle("is-expanded");
+                    });
+
+                    const body = document.createElement("div");
+                    body.className = "booking-task-body";
+                    body.addEventListener("click", (event) => event.stopPropagation());
+                    renderBookingBody(body, step);
+
+                    row.appendChild(head);
+                    row.appendChild(body);
+                } else {
+                    row.appendChild(taskLeft);
+                    row.appendChild(statusPill);
+                }
                 stepsEl.appendChild(row);
             });
         }
@@ -1628,6 +2160,34 @@
 
         const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
 
+        async function loadParticipantBookingData(projectId, recordId) {
+            const nextBookings = new Map();
+            let nextSlots = [];
+
+            const { data: slotData, error: slotError } = await supabase.rpc("get_project_availability_slots", {
+                p_project_id: projectId,
+            });
+            if (!slotError) nextSlots = slotData || [];
+            else console.warn("Availability slots unavailable:", slotError.message || slotError);
+
+            const { data: bookingData, error: bookingError } = await supabase
+                .from("project_availability_bookings")
+                .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone)")
+                .eq("record_id", recordId)
+                .eq("status", "booked");
+
+            if (!bookingError) {
+                for (const booking of bookingData || []) {
+                    nextBookings.set(String(booking.field_id || ""), booking);
+                }
+            } else {
+                console.warn("Booking records unavailable:", bookingError.message || bookingError);
+            }
+
+            AVAILABLE_SLOTS = nextSlots;
+            BOOKINGS_BY_FIELD = nextBookings;
+        }
+
         let { data: fieldsRaw, error: fErr } = await supabase
             .from("fields")
             .select("id, key, label, sort_order, field_role, show_in_participant_status")
@@ -1681,12 +2241,21 @@
             vals[f.key] = pickValueCell(rv);
         }
 
+        await loadParticipantBookingData(rec.project_id, rec.id);
+
         el("summary").textContent = `${rec.code || ""} - ${rec.title || ""}`;
 
-        const renderedSteps = (fields || []).map((f) => ({
-            label: f.label,
-            status: normalizeStatus(vals[f.key] || ""),
-        }));
+        const renderedSteps = (fields || []).map((f) => {
+            const booking = BOOKINGS_BY_FIELD.get(String(f.id || ""));
+            return {
+                id: f.id,
+                key: f.key,
+                label: f.label,
+                isBooking: isBookingField(f),
+                booking,
+                status: booking ? "Completed" : normalizeStatus(vals[f.key] || ""),
+            };
+        });
 
         renderSteps(renderedSteps);
         renderStats(renderedSteps);

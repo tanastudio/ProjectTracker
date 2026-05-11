@@ -370,6 +370,8 @@ N8N_WEBHOOK_URL = "env(N8N_WEBHOOK_URL)"
 N8N_PROJECT_UPDATE_WEBHOOK_URL = "env(N8N_PROJECT_UPDATE_WEBHOOK_URL)"
 TRACKER_BASE_URL = "env(TRACKER_BASE_URL)"
 PROJECT_UPDATE_CRON_SECRET = "env(PROJECT_UPDATE_CRON_SECRET)"
+RESEND_API_KEY = "env(RESEND_API_KEY)"
+NOTIFY_FROM_EMAIL = "env(NOTIFY_FROM_EMAIL)"
 
 [analytics]
 enabled = true
@@ -395,6 +397,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/ticket-notify/deno.json"
 entrypoint = "./functions/ticket-notify/index.ts"
+
+[functions.booking-notify]
+enabled = true
+verify_jwt = false
+import_map = "./functions/booking-notify/deno.json"
+entrypoint = "./functions/booking-notify/index.ts"
 
 [functions.admin-create-user]
 enabled = true

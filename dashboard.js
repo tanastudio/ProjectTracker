@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+import { bookingMapKey, formatBookingDateTime, isBookingField } from "./lib/booking-utils.js";
 
 /* ---------- Config ---------- */
 const DEFAULT_PROJECT_NAME = "Project ABC";
@@ -315,9 +316,32 @@ async function loadRecordValues(recordIds) {
     return data || [];
 }
 
+async function loadBookingValues(recordIds) {
+    const byRecordField = new Map();
+    if (!recordIds || recordIds.length === 0) return byRecordField;
 
-function buildItems(records, recordValues, fieldsById) {
+    const { data, error } = await supabase
+        .from("project_availability_bookings")
+        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone)")
+        .in("record_id", recordIds)
+        .eq("status", "booked");
+
+    if (error) {
+        console.warn("Booking values unavailable:", error.message || error);
+        return byRecordField;
+    }
+
+    for (const booking of data || []) {
+        byRecordField.set(bookingMapKey(booking.record_id, booking.field_id), booking);
+    }
+    return byRecordField;
+}
+
+
+function buildItems(records, recordValues, fieldsById, bookingsByRecordField = new Map()) {
     const byRecord = new Map();
+    const fieldsByKey = new Map();
+    for (const field of fieldsById.values()) fieldsByKey.set(String(field.key || ""), field);
 
     for (const rv of recordValues) {
         const rid = rv.record_id;
@@ -336,10 +360,18 @@ function buildItems(records, recordValues, fieldsById) {
 
         // Build steps
         const step = {};
+        const bookings = {};
+        const bookingDates = {};
         const stepStatuses = [];
         for (const s of STEP_KEYS) {
-            const norm = normalizeStatus(vals[s.key]);
+            const field = fieldsByKey.get(String(s.key || ""));
+            const booking = field && isBookingField(field) ? bookingsByRecordField.get(bookingMapKey(r.id, field.id)) : null;
+            const norm = booking ? "Completed" : normalizeStatus(vals[s.key]);
             step[s.key] = norm;
+            if (booking) {
+                bookings[s.key] = booking;
+                bookingDates[s.key] = formatBookingDateTime(booking);
+            }
             stepStatuses.push(norm);
         }
 
@@ -365,6 +397,8 @@ function buildItems(records, recordValues, fieldsById) {
             active: r.active !== false,
 
             step,
+            bookings,
+            bookingDates,
             overallStatus,
 
             // issue/decision now works even if stored in records table
@@ -562,6 +596,9 @@ function buildHeaderFromFields(fieldsList) {
         if (f.show_in_dashboard === false) continue;
         const label = f.label || f.key;
         headRow.insertAdjacentHTML("beforeend", `<th style="min-width:120px;">${escapeHtml(label)}</th>`);
+        if (isBookingField(f)) {
+            headRow.insertAdjacentHTML("beforeend", `<th style="min-width:160px;">${escapeHtml(label)} Date</th>`);
+        }
     }
 
     // Tail: Issue | Decision
@@ -637,6 +674,11 @@ function renderTable(items) {
             const raw = it.step?.[f.key] ?? it.values?.[f.key] ?? "";
             td.innerHTML = f.type === "select" ? statusPill(raw || "Not Started") : escapeHtml(String(raw));
             tr.appendChild(td);
+            if (isBookingField(f)) {
+                const tdDate = document.createElement("td");
+                tdDate.textContent = String(it.bookingDates?.[f.key] || "");
+                tr.appendChild(tdDate);
+            }
         }
 
         // Issue
@@ -689,6 +731,14 @@ function getVisibleDashboardFields() {
             label: f.label || f.key,
             getValue: (it) => String(it.step?.[f.key] ?? it.values?.[f.key] ?? ""),
         });
+
+        if (isBookingField(f)) {
+            columns.push({
+                key: `${f.key}__booking_date`,
+                label: `${f.label || f.key} Date`,
+                getValue: (it) => String(it.bookingDates?.[f.key] || ""),
+            });
+        }
     }
 
     columns.push(
@@ -1243,7 +1293,8 @@ async function refresh() {
         const rids = records.map((r) => r.id);
 
         const recordValues = await loadRecordValues(rids);
-        const items = buildItems(records, recordValues, fieldsById);
+        const bookingsByRecordField = await loadBookingValues(rids);
+        const items = buildItems(records, recordValues, fieldsById, bookingsByRecordField);
         CURRENT_ITEMS = items;
         await loadTicketStats(PROJECT_CTX.project_id);
 
