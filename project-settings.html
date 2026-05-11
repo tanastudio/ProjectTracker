@@ -431,6 +431,7 @@
     .availability-slot-list {
       border: 1px solid rgba(15,23,42,.10); border-radius: 12px; background: rgba(248,250,252,.72); padding: 12px;
     }
+    .availability-editor.disabled { opacity: .62; }
     .availability-month-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
     .availability-month-label { font-size: 15px; font-weight: 900; color: #0f172a; }
     .availability-nav-btn {
@@ -469,11 +470,26 @@
       width: 34px; height: 34px; border-radius: 9px; border: 1px solid rgba(239,68,68,.18);
       background: #fff; color: #dc2626; font-size: 18px; cursor: pointer;
     }
-    .availability-step-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .availability-step-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .availability-step-pill {
-      display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border-radius: 999px;
-      border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 900;
+      display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 10px; border-radius: 999px;
+      border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 900; cursor: pointer;
     }
+    .availability-step-pill.active { background: #0d6efd; border-color: #0d6efd; color: #fff; box-shadow: 0 8px 18px rgba(13,110,253,.18); }
+    .availability-step-pill.disabled { background: #f8fafc; border-color: #cbd5e1; color: #64748b; }
+    .availability-step-status { font-size: 10px; font-weight: 900; opacity: .82; }
+    .availability-step-config {
+      border: 1px solid rgba(15,23,42,.10); border-radius: 12px; background: #fff; padding: 12px; margin-top: 12px;
+    }
+    .availability-config-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px;
+    }
+    .availability-config-title { font-size: 13px; font-weight: 900; color: #0f172a; }
+    .availability-config-desc { font-size: 12px; color: #64748b; margin-top: 2px; line-height: 1.45; }
+    .availability-consultant-list { display: grid; gap: 8px; margin-top: 8px; }
+    .availability-consultant-row { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(160px, 1.2fr) 34px; gap: 8px; align-items: center; }
+    .availability-consultant-row .form-input { min-height: 36px; }
+    .availability-preview-row { display: grid; grid-template-columns: minmax(190px, 1fr) auto; gap: 8px; align-items: end; margin-top: 12px; }
     .availability-slot-list { display: grid; gap: 8px; max-height: 340px; overflow-y: auto; }
     .availability-slot-row {
       display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;
@@ -510,6 +526,8 @@
       .add-member-row { grid-template-columns: 1fr; }
       .schedule-layout { grid-template-columns: 1fr; }
       .availability-layout { grid-template-columns: 1fr; }
+      .availability-consultant-row,
+      .availability-preview-row { grid-template-columns: 1fr; }
       .email-history-grid { grid-template-columns: 1fr; }
       .email-history-head { flex-direction: column; align-items: stretch; }
       .member-table-head { display: none; }
@@ -928,7 +946,7 @@
       <div class="tab-panel" id="tab-availability">
         <div class="card">
           <div class="card-title">Available Slot Calendar</div>
-          <div class="card-desc">Create date and time slots for participant booking steps. Any select field with "booking" or "schedule" in its key or label uses this calendar.</div>
+          <div class="card-desc">Choose which booking steps use a calendar, then create separate date and time slots for each step.</div>
 
           <div class="availability-step-summary" id="availabilityStepSummary">
             <span class="muted small">Loading booking steps...</span>
@@ -968,6 +986,37 @@
                 <button class="btn-primary" id="availabilityApplyBtn" type="button">Apply Slots</button>
                 <button class="btn-ghost" id="availabilityRefreshBtn" type="button">Refresh Slots</button>
               </div>
+            </div>
+          </div>
+
+          <div class="availability-step-config" id="availabilityStepConfig">
+            <div class="availability-config-head">
+              <div>
+                <div class="availability-config-title" id="availabilityStepConfigTitle">Booking Step Setup</div>
+                <div class="availability-config-desc" id="availabilityStepConfigDesc">Select a booking step above to manage consultants and preview the participant view.</div>
+              </div>
+              <div class="toggle-wrap" title="Enable booking calendar for this step">
+                <label class="toggle">
+                  <input type="checkbox" id="availabilityStepEnabled">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label">Booking Calendar</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Consultants for confirmation email</label>
+              <div class="availability-consultant-list" id="availabilityConsultantRows"></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn-ghost" id="availabilityAddConsultantBtn" type="button">+ Add Consultant</button>
+              <button class="btn-primary" id="availabilitySaveConsultantsBtn" type="button">Save Consultants</button>
+            </div>
+            <div class="availability-preview-row">
+              <div class="form-group" style="margin-bottom:0">
+                <label>Preview as participant</label>
+                <select class="form-select" id="availabilityPreviewRecordSelect"></select>
+              </div>
+              <button class="btn-ghost" id="availabilityPreviewBtn" type="button">Preview Participant View</button>
             </div>
           </div>
         </div>
@@ -2254,6 +2303,7 @@ el("refreshEmailHistoryBtn").addEventListener("click", async () => {
 /* ============================================================
    AVAILABILITY TAB
    ============================================================ */
+let fields = [];
 const MAX_AVAILABILITY_TIME_ROWS = 10;
 let availabilityTimezone = getDefaultBookingTimezone("Asia/Bangkok");
 let availabilityMonth = new Date();
@@ -2262,6 +2312,12 @@ let availabilitySelectedDates = new Set();
 let availabilityHourRows = [{ start: "09:00", end: "17:00" }];
 let availabilitySlots = [];
 let availabilitySlotsSupported = true;
+let availabilityStepSettings = new Map();
+let availabilityConsultants = [];
+let availabilitySelectedFieldId = "";
+let availabilityPreviewRecords = [];
+let availabilityStepSettingsSupported = true;
+let availabilityConsultantsSupported = true;
 
 function dateKeyFromParts(year, monthIndex, day) {
   return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -2271,6 +2327,40 @@ function parseDateKey(dateKey) {
   const [year, month, day] = String(dateKey || "").split("-").map(Number);
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day);
+}
+
+function getAvailabilityBookingFields() {
+  return (fields || [])
+    .filter((f) => (
+      String(f.type || "").toLowerCase() === "select" &&
+      f.is_active !== false &&
+      String(f.field_role || "").toLowerCase() !== "overall_status" &&
+      isBookingField(f)
+    ))
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+}
+
+function getAvailabilitySelectedField() {
+  const bookingFields = getAvailabilityBookingFields();
+  if (!bookingFields.length) return null;
+  if (!availabilitySelectedFieldId || !bookingFields.some((field) => String(field.id) === availabilitySelectedFieldId)) {
+    availabilitySelectedFieldId = String(bookingFields[0].id);
+  }
+  return bookingFields.find((field) => String(field.id) === availabilitySelectedFieldId) || bookingFields[0];
+}
+
+function getAvailabilityStepSetting(fieldId) {
+  return availabilityStepSettings.get(String(fieldId || "")) || null;
+}
+
+function isAvailabilityStepEnabled(fieldId) {
+  const setting = getAvailabilityStepSetting(fieldId);
+  return setting?.is_enabled === true;
+}
+
+function requireAvailabilityFieldId() {
+  const field = getAvailabilitySelectedField();
+  return field ? String(field.id || "") : "";
 }
 
 function getAvailabilitySlotCounts() {
@@ -2297,6 +2387,8 @@ function renderAvailabilityCalendar() {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const slotCounts = getAvailabilitySlotCounts();
   const todayKey = getTodayKey();
+  const selectedFieldId = requireAvailabilityFieldId();
+  const stepEnabled = selectedFieldId ? isAvailabilityStepEnabled(selectedFieldId) : false;
 
   for (let i = 0; i < firstDay.getDay(); i++) {
     const cell = document.createElement("div");
@@ -2319,7 +2411,9 @@ function renderAvailabilityCalendar() {
     ].filter(Boolean).join(" ");
     btn.textContent = String(day);
     btn.title = slotCounts.has(dateKey) ? `${slotCounts.get(dateKey)} active slot(s)` : dateKey;
+    btn.disabled = !selectedFieldId || !stepEnabled;
     btn.addEventListener("click", () => {
+      if (!selectedFieldId || !stepEnabled) return;
       if (availabilitySelectedDates.has(dateKey)) availabilitySelectedDates.delete(dateKey);
       else availabilitySelectedDates.add(dateKey);
       renderAvailabilityCalendar();
@@ -2350,6 +2444,8 @@ function renderAvailabilityHours() {
   const rows = el("availabilityHourRows");
   if (!rows) return;
   rows.innerHTML = "";
+  const selectedFieldId = requireAvailabilityFieldId();
+  const stepEnabled = selectedFieldId ? isAvailabilityStepEnabled(selectedFieldId) : false;
 
   availabilityHourRows.forEach((row, index) => {
     const wrap = document.createElement("div");
@@ -2359,12 +2455,14 @@ function renderAvailabilityHours() {
     start.className = "form-input";
     start.type = "time";
     start.value = row.start || "09:00";
+    start.disabled = !stepEnabled;
     start.addEventListener("input", () => { availabilityHourRows[index].start = start.value; });
 
     const end = document.createElement("input");
     end.className = "form-input";
     end.type = "time";
     end.value = row.end || "17:00";
+    end.disabled = !stepEnabled;
     end.addEventListener("input", () => { availabilityHourRows[index].end = end.value; });
 
     const separator = document.createElement("span");
@@ -2376,7 +2474,7 @@ function renderAvailabilityHours() {
     remove.type = "button";
     remove.textContent = "x";
     remove.title = "Remove time range";
-    remove.disabled = availabilityHourRows.length <= 1;
+    remove.disabled = !stepEnabled || availabilityHourRows.length <= 1;
     remove.addEventListener("click", () => {
       availabilityHourRows.splice(index, 1);
       renderAvailabilityHours();
@@ -2390,7 +2488,9 @@ function renderAvailabilityHours() {
   });
 
   const addButton = el("availabilityAddHourBtn");
-  if (addButton) addButton.disabled = availabilityHourRows.length >= MAX_AVAILABILITY_TIME_ROWS;
+  if (addButton) addButton.disabled = !stepEnabled || availabilityHourRows.length >= MAX_AVAILABILITY_TIME_ROWS;
+  const applyButton = el("availabilityApplyBtn");
+  if (applyButton) applyButton.disabled = !stepEnabled;
 }
 
 function getValidAvailabilityHours() {
@@ -2425,6 +2525,11 @@ function populateAvailabilityTimezoneSelect() {
 function renderAvailabilitySlotList() {
   const list = el("availabilitySlotList");
   if (!list) return;
+  const selectedField = getAvailabilitySelectedField();
+  if (!selectedField) {
+    list.innerHTML = `<div class="muted">No booking steps found yet.</div>`;
+    return;
+  }
   const activeSlots = (availabilitySlots || [])
     .filter((slot) => slot.is_active !== false)
     .sort((a, b) => `${a.slot_date} ${a.start_time}`.localeCompare(`${b.slot_date} ${b.start_time}`));
@@ -2435,7 +2540,7 @@ function renderAvailabilitySlotList() {
   }
 
   if (!activeSlots.length) {
-    list.innerHTML = `<div class="muted">No active slots configured.</div>`;
+    list.innerHTML = `<div class="muted">No active slots configured for ${escapeHtml(selectedField.label || selectedField.key)}.</div>`;
     return;
   }
 
@@ -2450,7 +2555,7 @@ function renderAvailabilitySlotList() {
     title.textContent = formatSlotDateTime(slot);
     const meta = document.createElement("div");
     meta.className = "availability-slot-meta";
-    meta.textContent = formatTimezoneLabel(slot.timezone || "Asia/Bangkok");
+    meta.textContent = `${selectedField.label || selectedField.key} · ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
     copy.appendChild(title);
     copy.appendChild(meta);
 
@@ -2482,24 +2587,364 @@ function renderAvailabilitySlotList() {
 function renderAvailabilityStepSummary() {
   const node = el("availabilityStepSummary");
   if (!node) return;
-  const bookingFields = (fields || []).filter((f) => String(f.type || "").toLowerCase() === "select" && isBookingField(f));
+  const bookingFields = getAvailabilityBookingFields();
   if (!bookingFields.length) {
     node.innerHTML = `<span class="muted small">No booking or schedule select fields found yet.</span>`;
+    availabilitySelectedFieldId = "";
+    renderAvailabilityStepConfig();
+    renderAvailabilityCalendar();
+    renderAvailabilitySlotList();
     return;
   }
-  node.innerHTML = bookingFields
-    .map((field) => `<span class="availability-step-pill">${escapeHtml(field.label || field.key)}</span>`)
-    .join("");
+  if (!availabilitySelectedFieldId || !bookingFields.some((field) => String(field.id) === availabilitySelectedFieldId)) {
+    availabilitySelectedFieldId = String(bookingFields[0].id);
+  }
+  node.innerHTML = "";
+  for (const field of bookingFields) {
+    const fieldId = String(field.id || "");
+    const enabled = isAvailabilityStepEnabled(fieldId);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = [
+      "availability-step-pill",
+      availabilitySelectedFieldId === fieldId ? "active" : "",
+      enabled ? "" : "disabled",
+    ].filter(Boolean).join(" ");
+    button.dataset.availabilityFieldId = fieldId;
+    button.innerHTML = `${escapeHtml(field.label || field.key)} <span class="availability-step-status">${enabled ? "On" : "Off"}</span>`;
+    button.addEventListener("click", async () => {
+      availabilitySelectedFieldId = fieldId;
+      availabilitySelectedDates = new Set();
+      renderAvailabilityStepSummary();
+      renderAvailabilitySelectedSummary();
+      renderAvailabilityHours();
+      renderAvailabilityStepConfig();
+      await loadAvailabilitySlots();
+    });
+    node.appendChild(button);
+  }
+  renderAvailabilityStepConfig();
+}
+
+function renderAvailabilityStepConfig() {
+  const selectedField = getAvailabilitySelectedField();
+  const enabledInput = el("availabilityStepEnabled");
+  const title = el("availabilityStepConfigTitle");
+  const desc = el("availabilityStepConfigDesc");
+  const editor = document.querySelector(".availability-editor");
+  const selectedFieldId = selectedField ? String(selectedField.id || "") : "";
+  const enabled = selectedFieldId ? isAvailabilityStepEnabled(selectedFieldId) : false;
+
+  if (title) title.textContent = selectedField ? `${selectedField.label || selectedField.key} Setup` : "Booking Step Setup";
+  if (desc) {
+    desc.textContent = selectedField
+      ? "Enable this step, manage consultant recipients, and preview the participant booking view."
+      : "Select a booking step above to manage consultants and preview the participant view.";
+  }
+  if (enabledInput) {
+    enabledInput.checked = enabled;
+    enabledInput.disabled = !selectedField || !availabilityStepSettingsSupported;
+  }
+  const addConsultantButton = el("availabilityAddConsultantBtn");
+  if (addConsultantButton) addConsultantButton.disabled = !selectedField || !availabilityConsultantsSupported;
+  const saveConsultantButton = el("availabilitySaveConsultantsBtn");
+  if (saveConsultantButton) saveConsultantButton.disabled = !selectedField || !availabilityConsultantsSupported;
+  if (editor) editor.classList.toggle("disabled", !enabled);
+  renderAvailabilityConsultants();
+  renderAvailabilityPreviewSelect();
+}
+
+function renderAvailabilityConsultants() {
+  const rows = el("availabilityConsultantRows");
+  if (!rows) return;
+  rows.innerHTML = "";
+  const selectedFieldId = requireAvailabilityFieldId();
+  if (!selectedFieldId) {
+    rows.innerHTML = `<div class="muted small">Select a booking step first.</div>`;
+    return;
+  }
+  if (!availabilityConsultantsSupported) {
+    rows.innerHTML = `<div class="muted small">Consultant settings are not available yet. Run the latest Supabase migration.</div>`;
+    return;
+  }
+  const current = (availabilityConsultants || [])
+    .filter((consultant) => String(consultant.field_id || "") === selectedFieldId && consultant.is_active !== false)
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  if (!current.length) {
+    appendAvailabilityConsultantRow(rows, { name: "", email: "" });
+    return;
+  }
+  for (const consultant of current) appendAvailabilityConsultantRow(rows, consultant);
+}
+
+function appendAvailabilityConsultantRow(container = el("availabilityConsultantRows"), consultant = {}) {
+  if (!container) return;
+  const row = document.createElement("div");
+  row.className = "availability-consultant-row";
+
+  const name = document.createElement("input");
+  name.className = "form-input";
+  name.type = "text";
+  name.placeholder = "Consultant name";
+  name.value = consultant.name || "";
+  name.dataset.consultantName = "true";
+
+  const email = document.createElement("input");
+  email.className = "form-input";
+  email.type = "email";
+  email.placeholder = "consultant@example.com";
+  email.value = consultant.email || "";
+  email.dataset.consultantEmail = "true";
+
+  const remove = document.createElement("button");
+  remove.className = "availability-remove-btn";
+  remove.type = "button";
+  remove.textContent = "x";
+  remove.title = "Remove consultant";
+  remove.addEventListener("click", () => {
+    row.remove();
+    if (!container.querySelector(".availability-consultant-row")) appendAvailabilityConsultantRow(container);
+  });
+
+  row.appendChild(name);
+  row.appendChild(email);
+  row.appendChild(remove);
+  container.appendChild(row);
+}
+
+function renderAvailabilityPreviewSelect() {
+  const select = el("availabilityPreviewRecordSelect");
+  const button = el("availabilityPreviewBtn");
+  if (!select) return;
+  select.innerHTML = "";
+  if (!availabilityPreviewRecords.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No active participants found";
+    select.appendChild(option);
+    if (button) button.disabled = true;
+    return;
+  }
+  for (const record of availabilityPreviewRecords) {
+    const option = document.createElement("option");
+    option.value = record.id;
+    option.textContent = `${record.title || "Participant"}${record.code ? " (" + record.code + ")" : ""}`;
+    select.appendChild(option);
+  }
+  if (button) button.disabled = false;
+}
+
+async function loadAvailabilityStepSettings() {
+  const bookingFields = getAvailabilityBookingFields();
+  availabilityStepSettings = new Map();
+  if (!bookingFields.length) {
+    renderAvailabilityStepSummary();
+    return;
+  }
+  const fieldIds = bookingFields.map((field) => field.id);
+  const { data, error } = await supabase
+    .from("project_availability_step_settings")
+    .select("id, project_id, field_id, is_enabled")
+    .eq("project_id", PROJECT_ID)
+    .in("field_id", fieldIds);
+
+  if (error) {
+    availabilityStepSettingsSupported = false;
+    showHint("Availability step settings are not available. Run the latest Supabase migration.", true);
+    for (const field of bookingFields) {
+      availabilityStepSettings.set(String(field.id), { field_id: field.id, is_enabled: true });
+    }
+    renderAvailabilityStepSummary();
+    return;
+  }
+
+  availabilityStepSettingsSupported = true;
+  for (const setting of data || []) {
+    availabilityStepSettings.set(String(setting.field_id), { ...setting, is_enabled: setting.is_enabled === true });
+  }
+
+  const missing = bookingFields.filter((field) => !availabilityStepSettings.has(String(field.id)));
+  if (missing.length) {
+    const payload = missing.map((field) => ({
+      project_id: PROJECT_ID,
+      field_id: field.id,
+      is_enabled: false,
+      created_by: session.user.id,
+    }));
+    const { data: inserted, error: insertError } = await supabase
+      .from("project_availability_step_settings")
+      .upsert(payload, { onConflict: "project_id,field_id" })
+      .select("id, project_id, field_id, is_enabled");
+    if (insertError) {
+      showHint("Failed to initialize booking step settings: " + insertError.message, true);
+    } else {
+      for (const setting of inserted || []) {
+        availabilityStepSettings.set(String(setting.field_id), { ...setting, is_enabled: setting.is_enabled === true });
+      }
+    }
+  }
+
+  renderAvailabilityStepSummary();
+}
+
+async function setAvailabilityStepEnabled(enabled) {
+  const fieldId = requireAvailabilityFieldId();
+  if (!fieldId || !availabilityStepSettingsSupported) return;
+  const { data, error } = await supabase
+    .from("project_availability_step_settings")
+    .upsert({
+      project_id: PROJECT_ID,
+      field_id: fieldId,
+      is_enabled: enabled,
+      created_by: session.user.id,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "project_id,field_id" })
+    .select("id, project_id, field_id, is_enabled")
+    .maybeSingle();
+  if (error) {
+    showHint("Failed to update booking step: " + error.message, true);
+    renderAvailabilityStepConfig();
+    return;
+  }
+  availabilityStepSettings.set(fieldId, { ...data, is_enabled: data?.is_enabled === true });
+  if (!enabled) availabilitySelectedDates = new Set();
+  renderAvailabilityStepSummary();
+  renderAvailabilitySelectedSummary();
+  renderAvailabilityCalendar();
+  renderAvailabilityHours();
+  await loadAvailabilitySlots();
+  showHint(`${enabled ? "Enabled" : "Disabled"} booking calendar for this step.`, false);
+}
+
+async function loadAvailabilityConsultants() {
+  const { data, error } = await supabase
+    .from("project_availability_consultants")
+    .select("id, project_id, field_id, name, email, is_active, sort_order")
+    .eq("project_id", PROJECT_ID)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    availabilityConsultantsSupported = false;
+    availabilityConsultants = [];
+    renderAvailabilityStepConfig();
+    return;
+  }
+  availabilityConsultantsSupported = true;
+  availabilityConsultants = data || [];
+  renderAvailabilityStepConfig();
+}
+
+async function saveAvailabilityConsultants() {
+  const fieldId = requireAvailabilityFieldId();
+  if (!fieldId) {
+    showHint("Select a booking step first.", true);
+    return;
+  }
+  const rows = [...(el("availabilityConsultantRows")?.querySelectorAll(".availability-consultant-row") || [])];
+  const consultants = [];
+  const seenEmails = new Set();
+  for (const [index, row] of rows.entries()) {
+    const name = String(row.querySelector("[data-consultant-name]")?.value || "").trim();
+    const email = String(row.querySelector("[data-consultant-email]")?.value || "").trim().toLowerCase();
+    if (!name && !email) continue;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showHint("Enter a valid consultant email.", true);
+      return;
+    }
+    if (seenEmails.has(email)) continue;
+    seenEmails.add(email);
+    consultants.push({
+      project_id: PROJECT_ID,
+      field_id: fieldId,
+      name: name || email,
+      email,
+      is_active: true,
+      sort_order: index,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  const saveButton = el("availabilitySaveConsultantsBtn");
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+  }
+
+  const { error: deleteError } = await supabase
+    .from("project_availability_consultants")
+    .delete()
+    .eq("project_id", PROJECT_ID)
+    .eq("field_id", fieldId);
+  if (deleteError) {
+    showHint("Failed to save consultants: " + deleteError.message, true);
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = "Save Consultants";
+    }
+    return;
+  }
+  if (consultants.length) {
+    const { error: insertError } = await supabase
+      .from("project_availability_consultants")
+      .insert(consultants);
+    if (insertError) {
+      showHint("Failed to save consultants: " + insertError.message, true);
+      if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.textContent = "Save Consultants";
+      }
+      return;
+    }
+  }
+  if (saveButton) {
+    saveButton.disabled = false;
+    saveButton.textContent = "Save Consultants";
+  }
+  await loadAvailabilityConsultants();
+  showHint("Consultants saved.", false);
+}
+
+async function loadAvailabilityPreviewRecords() {
+  const { data, error } = await supabase
+    .from("records")
+    .select("id, code, title, active")
+    .eq("project_id", PROJECT_ID)
+    .neq("active", false)
+    .order("title", { ascending: true });
+  if (error) {
+    availabilityPreviewRecords = [];
+    renderAvailabilityPreviewSelect();
+    return;
+  }
+  availabilityPreviewRecords = data || [];
+  renderAvailabilityPreviewSelect();
+}
+
+function openAvailabilityParticipantPreview() {
+  const recordId = String(el("availabilityPreviewRecordSelect")?.value || "").trim();
+  if (!recordId) {
+    showHint("Select a participant to preview.", true);
+    return;
+  }
+  sessionStorage.setItem("admin_preview_record_id", recordId);
+  window.open(`./participant-status.html?preview_record=${encodeURIComponent(recordId)}`, "_blank", "noopener");
 }
 
 async function loadAvailabilitySlots() {
   const list = el("availabilitySlotList");
   if (list) list.innerHTML = `<div class="muted">Loading slots...</div>`;
+  const fieldId = requireAvailabilityFieldId();
+  if (!fieldId) {
+    availabilitySlots = [];
+    renderAvailabilityCalendar();
+    renderAvailabilitySlotList();
+    return;
+  }
 
   const { data, error } = await supabase
     .from("project_availability_slots")
-    .select("id, project_id, slot_date, start_time, end_time, timezone, is_active")
+    .select("id, project_id, field_id, slot_date, start_time, end_time, timezone, is_active")
     .eq("project_id", PROJECT_ID)
+    .eq("field_id", fieldId)
     .order("slot_date", { ascending: true })
     .order("start_time", { ascending: true });
 
@@ -2518,6 +2963,15 @@ async function loadAvailabilitySlots() {
 }
 
 async function applyAvailabilitySlots() {
+  const fieldId = requireAvailabilityFieldId();
+  if (!fieldId) {
+    showHint("Select a booking step first.", true);
+    return;
+  }
+  if (!isAvailabilityStepEnabled(fieldId)) {
+    showHint("Enable booking calendar for this step before applying slots.", true);
+    return;
+  }
   if (!availabilitySelectedDates.size) {
     showHint("Select at least one date.", true);
     return;
@@ -2536,6 +2990,7 @@ async function applyAvailabilitySlots() {
     for (const hour of hours) {
       payload.push({
         project_id: PROJECT_ID,
+        field_id: fieldId,
         slot_date: dateKey,
         start_time: hour.start,
         end_time: hour.end,
@@ -2560,7 +3015,7 @@ async function applyAvailabilitySlots() {
 
   const { error } = await supabase
     .from("project_availability_slots")
-    .upsert(payload, { onConflict: "project_id,slot_date,start_time" });
+    .upsert(payload, { onConflict: "project_id,field_id,slot_date,start_time" });
 
   if (button) {
     button.disabled = false;
@@ -2596,6 +3051,12 @@ el("availabilityAddHourBtn")?.addEventListener("click", () => {
 });
 el("availabilityApplyBtn")?.addEventListener("click", () => applyAvailabilitySlots().catch(console.error));
 el("availabilityRefreshBtn")?.addEventListener("click", () => loadAvailabilitySlots().catch(console.error));
+el("availabilityStepEnabled")?.addEventListener("change", (event) => {
+  setAvailabilityStepEnabled(event.target.checked).catch(console.error);
+});
+el("availabilityAddConsultantBtn")?.addEventListener("click", () => appendAvailabilityConsultantRow());
+el("availabilitySaveConsultantsBtn")?.addEventListener("click", () => saveAvailabilityConsultants().catch(console.error));
+el("availabilityPreviewBtn")?.addEventListener("click", () => openAvailabilityParticipantPreview());
 populateAvailabilityTimezoneSelect();
 renderAvailabilityHours();
 renderAvailabilitySelectedSummary();
@@ -2606,7 +3067,6 @@ renderAvailabilitySelectedSummary();
 const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
 const DASHBOARD_TOGGLE_ALLOWED_ROLES = new Set(["email"]);
 let supportsVisibilityChannels = true;
-let fields = [];
 
 async function loadFields() {
   let { data, error } = await supabase
@@ -3553,13 +4013,18 @@ el("importBtn").addEventListener("click", async () => {
 /* ── init ── */
 await Promise.all([
   loadProject(),
-  loadFields(),
-  loadAvailabilitySlots(),
   loadMembers(),
   loadAllProfiles(),
   loadProjectUpdateSettings(),
   loadEmailRunHistory(),
   loadInternalPortfolioContext(),
+]);
+await loadFields();
+await loadAvailabilityStepSettings();
+await Promise.all([
+  loadAvailabilityConsultants(),
+  loadAvailabilityPreviewRecords(),
+  loadAvailabilitySlots(),
 ]);
 </script>
 </body>

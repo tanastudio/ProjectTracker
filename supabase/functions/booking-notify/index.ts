@@ -14,7 +14,7 @@ type BookingNotifyBody = {
 };
 
 type EmailPayload = {
-  to: string;
+  to: string[];
   subject: string;
   title: string;
   body: string;
@@ -123,12 +123,33 @@ async function getParticipantEmail(
   return raw || null;
 }
 
+async function getConsultantEmails(
+  adminClient: ReturnType<typeof createClient>,
+  projectId: string,
+  fieldId: string,
+): Promise<string[]> {
+  const { data, error } = await adminClient
+    .from("project_availability_consultants")
+    .select("email")
+    .eq("project_id", projectId)
+    .eq("field_id", fieldId)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    console.warn("booking-notify: cannot load consultants", error.message);
+    return [];
+  }
+  return (data || [])
+    .map((row) => String(row?.email || "").trim().toLowerCase())
+    .filter((email, index, list) => isValidEmail(email) && list.indexOf(email) === index);
+}
+
 async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
   const res = await fetch(n8nWebhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      to_emails: [payload.to],
+      to_emails: payload.to,
       email_subject: payload.subject,
       name: payload.participantName || "Participant",
       message_title: payload.title,
@@ -173,7 +194,7 @@ async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPa
     },
     body: JSON.stringify({
       from: fromEmail,
-      to: [payload.to],
+      to: payload.to,
       subject: payload.subject,
       html,
       text: `${payload.title}\n\n${payload.body}\n\n${payload.actionText}: ${payload.actionUrl}`,
@@ -267,12 +288,16 @@ serve(async (req) => {
     const stepLabel = String(field?.label || "Booking");
     const slotLabel = formatSlotLabel(slot || {});
     const actionUrl = `${trackerBaseUrl}/participant-status.html`;
+    const consultantRecipients = await getConsultantEmails(adminClient, booking.project_id, booking.field_id);
+    const recipients = [recipient, ...consultantRecipients]
+      .map((email) => email.trim().toLowerCase())
+      .filter((email, index, list) => isValidEmail(email) && list.indexOf(email) === index);
 
     const result = await sendEmail({
-      to: recipient,
+      to: recipients,
       subject: `[Booking Confirmed] ${stepLabel} - ${projectName}`,
       title: "Booking confirmed",
-      body: `Your booking for ${stepLabel} is confirmed.\n\nDate and time: ${slotLabel}`,
+      body: `${participantName}'s booking for ${stepLabel} is confirmed.\n\nDate and time: ${slotLabel}`,
       actionUrl,
       actionText: "View My Status",
       projectName,
@@ -286,7 +311,7 @@ serve(async (req) => {
       .update({ notification_sent_at: new Date().toISOString(), notification_error: null, updated_at: new Date().toISOString() })
       .eq("id", bookingId);
 
-    return json({ ok: true, sent_to: [recipient], provider: result.provider });
+    return json({ ok: true, sent_to: recipients, provider: result.provider });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unexpected error";
     console.error("booking-notify error:", err);

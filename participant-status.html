@@ -1701,15 +1701,19 @@
 
         let AVAILABLE_SLOTS = [];
         let BOOKINGS_BY_FIELD = new Map();
+        let BOOKING_ENABLED_FIELD_IDS = new Set();
+        let BOOKING_SETTINGS_SUPPORTED = true;
         const BOOKING_CALENDAR_STATE = new Map();
         let PARTICIPANT_BOOKING_TIMEZONE =
             sessionStorage.getItem("participant_booking_timezone") ||
             getDefaultBookingTimezone("Asia/Bangkok");
 
-        function getAvailableSlotsByDate() {
+        function getAvailableSlotsByDate(fieldId) {
             const today = getDateKeyForTimezone(PARTICIPANT_BOOKING_TIMEZONE);
             const byDate = new Map();
+            const targetFieldId = String(fieldId || "");
             for (const slot of AVAILABLE_SLOTS || []) {
+                if (String(slot.field_id || "") !== targetFieldId) continue;
                 if (slot.is_booked) continue;
                 const dateKey = formatDateKeyInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
                 if (!dateKey || dateKey < today) continue;
@@ -1725,9 +1729,8 @@
             return byDate;
         }
 
-        function getBookingCalendarState(fieldId) {
+        function getBookingCalendarState(fieldId, slotsByDate) {
             const key = String(fieldId || "");
-            const slotsByDate = getAvailableSlotsByDate();
             const firstDateKey = [...slotsByDate.keys()].sort()[0] || getDateKeyForTimezone(PARTICIPANT_BOOKING_TIMEZONE);
             const firstDate = parseDateKeyLocal(firstDateKey);
             const fallbackMonth = firstDate || new Date();
@@ -1795,8 +1798,8 @@
         }
 
         function renderBookingCalendar(container, step) {
-            const slotsByDate = getAvailableSlotsByDate();
-            const state = getBookingCalendarState(step.id);
+            const slotsByDate = getAvailableSlotsByDate(step.id);
+            const state = getBookingCalendarState(step.id, slotsByDate);
             const selectedSlots = slotsByDate.get(state.selectedDateKey) || [];
 
             container.innerHTML = "";
@@ -2240,6 +2243,22 @@
         async function loadParticipantBookingData(projectId, recordId) {
             const nextBookings = new Map();
             let nextSlots = [];
+            const nextEnabledFieldIds = new Set();
+
+            const { data: settingData, error: settingError } = await supabase
+                .from("project_availability_step_settings")
+                .select("field_id, is_enabled")
+                .eq("project_id", projectId)
+                .eq("is_enabled", true);
+            if (!settingError) {
+                BOOKING_SETTINGS_SUPPORTED = true;
+                for (const setting of settingData || []) {
+                    if (setting.field_id) nextEnabledFieldIds.add(String(setting.field_id));
+                }
+            } else {
+                BOOKING_SETTINGS_SUPPORTED = false;
+                console.warn("Booking step settings unavailable:", settingError.message || settingError);
+            }
 
             const { data: slotData, error: slotError } = await supabase.rpc("get_project_availability_slots", {
                 p_project_id: projectId,
@@ -2263,6 +2282,7 @@
 
             AVAILABLE_SLOTS = nextSlots;
             BOOKINGS_BY_FIELD = nextBookings;
+            BOOKING_ENABLED_FIELD_IDS = nextEnabledFieldIds;
         }
 
         let { data: fieldsRaw, error: fErr } = await supabase
@@ -2324,11 +2344,14 @@
 
         const renderedSteps = (fields || []).map((f) => {
             const booking = BOOKINGS_BY_FIELD.get(String(f.id || ""));
+            const isEnabledBookingStep = isBookingField(f) && (
+                BOOKING_SETTINGS_SUPPORTED ? BOOKING_ENABLED_FIELD_IDS.has(String(f.id || "")) : true
+            );
             return {
                 id: f.id,
                 key: f.key,
                 label: f.label,
-                isBooking: isBookingField(f),
+                isBooking: isEnabledBookingStep || Boolean(booking),
                 booking,
                 status: booking ? "Completed" : normalizeStatus(vals[f.key] || ""),
             };
