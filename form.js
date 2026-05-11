@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient.js";
 import { STEP_STATUS, normalizeStatus, computeOverall } from "./lib/form-utils.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+import { bookingMapKey, formatBookingDateTime, isBookingField } from "./lib/booking-utils.js";
 
 const UUID_PAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -279,6 +280,7 @@ await ticketNavBadge.refresh();
 let FIELDS    = { list: [], byKey: {}, byId: new Map() };
 let MODEL     = [];
 let SELECTED  = null;
+let BOOKINGS_BY_RECORD_FIELD = new Map();
 
 /* Derived from FIELDS after each reload */
 let SELECT_FIELDS        = [];   // fields with type="select" excluding overall_status
@@ -353,10 +355,31 @@ async function loadRecordValues(recordIds) {
     return data || [];
 }
 
+async function loadBookingValues(recordIds) {
+    const byRecordField = new Map();
+    if (!recordIds || recordIds.length === 0) return byRecordField;
+
+    const { data, error } = await supabase
+        .from("project_availability_bookings")
+        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone)")
+        .in("record_id", recordIds)
+        .eq("status", "booked");
+
+    if (error) {
+        console.warn("Booking values unavailable:", error.message || error);
+        return byRecordField;
+    }
+
+    for (const booking of data || []) {
+        byRecordField.set(bookingMapKey(booking.record_id, booking.field_id), booking);
+    }
+    return byRecordField;
+}
+
 /* ============================================================
    BUILD MODEL
    ============================================================ */
-function buildModel(records, recordValues) {
+function buildModel(records, recordValues, bookingsByRecordField = new Map()) {
     const byRecord = new Map();
     for (const rv of recordValues) {
         const field = FIELDS.byId.get(rv.field_id);
@@ -381,13 +404,26 @@ function buildModel(records, recordValues) {
             updatedBy: r.updated_by || "",
             active:    r.active !== false,
             steps:     {},
+            bookings:  {},
+            bookingDates: {},
+            _bookingStatusNeedsSync: {},
             issue:     String(vals.issue    ?? ""),
             decision:  String(vals.decision ?? ""),
             overall:   String(vals.overall_status ?? "").trim(),
         };
 
         for (const f of SELECT_FIELDS) {
-            row.steps[f.key] = normalizeStatus(vals[f.key], f.options);
+            const booking = isBookingField(f) ? bookingsByRecordField.get(bookingMapKey(r.id, f.id)) : null;
+            if (booking) {
+                row.bookings[f.key] = booking;
+                row.bookingDates[f.key] = formatBookingDateTime(booking);
+                row.steps[f.key] = "Completed";
+                if (normalizeStatus(vals[f.key], f.options) !== "Completed") {
+                    row._bookingStatusNeedsSync[f.key] = true;
+                }
+            } else {
+                row.steps[f.key] = normalizeStatus(vals[f.key], f.options);
+            }
         }
 
         if (!row.overall) {
@@ -428,6 +464,16 @@ async function upsertRecordValue(recordId, fieldKey, value) {
         }, { onConflict: "record_id,field_id" });
 
     if (error) throw error;
+}
+
+async function syncBookedStepStatuses(rows) {
+    const jobs = [];
+    for (const row of rows || []) {
+        for (const key of Object.keys(row._bookingStatusNeedsSync || {})) {
+            jobs.push(upsertRecordValue(row.id, key, "Completed"));
+        }
+    }
+    if (jobs.length) await Promise.all(jobs);
 }
 
 async function updateRecordBase(row) {
@@ -572,8 +618,16 @@ function buildStepSelectsUI() {
 
         wrapper.appendChild(lbl);
         wrapper.appendChild(sel);
+
+        let bookingDateDisplay = null;
+        if (isBookingField(f)) {
+            bookingDateDisplay = document.createElement("div");
+            bookingDateDisplay.className = "booking-date-inline";
+            wrapper.appendChild(bookingDateDisplay);
+        }
+
         stepsGrid.appendChild(wrapper);
-        STEP_SELECTS.push({ field: f, select: sel });
+        STEP_SELECTS.push({ field: f, select: sel, bookingDateDisplay });
     }
 
     // Overall Status - read-only, computed by DB
@@ -596,6 +650,10 @@ function bindTopFormStepEvents() {
     for (const { field, select } of STEP_SELECTS) {
         select.addEventListener("change", () => {
             if (TOP_FORM_LOCK || !SELECTED) return;
+            if (SELECTED.bookings?.[field.key]) {
+                select.value = "Completed";
+                return;
+            }
             SELECTED.steps[field.key] = select.value;
             markDirty(SELECTED, field.key, select.value);
             recomputeOverall(SELECTED);
@@ -622,8 +680,20 @@ function updateTopFormFromRow(row) {
     candIssue.value     = row.issue     || "";
     candDecision.value  = row.decision  || "";
 
-    for (const { field, select } of STEP_SELECTS) {
-        select.value = row.steps[field.key] ?? getDefaultOption(field);
+    for (const { field, select, bookingDateDisplay } of STEP_SELECTS) {
+        const hasBooking = !!row.bookings?.[field.key];
+        if (hasBooking && ![...select.options].some((option) => option.value === "Completed")) {
+            const completed = document.createElement("option");
+            completed.value = "Completed";
+            completed.textContent = "Completed";
+            select.appendChild(completed);
+        }
+        select.value = hasBooking ? "Completed" : (row.steps[field.key] ?? getDefaultOption(field));
+        select.disabled = hasBooking;
+        select.classList.toggle("booking-locked", hasBooking);
+        if (bookingDateDisplay) {
+            bookingDateDisplay.textContent = hasBooking ? `Booked: ${row.bookingDates?.[field.key] || "-"}` : "";
+        }
     }
 
     if (overallStatusDisplay) {
@@ -717,6 +787,9 @@ function renderTableHead() {
     // Dynamic select columns (from DB)
     for (const f of SELECT_FIELDS) {
         tr.appendChild(makeSortTh(f.key, f.label, null, null));
+        if (isBookingField(f)) {
+            tr.appendChild(makeSortTh(`${f.key}__booking_date`, `${f.label} Date`, "180px", null));
+        }
     }
 
     // Overall Status (read-only, DB-computed)
@@ -803,6 +876,10 @@ function getSortValue(row, key) {
     if (key === "decision")  return row.decision  || "";
     if (key === "updatedBy") return row.updatedBy || "";
     if (key === "active")    return row.active ? "Active" : "Inactive";
+    if (key.endsWith("__booking_date")) {
+        const stepKey = key.replace(/__booking_date$/, "");
+        return row.bookingDates?.[stepKey] || "";
+    }
 
     const f = SELECT_FIELDS.find(f => f.key === key);
     if (f) return row.steps[key] || getDefaultOption(f);
@@ -873,7 +950,8 @@ function currentFilteredModel() {
 function makeSelect(field, statusValue, onChange) {
     const sel  = document.createElement("select");
     sel.className = "cell-select";
-    const opts = (Array.isArray(field.options) && field.options.length) ? field.options : STEP_STATUS;
+    const opts = [...((Array.isArray(field.options) && field.options.length) ? field.options : STEP_STATUS)];
+    if (statusValue && !opts.includes(statusValue)) opts.push(statusValue);
     for (const s of opts) {
         const o       = document.createElement("option");
         o.value       = s;
@@ -953,7 +1031,12 @@ function buildRow(r) {
     // Dynamic select fields
     for (const f of SELECT_FIELDS) {
         const td  = document.createElement("td");
+        const hasBooking = !!r.bookings?.[f.key];
         const sel = makeSelect(f, r.steps[f.key], () => {
+            if (r.bookings?.[f.key]) {
+                sel.value = "Completed";
+                return;
+            }
             r.steps[f.key] = sel.value;
             sel.classList.remove("status-not-started", "status-in-progress", "status-completed", "status-issue");
             sel.classList.add(statusClassSuffix(sel.value));
@@ -962,9 +1045,21 @@ function buildRow(r) {
             scheduleRowSave(r);
         });
         sel.classList.add(statusClassSuffix(r.steps[f.key]));
+        if (hasBooking) {
+            sel.disabled = true;
+            sel.classList.add("booking-locked");
+            sel.title = "Booking date exists; status is completed.";
+        }
         sel.dataset.cellKey = f.key;
         td.appendChild(sel);
         tr.appendChild(td);
+
+        if (isBookingField(f)) {
+            const tdDate = document.createElement("td");
+            tdDate.appendChild(makeTextCell(r.bookingDates?.[f.key] || "", { key: `${f.key}__booking_date` }));
+            tdDate.querySelector("[data-cell-key]")?.classList.add("booking-date-cell");
+            tr.appendChild(tdDate);
+        }
     }
 
     // Overall Status (read-only, DB-computed)
@@ -1066,6 +1161,12 @@ function updateRowCells(tr, r) {
     for (const cell of tr.querySelectorAll("[data-cell-key]")) {
         if (cell === focused) continue;
         const key    = cell.dataset.cellKey;
+        if (key.endsWith("__booking_date")) {
+            const stepKey = key.replace(/__booking_date$/, "");
+            cell.textContent = r.bookingDates?.[stepKey] || "";
+            cell.classList.add("booking-date-cell");
+            continue;
+        }
         const newVal =
             key === "code"      ? r.code      :
             key === "name"      ? r.name      :
@@ -1094,6 +1195,9 @@ function updateRowCells(tr, r) {
             if (newVal !== undefined && cell.value !== String(newVal)) cell.value = newVal;
             cell.classList.remove("status-not-started", "status-in-progress", "status-completed", "status-issue");
             cell.classList.add(statusClassSuffix(cell.value));
+            const hasBooking = !!r.bookings?.[key];
+            cell.disabled = hasBooking;
+            cell.classList.toggle("booking-locked", hasBooking);
             continue;
         }
         if (cell.tagName === "INPUT" || cell.tagName === "TEXTAREA") {
@@ -1294,8 +1398,12 @@ async function reloadAll() {
             if (namesMap.has(r.updated_by)) r.updated_by = namesMap.get(r.updated_by);
         }
         const values  = await loadRecordValues(records.map(r => r.id));
+        BOOKINGS_BY_RECORD_FIELD = await loadBookingValues(records.map(r => r.id));
 
-        MODEL        = buildModel(records, values);
+        MODEL        = buildModel(records, values, BOOKINGS_BY_RECORD_FIELD);
+        await syncBookedStepStatuses(MODEL).catch((error) => {
+            console.warn("Booked step status sync failed:", error?.message || error);
+        });
         ROW_ELEMENTS.clear();
         if (tbody) tbody.innerHTML = "";
 
