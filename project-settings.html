@@ -495,8 +495,31 @@
       display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;
       border: 1px solid rgba(15,23,42,.08); border-radius: 10px; background: #fff; padding: 9px 10px;
     }
+    .availability-slot-row.booked { border-color: rgba(13,148,136,.22); background: #f8fffd; }
     .availability-slot-title { font-size: 13px; font-weight: 900; color: #0f172a; }
     .availability-slot-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .availability-slot-booking { font-size: 12px; color: #0f766e; font-weight: 800; margin-top: 4px; }
+    .availability-slot-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .availability-preview-modal { width: min(980px, 100%); }
+    .availability-preview-banner {
+      background: #082644; color: #fff; padding: 10px 14px; font-size: 13px; font-weight: 800;
+      border-radius: 12px 12px 0 0;
+    }
+    .availability-preview-hero {
+      padding: 22px 16px; text-align: center; border-bottom: 1px solid rgba(15,23,42,.10);
+    }
+    .availability-preview-title { margin: 0 0 10px; font-size: 26px; font-weight: 900; color: #082644; }
+    .availability-preview-meta { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; color: #64748b; font-size: 13px; font-weight: 800; }
+    .availability-preview-body { padding: 20px; }
+    .availability-preview-layout { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(260px, 1.15fr); gap: 20px; align-items: start; }
+    .availability-preview-timezone { display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 14px; }
+    .availability-preview-timezone label { font-size: 12px; font-weight: 900; color: #0f172a; }
+    .availability-preview-selected { font-size: 15px; font-weight: 900; color: #0f172a; margin-bottom: 12px; }
+    .availability-preview-time-list { display: grid; gap: 10px; }
+    .availability-preview-time {
+      min-height: 48px; border-radius: 6px; border: 1px solid #6ea2ff; background: #fff;
+      color: #0066ff; font-size: 16px; font-weight: 900;
+    }
 
     .csv-preview { overflow-x: auto; margin-top: 10px; }
     .csv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -528,6 +551,7 @@
       .availability-layout { grid-template-columns: 1fr; }
       .availability-consultant-row,
       .availability-preview-row { grid-template-columns: 1fr; }
+      .availability-preview-layout { grid-template-columns: 1fr; }
       .email-history-grid { grid-template-columns: 1fr; }
       .email-history-head { flex-direction: column; align-items: stretch; }
       .member-table-head { display: none; }
@@ -986,6 +1010,9 @@
                 <button class="btn-primary" id="availabilityApplyBtn" type="button">Apply Slots</button>
                 <button class="btn-ghost" id="availabilityRefreshBtn" type="button">Refresh Slots</button>
               </div>
+              <div class="btn-row">
+                <button class="btn-ghost" id="availabilityPreviewBtn" type="button">Preview Booking Page</button>
+              </div>
             </div>
           </div>
 
@@ -1010,13 +1037,6 @@
             <div class="btn-row">
               <button class="btn-ghost" id="availabilityAddConsultantBtn" type="button">+ Add Consultant</button>
               <button class="btn-primary" id="availabilitySaveConsultantsBtn" type="button">Save Consultants</button>
-            </div>
-            <div class="availability-preview-row">
-              <div class="form-group" style="margin-bottom:0">
-                <label>Preview as participant</label>
-                <select class="form-select" id="availabilityPreviewRecordSelect"></select>
-              </div>
-              <button class="btn-ghost" id="availabilityPreviewBtn" type="button">Preview Participant View</button>
             </div>
           </div>
         </div>
@@ -1226,6 +1246,22 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="availabilityPreviewModal" aria-hidden="true">
+  <div class="modal-panel availability-preview-modal" role="dialog" aria-modal="true" aria-labelledby="availabilityPreviewTitle">
+    <div class="availability-preview-banner">
+      This is a preview. Participants can select a time, then confirm before booking.
+    </div>
+    <div class="modal-head">
+      <div>
+        <h2 class="modal-title" id="availabilityPreviewTitle">Booking Preview</h2>
+        <p class="modal-desc" id="availabilityPreviewDesc">Preview the selected booking step calendar.</p>
+      </div>
+      <button class="modal-close" id="availabilityPreviewCloseBtn" type="button" aria-label="Close">x</button>
+    </div>
+    <div class="modal-body" id="availabilityPreviewBody"></div>
+  </div>
+</div>
+
 <script type="module">
 import { supabase } from "./supabaseClient.js";
 import { SUPABASE_URL } from "./js/config.js";
@@ -1240,8 +1276,11 @@ import {
 } from "./lib/project-update-email-utils.js";
 import {
   BOOKING_TIMEZONES,
+  formatDateKeyInTimezone,
   formatSlotDateTime,
+  formatSlotTimeInTimezone,
   formatTimezoneLabel,
+  getDateKeyForTimezone,
   getDefaultBookingTimezone,
   getTodayKey,
   isBookingField,
@@ -2311,13 +2350,17 @@ availabilityMonth = new Date(availabilityMonth.getFullYear(), availabilityMonth.
 let availabilitySelectedDates = new Set();
 let availabilityHourRows = [{ start: "09:00", end: "17:00" }];
 let availabilitySlots = [];
+let availabilityBookingsBySlot = new Map();
 let availabilitySlotsSupported = true;
 let availabilityStepSettings = new Map();
 let availabilityConsultants = [];
 let availabilitySelectedFieldId = "";
-let availabilityPreviewRecords = [];
 let availabilityStepSettingsSupported = true;
 let availabilityConsultantsSupported = true;
+let availabilityPreviewTimezone = availabilityTimezone;
+let availabilityPreviewMonth = new Date();
+availabilityPreviewMonth = new Date(availabilityPreviewMonth.getFullYear(), availabilityPreviewMonth.getMonth(), 1);
+let availabilityPreviewSelectedDate = "";
 
 function dateKeyFromParts(year, monthIndex, day) {
   return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -2546,8 +2589,9 @@ function renderAvailabilitySlotList() {
 
   list.innerHTML = "";
   for (const slot of activeSlots) {
+    const booking = availabilityBookingsBySlot.get(String(slot.id || ""));
     const row = document.createElement("div");
-    row.className = "availability-slot-row";
+    row.className = ["availability-slot-row", booking ? "booked" : ""].filter(Boolean).join(" ");
 
     const copy = document.createElement("div");
     const title = document.createElement("div");
@@ -2558,30 +2602,85 @@ function renderAvailabilitySlotList() {
     meta.textContent = `${selectedField.label || selectedField.key} · ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
     copy.appendChild(title);
     copy.appendChild(meta);
+    if (booking) {
+      const booked = document.createElement("div");
+      booked.className = "availability-slot-booking";
+      const record = booking.records || {};
+      booked.textContent = `Booked by ${record.title || record.code || "participant"}`;
+      copy.appendChild(booked);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "availability-slot-actions";
+    if (booking) {
+      const cancel = document.createElement("button");
+      cancel.className = "btn-ghost";
+      cancel.type = "button";
+      cancel.textContent = "Cancel Booking";
+      cancel.addEventListener("click", () => cancelAvailabilityBooking(booking, cancel));
+      actions.appendChild(cancel);
+    }
 
     const remove = document.createElement("button");
     remove.className = "btn-danger-sm";
     remove.type = "button";
-    remove.textContent = "Remove";
-    remove.addEventListener("click", async () => {
-      remove.disabled = true;
-      const { error } = await supabase
-        .from("project_availability_slots")
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq("id", slot.id);
-      if (error) {
-        showHint("Failed to remove slot: " + error.message, true);
-        remove.disabled = false;
-        return;
-      }
-      await loadAvailabilitySlots();
-      showHint("Slot removed.", false);
-    });
+    remove.textContent = booking ? "Cancel & Remove" : "Remove Slot";
+    remove.addEventListener("click", () => removeAvailabilitySlot(slot, booking, remove));
+    actions.appendChild(remove);
 
     row.appendChild(copy);
-    row.appendChild(remove);
+    row.appendChild(actions);
     list.appendChild(row);
   }
+}
+
+async function cancelAvailabilityBooking(booking, button) {
+  if (!booking?.id) return;
+  if (!confirm("Cancel this booking and make the slot available again?")) return;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Cancelling...";
+  }
+  const { error } = await supabase.rpc("cancel_project_availability_booking", {
+    p_booking_id: booking.id,
+  });
+  if (error) {
+    showHint("Failed to cancel booking: " + error.message, true);
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Cancel Booking";
+    }
+    return;
+  }
+  await loadAvailabilitySlots();
+  showHint("Booking cancelled. The slot is available again.", false);
+}
+
+async function removeAvailabilitySlot(slot, booking, button) {
+  if (!slot?.id) return;
+  const hasBooking = Boolean(booking?.id);
+  const message = hasBooking
+    ? "This slot is booked. Cancel the booking and remove the slot from the calendar?"
+    : "Remove this slot from the participant calendar?";
+  if (!confirm(message)) return;
+  if (button) {
+    button.disabled = true;
+    button.textContent = hasBooking ? "Removing..." : "Removing...";
+  }
+  const { error } = await supabase.rpc("remove_project_availability_slot", {
+    p_slot_id: slot.id,
+    p_cancel_booking: hasBooking,
+  });
+  if (error) {
+    showHint("Failed to remove slot: " + error.message, true);
+    if (button) {
+      button.disabled = false;
+      button.textContent = hasBooking ? "Cancel & Remove" : "Remove Slot";
+    }
+    return;
+  }
+  await loadAvailabilitySlots();
+  showHint(hasBooking ? "Booking cancelled and slot removed." : "Slot removed.", false);
 }
 
 function renderAvailabilityStepSummary() {
@@ -2649,9 +2748,10 @@ function renderAvailabilityStepConfig() {
   if (addConsultantButton) addConsultantButton.disabled = !selectedField || !availabilityConsultantsSupported;
   const saveConsultantButton = el("availabilitySaveConsultantsBtn");
   if (saveConsultantButton) saveConsultantButton.disabled = !selectedField || !availabilityConsultantsSupported;
+  const previewButton = el("availabilityPreviewBtn");
+  if (previewButton) previewButton.disabled = !selectedField || !enabled;
   if (editor) editor.classList.toggle("disabled", !enabled);
   renderAvailabilityConsultants();
-  renderAvailabilityPreviewSelect();
 }
 
 function renderAvailabilityConsultants() {
@@ -2710,28 +2810,6 @@ function appendAvailabilityConsultantRow(container = el("availabilityConsultantR
   row.appendChild(email);
   row.appendChild(remove);
   container.appendChild(row);
-}
-
-function renderAvailabilityPreviewSelect() {
-  const select = el("availabilityPreviewRecordSelect");
-  const button = el("availabilityPreviewBtn");
-  if (!select) return;
-  select.innerHTML = "";
-  if (!availabilityPreviewRecords.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No active participants found";
-    select.appendChild(option);
-    if (button) button.disabled = true;
-    return;
-  }
-  for (const record of availabilityPreviewRecords) {
-    const option = document.createElement("option");
-    option.value = record.id;
-    option.textContent = `${record.title || "Participant"}${record.code ? " (" + record.code + ")" : ""}`;
-    select.appendChild(option);
-  }
-  if (button) button.disabled = false;
 }
 
 async function loadAvailabilityStepSettings() {
@@ -2869,31 +2947,18 @@ async function saveAvailabilityConsultants() {
     saveButton.textContent = "Saving...";
   }
 
-  const { error: deleteError } = await supabase
-    .from("project_availability_consultants")
-    .delete()
-    .eq("project_id", PROJECT_ID)
-    .eq("field_id", fieldId);
-  if (deleteError) {
-    showHint("Failed to save consultants: " + deleteError.message, true);
+  const { error } = await supabase.rpc("replace_project_availability_consultants", {
+    p_project_id: PROJECT_ID,
+    p_field_id: fieldId,
+    p_consultants: consultants.map(({ name, email }) => ({ name, email })),
+  });
+  if (error) {
+    showHint("Failed to save consultants: " + error.message, true);
     if (saveButton) {
       saveButton.disabled = false;
       saveButton.textContent = "Save Consultants";
     }
     return;
-  }
-  if (consultants.length) {
-    const { error: insertError } = await supabase
-      .from("project_availability_consultants")
-      .insert(consultants);
-    if (insertError) {
-      showHint("Failed to save consultants: " + insertError.message, true);
-      if (saveButton) {
-        saveButton.disabled = false;
-        saveButton.textContent = "Save Consultants";
-      }
-      return;
-    }
   }
   if (saveButton) {
     saveButton.disabled = false;
@@ -2903,30 +2968,225 @@ async function saveAvailabilityConsultants() {
   showHint("Consultants saved.", false);
 }
 
-async function loadAvailabilityPreviewRecords() {
-  const { data, error } = await supabase
-    .from("records")
-    .select("id, code, title, active")
-    .eq("project_id", PROJECT_ID)
-    .neq("active", false)
-    .order("title", { ascending: true });
-  if (error) {
-    availabilityPreviewRecords = [];
-    renderAvailabilityPreviewSelect();
-    return;
+function getAvailabilityPreviewSlotsByDate() {
+  const today = getDateKeyForTimezone(availabilityPreviewTimezone);
+  const byDate = new Map();
+  for (const slot of availabilitySlots || []) {
+    if (slot.is_active === false) continue;
+    if (availabilityBookingsBySlot.has(String(slot.id))) continue;
+    const dateKey = formatDateKeyInTimezone(slot, availabilityPreviewTimezone);
+    if (!dateKey || dateKey < today) continue;
+    if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+    byDate.get(dateKey).push(slot);
   }
-  availabilityPreviewRecords = data || [];
-  renderAvailabilityPreviewSelect();
+  for (const slots of byDate.values()) {
+    slots.sort((a, b) => formatSlotTimeInTimezone(a, availabilityPreviewTimezone).localeCompare(formatSlotTimeInTimezone(b, availabilityPreviewTimezone)));
+  }
+  return byDate;
 }
 
-function openAvailabilityParticipantPreview() {
-  const recordId = String(el("availabilityPreviewRecordSelect")?.value || "").trim();
-  if (!recordId) {
-    showHint("Select a participant to preview.", true);
+function ensureAvailabilityPreviewState(slotsByDate) {
+  const firstDateKey = [...slotsByDate.keys()].sort()[0] || getDateKeyForTimezone(availabilityPreviewTimezone);
+  if (!availabilityPreviewSelectedDate || !slotsByDate.has(availabilityPreviewSelectedDate)) {
+    availabilityPreviewSelectedDate = firstDateKey;
+  }
+  const selectedDate = parseDateKey(availabilityPreviewSelectedDate) || parseDateKey(firstDateKey) || new Date();
+  if (!availabilityPreviewMonth) availabilityPreviewMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+}
+
+function renderAvailabilityPreviewModal() {
+  const body = el("availabilityPreviewBody");
+  const title = el("availabilityPreviewTitle");
+  const desc = el("availabilityPreviewDesc");
+  const selectedField = getAvailabilitySelectedField();
+  if (!body || !selectedField) return;
+
+  const slotsByDate = getAvailabilityPreviewSlotsByDate();
+  ensureAvailabilityPreviewState(slotsByDate);
+  const selectedSlots = slotsByDate.get(availabilityPreviewSelectedDate) || [];
+  if (title) title.textContent = selectedField.label || selectedField.key || "Booking Preview";
+  if (desc) desc.textContent = "Global preview for this booking step. It does not require a participant record.";
+
+  body.innerHTML = "";
+  const hero = document.createElement("div");
+  hero.className = "availability-preview-hero";
+  hero.innerHTML = `
+    <h3 class="availability-preview-title">${escapeHtml(selectedField.label || selectedField.key || "Booking")}</h3>
+    <div class="availability-preview-meta">
+      <span>1 hr</span>
+      <span>Confirmation email after booking</span>
+    </div>`;
+  body.appendChild(hero);
+
+  const content = document.createElement("div");
+  content.className = "availability-preview-body";
+  const heading = document.createElement("h3");
+  heading.className = "availability-preview-title";
+  heading.style.fontSize = "20px";
+  heading.textContent = "Select a Date & Time";
+  content.appendChild(heading);
+
+  if (!slotsByDate.size) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No available slots are open for this booking step.";
+    content.appendChild(empty);
+    body.appendChild(content);
     return;
   }
-  sessionStorage.setItem("admin_preview_record_id", recordId);
-  window.open(`./participant-status.html?preview_record=${encodeURIComponent(recordId)}`, "_blank", "noopener");
+
+  const layout = document.createElement("div");
+  layout.className = "availability-preview-layout";
+  const calendar = document.createElement("div");
+  const monthHead = document.createElement("div");
+  monthHead.className = "availability-month-head";
+
+  const prev = document.createElement("button");
+  prev.className = "availability-nav-btn";
+  prev.type = "button";
+  prev.textContent = "‹";
+  prev.addEventListener("click", () => {
+    availabilityPreviewMonth = new Date(availabilityPreviewMonth.getFullYear(), availabilityPreviewMonth.getMonth() - 1, 1);
+    renderAvailabilityPreviewModal();
+  });
+
+  const monthLabel = document.createElement("div");
+  monthLabel.className = "availability-month-label";
+  monthLabel.textContent = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(availabilityPreviewMonth);
+
+  const next = document.createElement("button");
+  next.className = "availability-nav-btn";
+  next.type = "button";
+  next.textContent = "›";
+  next.addEventListener("click", () => {
+    availabilityPreviewMonth = new Date(availabilityPreviewMonth.getFullYear(), availabilityPreviewMonth.getMonth() + 1, 1);
+    renderAvailabilityPreviewModal();
+  });
+
+  monthHead.appendChild(prev);
+  monthHead.appendChild(monthLabel);
+  monthHead.appendChild(next);
+  calendar.appendChild(monthHead);
+
+  const weekdays = document.createElement("div");
+  weekdays.className = "availability-weekdays";
+  for (const dayName of ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) {
+    const day = document.createElement("div");
+    day.className = "availability-weekday";
+    day.textContent = dayName;
+    weekdays.appendChild(day);
+  }
+  calendar.appendChild(weekdays);
+
+  const grid = document.createElement("div");
+  grid.className = "availability-day-grid";
+  const year = availabilityPreviewMonth.getFullYear();
+  const monthIndex = availabilityPreviewMonth.getMonth();
+  const firstDay = new Date(year, monthIndex, 1);
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  for (let i = 0; i < firstDay.getDay(); i++) {
+    const cell = document.createElement("div");
+    cell.className = "availability-day-cell";
+    grid.appendChild(cell);
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateKey = dateKeyFromParts(year, monthIndex, day);
+    const hasSlots = slotsByDate.has(dateKey);
+    const cell = document.createElement("div");
+    cell.className = "availability-day-cell";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = [
+      "availability-day-btn",
+      hasSlots ? "has-slot" : "",
+      availabilityPreviewSelectedDate === dateKey ? "selected" : "",
+    ].filter(Boolean).join(" ");
+    btn.textContent = String(day);
+    btn.disabled = !hasSlots;
+    if (hasSlots) {
+      btn.addEventListener("click", () => {
+        availabilityPreviewSelectedDate = dateKey;
+        renderAvailabilityPreviewModal();
+      });
+    }
+    cell.appendChild(btn);
+    grid.appendChild(cell);
+  }
+  calendar.appendChild(grid);
+
+  const timezoneRow = document.createElement("div");
+  timezoneRow.className = "availability-preview-timezone";
+  const timezoneLabel = document.createElement("label");
+  timezoneLabel.textContent = "Time zone";
+  const timezoneSelect = document.createElement("select");
+  timezoneSelect.className = "form-select";
+  for (const zone of BOOKING_TIMEZONES) {
+    const option = document.createElement("option");
+    option.value = zone.value;
+    option.textContent = formatTimezoneLabel(zone.value);
+    timezoneSelect.appendChild(option);
+  }
+  timezoneSelect.value = availabilityPreviewTimezone;
+  timezoneSelect.addEventListener("change", () => {
+    availabilityPreviewTimezone = timezoneSelect.value || "Asia/Bangkok";
+    availabilityPreviewSelectedDate = "";
+    renderAvailabilityPreviewModal();
+  });
+  timezoneRow.appendChild(timezoneLabel);
+  timezoneRow.appendChild(timezoneSelect);
+  calendar.appendChild(timezoneRow);
+
+  const times = document.createElement("div");
+  const selectedLabel = document.createElement("div");
+  selectedLabel.className = "availability-preview-selected";
+  selectedLabel.textContent = parseDateKey(availabilityPreviewSelectedDate)
+    ? new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(parseDateKey(availabilityPreviewSelectedDate))
+    : availabilityPreviewSelectedDate;
+  times.appendChild(selectedLabel);
+  const timeList = document.createElement("div");
+  timeList.className = "availability-preview-time-list";
+  if (!selectedSlots.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No available times for this date.";
+    timeList.appendChild(empty);
+  } else {
+    for (const slot of selectedSlots) {
+      const time = document.createElement("button");
+      time.className = "availability-preview-time";
+      time.type = "button";
+      time.textContent = formatSlotTimeInTimezone(slot, availabilityPreviewTimezone);
+      time.disabled = true;
+      timeList.appendChild(time);
+    }
+  }
+  times.appendChild(timeList);
+
+  layout.appendChild(calendar);
+  layout.appendChild(times);
+  content.appendChild(layout);
+  body.appendChild(content);
+}
+
+function openAvailabilityPreviewModal() {
+  const selectedField = getAvailabilitySelectedField();
+  if (!selectedField) {
+    showHint("Select a booking step first.", true);
+    return;
+  }
+  availabilityPreviewTimezone = availabilityTimezone || getDefaultBookingTimezone("Asia/Bangkok");
+  availabilityPreviewSelectedDate = "";
+  availabilityPreviewMonth = new Date(availabilityMonth.getFullYear(), availabilityMonth.getMonth(), 1);
+  renderAvailabilityPreviewModal();
+  const modal = el("availabilityPreviewModal");
+  modal?.classList.add("open");
+  modal?.setAttribute("aria-hidden", "false");
+}
+
+function closeAvailabilityPreviewModal() {
+  const modal = el("availabilityPreviewModal");
+  modal?.classList.remove("open");
+  modal?.setAttribute("aria-hidden", "true");
 }
 
 async function loadAvailabilitySlots() {
@@ -2935,6 +3195,7 @@ async function loadAvailabilitySlots() {
   const fieldId = requireAvailabilityFieldId();
   if (!fieldId) {
     availabilitySlots = [];
+    availabilityBookingsBySlot = new Map();
     renderAvailabilityCalendar();
     renderAvailabilitySlotList();
     return;
@@ -2951,6 +3212,7 @@ async function loadAvailabilitySlots() {
   if (error) {
     availabilitySlotsSupported = false;
     availabilitySlots = [];
+    availabilityBookingsBySlot = new Map();
     renderAvailabilityCalendar();
     renderAvailabilitySlotList();
     return;
@@ -2958,6 +3220,20 @@ async function loadAvailabilitySlots() {
 
   availabilitySlotsSupported = true;
   availabilitySlots = data || [];
+  availabilityBookingsBySlot = new Map();
+  const { data: bookings, error: bookingError } = await supabase
+    .from("project_availability_bookings")
+    .select("id, project_id, slot_id, record_id, field_id, status, booked_at, records(code,title)")
+    .eq("project_id", PROJECT_ID)
+    .eq("field_id", fieldId)
+    .eq("status", "booked");
+  if (!bookingError) {
+    for (const booking of bookings || []) {
+      availabilityBookingsBySlot.set(String(booking.slot_id || ""), booking);
+    }
+  } else {
+    console.warn("Failed to load slot bookings:", bookingError.message || bookingError);
+  }
   renderAvailabilityCalendar();
   renderAvailabilitySlotList();
 }
@@ -3056,7 +3332,11 @@ el("availabilityStepEnabled")?.addEventListener("change", (event) => {
 });
 el("availabilityAddConsultantBtn")?.addEventListener("click", () => appendAvailabilityConsultantRow());
 el("availabilitySaveConsultantsBtn")?.addEventListener("click", () => saveAvailabilityConsultants().catch(console.error));
-el("availabilityPreviewBtn")?.addEventListener("click", () => openAvailabilityParticipantPreview());
+el("availabilityPreviewBtn")?.addEventListener("click", () => openAvailabilityPreviewModal());
+el("availabilityPreviewCloseBtn")?.addEventListener("click", () => closeAvailabilityPreviewModal());
+el("availabilityPreviewModal")?.addEventListener("click", (event) => {
+  if (event.target === el("availabilityPreviewModal")) closeAvailabilityPreviewModal();
+});
 populateAvailabilityTimezoneSelect();
 renderAvailabilityHours();
 renderAvailabilitySelectedSummary();
@@ -4023,7 +4303,6 @@ await loadFields();
 await loadAvailabilityStepSettings();
 await Promise.all([
   loadAvailabilityConsultants(),
-  loadAvailabilityPreviewRecords(),
   loadAvailabilitySlots(),
 ]);
 </script>

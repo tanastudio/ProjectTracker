@@ -590,6 +590,41 @@
             background: #eff6ff;
         }
 
+        .booking-time-btn.selected {
+            background: #0d6efd;
+            color: #fff;
+            border-color: #0d6efd;
+            box-shadow: 0 8px 18px rgba(13,110,253,.20);
+        }
+
+        .booking-selection-panel {
+            margin-top: 12px;
+            padding: 10px;
+            border: 1px solid rgba(13,110,253,.18);
+            border-radius: 10px;
+            background: #f8fbff;
+        }
+
+        .booking-selection-text {
+            margin: 0 0 8px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #17365d;
+        }
+
+        .booking-confirm-btn {
+            min-height: 38px;
+            border: none;
+            border-radius: 10px;
+            background: #0d6efd;
+            color: #fff;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 900;
+            padding: 0 14px;
+            cursor: pointer;
+        }
+
         .booking-empty,
         .booking-message {
             margin: 12px 0 0;
@@ -1704,6 +1739,7 @@
         let BOOKING_ENABLED_FIELD_IDS = new Set();
         let BOOKING_SETTINGS_SUPPORTED = true;
         const BOOKING_CALENDAR_STATE = new Map();
+        const BOOKING_SELECTED_SLOT_BY_FIELD = new Map();
         let PARTICIPANT_BOOKING_TIMEZONE =
             sessionStorage.getItem("participant_booking_timezone") ||
             getDefaultBookingTimezone("Asia/Bangkok");
@@ -1901,6 +1937,7 @@
                     btn.addEventListener("click", (event) => {
                         event.stopPropagation();
                         state.selectedDateKey = dateKey;
+                        BOOKING_SELECTED_SLOT_BY_FIELD.delete(String(step.id || ""));
                         renderBookingCalendar(container, step);
                     });
                 }
@@ -1919,6 +1956,9 @@
 
             const timeList = document.createElement("div");
             timeList.className = "booking-time-list";
+            const selectedSlotKey = String(BOOKING_SELECTED_SLOT_BY_FIELD.get(String(step.id || "")) || "");
+            const selectedSlot = selectedSlots.find((slot) => String(slot.id || "") === selectedSlotKey) || null;
+            if (selectedSlotKey && !selectedSlot) BOOKING_SELECTED_SLOT_BY_FIELD.delete(String(step.id || ""));
             if (!selectedSlots.length) {
                 const empty = document.createElement("p");
                 empty.className = "booking-empty";
@@ -1927,17 +1967,38 @@
             } else {
                 for (const slot of selectedSlots) {
                     const btn = document.createElement("button");
-                    btn.className = "booking-time-btn";
+                    const isSelected = String(slot.id || "") === String(selectedSlot?.id || "");
+                    btn.className = ["booking-time-btn", isSelected ? "selected" : ""].filter(Boolean).join(" ");
                     btn.type = "button";
                     btn.textContent = formatSlotTimeInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
                     btn.addEventListener("click", (event) => {
                         event.stopPropagation();
-                        bookAvailabilitySlot(step, slot, box).catch(console.error);
+                        BOOKING_SELECTED_SLOT_BY_FIELD.set(String(step.id || ""), String(slot.id || ""));
+                        renderBookingCalendar(container, step);
                     });
                     timeList.appendChild(btn);
                 }
             }
             times.appendChild(timeList);
+
+            if (selectedSlot) {
+                const confirmPanel = document.createElement("div");
+                confirmPanel.className = "booking-selection-panel";
+                const text = document.createElement("p");
+                text.className = "booking-selection-text";
+                text.textContent = `Selected ${formatSlotTimeInTimezone(selectedSlot, PARTICIPANT_BOOKING_TIMEZONE)}. Confirm to book this time.`;
+                const confirm = document.createElement("button");
+                confirm.className = "booking-confirm-btn";
+                confirm.type = "button";
+                confirm.textContent = "Confirm Booking";
+                confirm.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    bookAvailabilitySlot(step, selectedSlot, box).catch(console.error);
+                });
+                confirmPanel.appendChild(text);
+                confirmPanel.appendChild(confirm);
+                times.appendChild(confirmPanel);
+            }
 
             const message = document.createElement("p");
             message.className = "booking-message";
@@ -1977,6 +2038,7 @@
                 message.className = "booking-message";
                 message.textContent = "Booking saved. Sending confirmation email...";
             }
+            BOOKING_SELECTED_SLOT_BY_FIELD.delete(String(step.id || ""));
 
             const notifyResult = await notifyBookingViaEdge(bookingId);
             if (message) {
