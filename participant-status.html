@@ -446,6 +446,34 @@
             color: #082644;
         }
 
+        .booking-timezone-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin: 0 0 14px;
+        }
+
+        .booking-timezone-label {
+            font-size: 12px;
+            font-weight: 800;
+            color: #64748b;
+        }
+
+        .booking-timezone-select {
+            min-width: 210px;
+            max-width: 100%;
+            height: 36px;
+            border-radius: 10px;
+            border: 1px solid rgba(80,110,150,.16);
+            background: #fff;
+            color: #17365d;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 0 10px;
+        }
+
         .booking-calendar-layout {
             display: grid;
             grid-template-columns: minmax(220px, .85fr) minmax(220px, 1.15fr);
@@ -1013,6 +1041,15 @@
                 grid-template-columns: 1fr;
             }
 
+            .booking-timezone-row {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .booking-timezone-select {
+                width: 100%;
+            }
+
             .hero-stats {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
@@ -1539,11 +1576,14 @@
         import { supabase } from "./supabaseClient.js";
         import { escapeHtml } from "./js/sanitize.js";
         import {
+            BOOKING_TIMEZONES,
+            formatDateKeyInTimezone,
             formatBookingDateTime,
-            formatSlotTime,
-            getTodayKey,
+            formatSlotTimeInTimezone,
+            formatTimezoneLabel,
+            getDateKeyForTimezone,
+            getDefaultBookingTimezone,
             isBookingField,
-            normalizeTimeText,
         } from "./lib/booking-utils.js";
 
 
@@ -1662,19 +1702,25 @@
         let AVAILABLE_SLOTS = [];
         let BOOKINGS_BY_FIELD = new Map();
         const BOOKING_CALENDAR_STATE = new Map();
+        let PARTICIPANT_BOOKING_TIMEZONE =
+            sessionStorage.getItem("participant_booking_timezone") ||
+            getDefaultBookingTimezone("Asia/Bangkok");
 
         function getAvailableSlotsByDate() {
-            const today = getTodayKey();
+            const today = getDateKeyForTimezone(PARTICIPANT_BOOKING_TIMEZONE);
             const byDate = new Map();
             for (const slot of AVAILABLE_SLOTS || []) {
                 if (slot.is_booked) continue;
-                const dateKey = String(slot.slot_date || "");
+                const dateKey = formatDateKeyInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
                 if (!dateKey || dateKey < today) continue;
                 if (!byDate.has(dateKey)) byDate.set(dateKey, []);
                 byDate.get(dateKey).push(slot);
             }
             for (const slots of byDate.values()) {
-                slots.sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
+                slots.sort((a, b) => (
+                    formatSlotTimeInTimezone(a, PARTICIPANT_BOOKING_TIMEZONE)
+                        .localeCompare(formatSlotTimeInTimezone(b, PARTICIPANT_BOOKING_TIMEZONE))
+                ));
             }
             return byDate;
         }
@@ -1682,7 +1728,7 @@
         function getBookingCalendarState(fieldId) {
             const key = String(fieldId || "");
             const slotsByDate = getAvailableSlotsByDate();
-            const firstDateKey = [...slotsByDate.keys()].sort()[0] || getTodayKey();
+            const firstDateKey = [...slotsByDate.keys()].sort()[0] || getDateKeyForTimezone(PARTICIPANT_BOOKING_TIMEZONE);
             const firstDate = parseDateKeyLocal(firstDateKey);
             const fallbackMonth = firstDate || new Date();
             const existing = BOOKING_CALENDAR_STATE.get(key);
@@ -1719,6 +1765,35 @@
             }).format(date);
         }
 
+        function renderBookingTimezoneSelect(container, rerender) {
+            const row = document.createElement("div");
+            row.className = "booking-timezone-row";
+
+            const label = document.createElement("label");
+            label.className = "booking-timezone-label";
+            label.textContent = "Time zone";
+
+            const select = document.createElement("select");
+            select.className = "booking-timezone-select";
+            for (const zone of BOOKING_TIMEZONES) {
+                const option = document.createElement("option");
+                option.value = zone.value;
+                option.textContent = formatTimezoneLabel(zone.value);
+                select.appendChild(option);
+            }
+            select.value = PARTICIPANT_BOOKING_TIMEZONE;
+            select.addEventListener("change", (event) => {
+                event.stopPropagation();
+                PARTICIPANT_BOOKING_TIMEZONE = select.value || "Asia/Bangkok";
+                sessionStorage.setItem("participant_booking_timezone", PARTICIPANT_BOOKING_TIMEZONE);
+                rerender();
+            });
+
+            row.appendChild(label);
+            row.appendChild(select);
+            container.appendChild(row);
+        }
+
         function renderBookingCalendar(container, step) {
             const slotsByDate = getAvailableSlotsByDate();
             const state = getBookingCalendarState(step.id);
@@ -1732,6 +1807,7 @@
             title.className = "booking-calendar-title";
             title.textContent = "Select a Date & Time";
             box.appendChild(title);
+            renderBookingTimezoneSelect(box, () => renderBookingCalendar(container, step));
 
             if (!slotsByDate.size) {
                 const empty = document.createElement("p");
@@ -1795,7 +1871,7 @@
             const firstDay = new Date(year, monthIndex, 1);
             const mondayStartOffset = (firstDay.getDay() + 6) % 7;
             const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-            const todayKey = getTodayKey();
+            const todayKey = getDateKeyForTimezone(PARTICIPANT_BOOKING_TIMEZONE);
 
             for (let i = 0; i < mondayStartOffset; i++) {
                 const cell = document.createElement("div");
@@ -1850,7 +1926,7 @@
                     const btn = document.createElement("button");
                     btn.className = "booking-time-btn";
                     btn.type = "button";
-                    btn.textContent = normalizeTimeText(slot.start_time) || formatSlotTime(slot);
+                    btn.textContent = formatSlotTimeInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
                     btn.addEventListener("click", (event) => {
                         event.stopPropagation();
                         bookAvailabilitySlot(step, slot, box).catch(console.error);
@@ -1931,8 +2007,9 @@
                 title.textContent = "Booking confirmed";
                 const date = document.createElement("div");
                 date.className = "booking-confirmed-date";
-                date.textContent = formatBookingDateTime(step.booking) || "Date confirmed";
+                date.textContent = formatBookingDateTime(step.booking, "en-US", PARTICIPANT_BOOKING_TIMEZONE) || "Date confirmed";
                 box.appendChild(title);
+                renderBookingTimezoneSelect(box, () => renderBookingBody(container, step));
                 box.appendChild(date);
                 container.appendChild(box);
                 return;
@@ -1974,7 +2051,7 @@
                 const taskNote = document.createElement("p");
                 taskNote.className = "task-note";
                 taskNote.textContent = step.booking
-                    ? `Booked for ${formatBookingDateTime(step.booking)}`
+                    ? `Booked for ${formatBookingDateTime(step.booking, "en-US", PARTICIPANT_BOOKING_TIMEZONE)}`
                     : getTaskNote(step.status);
 
                 taskCopy.appendChild(taskName);
