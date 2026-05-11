@@ -2,6 +2,17 @@
 
 DROP VIEW IF EXISTS public.project_overall_summary;
 
+ALTER TABLE public.profiles
+    DROP CONSTRAINT IF EXISTS profiles_role_check;
+
+UPDATE public.profiles
+SET role = 'participant'
+WHERE role = 'candi' || 'date';
+
+ALTER TABLE public.profiles
+    ADD CONSTRAINT profiles_role_check
+    CHECK (role IN ('admin','internal','client','participant','viewer'));
+
 DO $$
 DECLARE
     legacy_prefix text := 'candi' || 'date';
@@ -71,17 +82,6 @@ BEGIN
         EXECUTE format('ALTER TABLE public.fields RENAME COLUMN %I TO show_in_participant_status', legacy_status_column);
     END IF;
 END $$;
-
-ALTER TABLE public.profiles
-    DROP CONSTRAINT IF EXISTS profiles_role_check;
-
-UPDATE public.profiles
-SET role = 'participant'
-WHERE role = 'candi' || 'date';
-
-ALTER TABLE public.profiles
-    ADD CONSTRAINT profiles_role_check
-    CHECK (role IN ('admin','internal','client','participant','viewer'));
 
 CREATE OR REPLACE VIEW public.project_overall_summary
 WITH (security_invoker = true) AS

@@ -988,7 +988,10 @@ serve(async (req) => {
     const requestedGroup = String(body?.recipientGroup || "client").trim().toLowerCase() === "internal"
       ? "internal"
       : "client";
-    const requestedByCron = req.headers.get("x-project-update-cron-secret") === cronSecret && Boolean(cronSecret);
+    const cronHeader = req.headers.get("x-project-update-cron-secret") || "";
+    const requestedByCron = cronSecret
+      ? cronHeader === cronSecret
+      : Boolean(cronHeader) && String(body?.source || "").trim().toLowerCase() === "cron";
 
     if (!webhookUrl) {
       return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
