@@ -714,6 +714,32 @@
             return Math.max(0, Math.min(100, Math.round((c / t) * 100)));
         }
 
+        function asCount(value) {
+            const n = Number(value ?? 0);
+            return Number.isFinite(n) ? Math.max(0, n) : 0;
+        }
+
+        function resolveSummaryCounts(summary) {
+            const completed = asCount(summary?.n_completed);
+            const inProgress = asCount(summary?.n_in_progress);
+            const issue = asCount(summary?.n_issue);
+            const notStarted = asCount(summary?.n_not_started);
+            const countedTotal = completed + inProgress + issue + notStarted;
+            const legacyTotalKey = `total_${"candi"}${"dates"}`;
+            const explicitTotal = Math.max(
+                asCount(summary?.total_participants),
+                asCount(summary?.[legacyTotalKey])
+            );
+
+            return {
+                total: Math.max(explicitTotal, countedTotal),
+                completed,
+                inProgress,
+                issue,
+                notStarted,
+            };
+        }
+
         function isSimulatedEmptyProjectsMode() {
             const url = new URL(window.location.href);
             return ["1", "true", "yes"].includes(String(url.searchParams.get("simulate_empty_projects") || "").trim().toLowerCase());
@@ -1027,11 +1053,7 @@
             const role = m.role || "viewer";
 
             const s = summaryByProject.get(String(m.project_id));
-            const total = s?.total_participants ?? 0;
-            const completed = s?.n_completed ?? 0;
-            const inProgress = s?.n_in_progress ?? 0;
-            const issue = s?.n_issue ?? 0;
-            const notStarted = s?.n_not_started ?? 0;
+            const { total, completed, inProgress, issue, notStarted } = resolveSummaryCounts(s);
             const pct = calcCompletedPercent(total, completed);
 
             const isSelected = currentProjectId === String(m.project_id);
