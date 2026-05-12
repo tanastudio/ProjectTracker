@@ -3500,23 +3500,32 @@ async function applyAvailabilitySlots() {
     button.textContent = "Applying...";
   }
 
-  const { error } = await supabase
-    .from("project_availability_slots")
-    .upsert(payload, { onConflict: "project_id,field_id,consultant_id,slot_date,start_time" });
+  let savedCount = 0;
+  const failures = [];
+  for (const slotPayload of payload) {
+    const { error } = await supabase
+      .from("project_availability_slots")
+      .upsert(slotPayload, { onConflict: "project_id,field_id,consultant_id,slot_date,start_time" });
+    if (error) failures.push({ slot: slotPayload, message: error.message || "Unknown error" });
+    else savedCount += 1;
+  }
 
   if (button) {
     button.disabled = false;
     button.textContent = "Apply Slots";
   }
 
-  if (error) {
-    showHint("Failed to apply slots: " + error.message, true);
+  await loadAvailabilitySlots();
+
+  if (failures.length) {
+    const first = failures[0];
+    const firstLabel = `${first.slot.slot_date} ${first.slot.start_time} - ${first.slot.end_time}`;
+    showHint(`${savedCount} slot${savedCount === 1 ? "" : "s"} saved. ${failures.length} skipped. First skipped: ${firstLabel}: ${first.message}`, true);
     return;
   }
 
   availabilitySelectedDates = new Set();
   renderAvailabilitySelectedSummary();
-  await loadAvailabilitySlots();
   showHint(`${payload.length} slot${payload.length === 1 ? "" : "s"} saved.`, false);
 }
 
