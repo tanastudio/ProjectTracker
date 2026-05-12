@@ -437,6 +437,13 @@
             font-weight: 800;
         }
 
+        .booking-confirmed-consultant {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #17365d;
+            font-weight: 800;
+        }
+
         .booking-calendar-title {
             margin: 0 0 12px;
             text-align: center;
@@ -454,13 +461,23 @@
             margin: 0 0 14px;
         }
 
-        .booking-timezone-label {
+        .booking-filter-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin: 0 0 10px;
+        }
+
+        .booking-timezone-label,
+        .booking-filter-label {
             font-size: 12px;
             font-weight: 800;
             color: #64748b;
         }
 
-        .booking-timezone-select {
+        .booking-timezone-select,
+        .booking-filter-select {
             min-width: 210px;
             max-width: 100%;
             height: 36px;
@@ -584,6 +601,17 @@
             font-size: 16px;
             font-weight: 800;
             cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+        }
+
+        .booking-time-sub {
+            font-size: 11px;
+            font-weight: 800;
+            color: #64748b;
         }
 
         .booking-time-btn:hover {
@@ -595,6 +623,10 @@
             color: #fff;
             border-color: #0d6efd;
             box-shadow: 0 8px 18px rgba(13,110,253,.20);
+        }
+
+        .booking-time-btn.selected .booking-time-sub {
+            color: rgba(255,255,255,.86);
         }
 
         .booking-selection-panel {
@@ -1076,12 +1108,14 @@
                 grid-template-columns: 1fr;
             }
 
-            .booking-timezone-row {
+            .booking-timezone-row,
+            .booking-filter-row {
                 align-items: stretch;
                 flex-direction: column;
             }
 
-            .booking-timezone-select {
+            .booking-timezone-select,
+            .booking-filter-select {
                 width: 100%;
             }
 
@@ -1740,27 +1774,86 @@
         let BOOKING_SETTINGS_SUPPORTED = true;
         const BOOKING_CALENDAR_STATE = new Map();
         const BOOKING_SELECTED_SLOT_BY_FIELD = new Map();
+        const BOOKING_CONSULTANT_FILTER_BY_FIELD = new Map();
         let PARTICIPANT_BOOKING_TIMEZONE =
             sessionStorage.getItem("participant_booking_timezone") ||
             getDefaultBookingTimezone("Asia/Bangkok");
 
-        function getAvailableSlotsByDate(fieldId) {
+        function getSlotConsultantName(slot) {
+            return String(slot?.consultant_name || slot?.project_availability_consultants?.name || slot?.consultant_email || "").trim();
+        }
+
+        function getBookingConsultantsForField(fieldId) {
+            const targetFieldId = String(fieldId || "");
+            const byId = new Map();
+            for (const slot of AVAILABLE_SLOTS || []) {
+                if (String(slot.field_id || "") !== targetFieldId) continue;
+                if (!slot.consultant_id) continue;
+                const key = String(slot.consultant_id);
+                if (!byId.has(key)) {
+                    byId.set(key, {
+                        id: key,
+                        name: getSlotConsultantName(slot) || "Consultant",
+                        email: String(slot.consultant_email || "").trim(),
+                        sortOrder: Number(slot.consultant_sort_order || 0),
+                    });
+                }
+            }
+            return [...byId.values()].sort((a, b) => (
+                a.sortOrder - b.sortOrder ||
+                a.name.localeCompare(b.name) ||
+                a.email.localeCompare(b.email)
+            ));
+        }
+
+        function getSelectedBookingConsultantId(fieldId) {
+            const key = String(fieldId || "");
+            const selected = String(BOOKING_CONSULTANT_FILTER_BY_FIELD.get(key) || "");
+            if (!selected) return "";
+            const consultants = getBookingConsultantsForField(key);
+            if (!consultants.some((consultant) => consultant.id === selected)) {
+                BOOKING_CONSULTANT_FILTER_BY_FIELD.delete(key);
+                return "";
+            }
+            return selected;
+        }
+
+        function getAvailableSlotOptionsByDate(fieldId) {
             const today = getDateKeyForTimezone(PARTICIPANT_BOOKING_TIMEZONE);
             const byDate = new Map();
             const targetFieldId = String(fieldId || "");
+            const consultantFilter = getSelectedBookingConsultantId(targetFieldId);
+            const grouped = new Map();
             for (const slot of AVAILABLE_SLOTS || []) {
                 if (String(slot.field_id || "") !== targetFieldId) continue;
                 if (slot.is_booked) continue;
+                if (consultantFilter && String(slot.consultant_id || "") !== consultantFilter) continue;
                 const dateKey = formatDateKeyInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
                 if (!dateKey || dateKey < today) continue;
-                if (!byDate.has(dateKey)) byDate.set(dateKey, []);
-                byDate.get(dateKey).push(slot);
+                const timeLabel = formatSlotTimeInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
+                const optionKey = `${dateKey}::${timeLabel}`;
+                if (!grouped.has(optionKey)) {
+                    grouped.set(optionKey, {
+                        id: optionKey,
+                        dateKey,
+                        timeLabel,
+                        slots: [],
+                        slotIds: [],
+                        consultantNames: new Set(),
+                    });
+                }
+                const option = grouped.get(optionKey);
+                option.slots.push(slot);
+                option.slotIds.push(slot.id);
+                const consultantName = getSlotConsultantName(slot);
+                if (consultantName) option.consultantNames.add(consultantName);
             }
-            for (const slots of byDate.values()) {
-                slots.sort((a, b) => (
-                    formatSlotTimeInTimezone(a, PARTICIPANT_BOOKING_TIMEZONE)
-                        .localeCompare(formatSlotTimeInTimezone(b, PARTICIPANT_BOOKING_TIMEZONE))
-                ));
+            for (const option of grouped.values()) {
+                if (!byDate.has(option.dateKey)) byDate.set(option.dateKey, []);
+                byDate.get(option.dateKey).push(option);
+            }
+            for (const options of byDate.values()) {
+                options.sort((a, b) => a.timeLabel.localeCompare(b.timeLabel));
             }
             return byDate;
         }
@@ -1833,10 +1926,51 @@
             container.appendChild(row);
         }
 
+        function renderBookingConsultantSelect(container, step, rerender) {
+            const consultants = getBookingConsultantsForField(step.id);
+            if (!consultants.length) return;
+
+            const row = document.createElement("div");
+            row.className = "booking-filter-row";
+
+            const label = document.createElement("label");
+            label.className = "booking-filter-label";
+            label.textContent = "Consultant";
+
+            const select = document.createElement("select");
+            select.className = "booking-filter-select";
+
+            const anyOption = document.createElement("option");
+            anyOption.value = "";
+            anyOption.textContent = "Any consultant";
+            select.appendChild(anyOption);
+
+            for (const consultant of consultants) {
+                const option = document.createElement("option");
+                option.value = consultant.id;
+                option.textContent = consultant.name;
+                select.appendChild(option);
+            }
+
+            select.value = getSelectedBookingConsultantId(step.id);
+            select.addEventListener("change", (event) => {
+                event.stopPropagation();
+                const key = String(step.id || "");
+                if (select.value) BOOKING_CONSULTANT_FILTER_BY_FIELD.set(key, select.value);
+                else BOOKING_CONSULTANT_FILTER_BY_FIELD.delete(key);
+                BOOKING_SELECTED_SLOT_BY_FIELD.delete(key);
+                rerender();
+            });
+
+            row.appendChild(label);
+            row.appendChild(select);
+            container.appendChild(row);
+        }
+
         function renderBookingCalendar(container, step) {
-            const slotsByDate = getAvailableSlotsByDate(step.id);
+            const slotsByDate = getAvailableSlotOptionsByDate(step.id);
             const state = getBookingCalendarState(step.id, slotsByDate);
-            const selectedSlots = slotsByDate.get(state.selectedDateKey) || [];
+            const selectedOptions = slotsByDate.get(state.selectedDateKey) || [];
 
             container.innerHTML = "";
             const box = document.createElement("div");
@@ -1846,6 +1980,7 @@
             title.className = "booking-calendar-title";
             title.textContent = "Select a Date & Time";
             box.appendChild(title);
+            renderBookingConsultantSelect(box, step, () => renderBookingCalendar(container, step));
             renderBookingTimezoneSelect(box, () => renderBookingCalendar(container, step));
 
             if (!slotsByDate.size) {
@@ -1956,24 +2091,29 @@
 
             const timeList = document.createElement("div");
             timeList.className = "booking-time-list";
-            const selectedSlotKey = String(BOOKING_SELECTED_SLOT_BY_FIELD.get(String(step.id || "")) || "");
-            const selectedSlot = selectedSlots.find((slot) => String(slot.id || "") === selectedSlotKey) || null;
-            if (selectedSlotKey && !selectedSlot) BOOKING_SELECTED_SLOT_BY_FIELD.delete(String(step.id || ""));
-            if (!selectedSlots.length) {
+            const selectedOptionKey = String(BOOKING_SELECTED_SLOT_BY_FIELD.get(String(step.id || "")) || "");
+            const selectedOption = selectedOptions.find((option) => String(option.id || "") === selectedOptionKey) || null;
+            if (selectedOptionKey && !selectedOption) BOOKING_SELECTED_SLOT_BY_FIELD.delete(String(step.id || ""));
+            if (!selectedOptions.length) {
                 const empty = document.createElement("p");
                 empty.className = "booking-empty";
                 empty.textContent = "No available times for this date.";
                 timeList.appendChild(empty);
             } else {
-                for (const slot of selectedSlots) {
+                for (const option of selectedOptions) {
                     const btn = document.createElement("button");
-                    const isSelected = String(slot.id || "") === String(selectedSlot?.id || "");
+                    const isSelected = String(option.id || "") === String(selectedOption?.id || "");
+                    const consultantNames = [...option.consultantNames];
+                    const consultantFilter = getSelectedBookingConsultantId(step.id);
+                    const subLabel = consultantFilter
+                        ? (consultantNames[0] || "Selected consultant")
+                        : `${consultantNames.length || option.slots.length} consultant${(consultantNames.length || option.slots.length) === 1 ? "" : "s"} available`;
                     btn.className = ["booking-time-btn", isSelected ? "selected" : ""].filter(Boolean).join(" ");
                     btn.type = "button";
-                    btn.textContent = formatSlotTimeInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
+                    btn.innerHTML = `<span>${escapeHtml(option.timeLabel)}</span><span class="booking-time-sub">${escapeHtml(subLabel)}</span>`;
                     btn.addEventListener("click", (event) => {
                         event.stopPropagation();
-                        BOOKING_SELECTED_SLOT_BY_FIELD.set(String(step.id || ""), String(slot.id || ""));
+                        BOOKING_SELECTED_SLOT_BY_FIELD.set(String(step.id || ""), String(option.id || ""));
                         renderBookingCalendar(container, step);
                     });
                     timeList.appendChild(btn);
@@ -1981,19 +2121,19 @@
             }
             times.appendChild(timeList);
 
-            if (selectedSlot) {
+            if (selectedOption) {
                 const confirmPanel = document.createElement("div");
                 confirmPanel.className = "booking-selection-panel";
                 const text = document.createElement("p");
                 text.className = "booking-selection-text";
-                text.textContent = `Selected ${formatSlotTimeInTimezone(selectedSlot, PARTICIPANT_BOOKING_TIMEZONE)}. Confirm to book this time.`;
+                text.textContent = `Selected ${selectedOption.timeLabel}. Confirm to book this time.`;
                 const confirm = document.createElement("button");
                 confirm.className = "booking-confirm-btn";
                 confirm.type = "button";
                 confirm.textContent = "Confirm Booking";
                 confirm.addEventListener("click", (event) => {
                     event.stopPropagation();
-                    bookAvailabilitySlot(step, selectedSlot, box).catch(console.error);
+                    bookAvailabilitySlot(step, selectedOption, box).catch(console.error);
                 });
                 confirmPanel.appendChild(text);
                 confirmPanel.appendChild(confirm);
@@ -2010,7 +2150,10 @@
             container.appendChild(box);
         }
 
-        async function bookAvailabilitySlot(step, slot, box) {
+        async function bookAvailabilitySlot(step, option, box) {
+            const slotIds = (option?.slotIds || []).filter(Boolean);
+            const primarySlotId = slotIds[0] || option?.slots?.[0]?.id;
+            if (!primarySlotId) return;
             const buttons = box.querySelectorAll("button");
             const message = box.querySelector("[data-booking-message]");
             buttons.forEach((button) => { button.disabled = true; });
@@ -2019,10 +2162,11 @@
                 message.textContent = "Saving booking...";
             }
 
-            const { data: bookingId, error } = await supabase.rpc("book_project_availability_slot", {
+            const { data: bookingId, error } = await supabase.rpc("book_project_availability_slot_v2", {
                 p_record_id: rec.id,
                 p_field_id: step.id,
-                p_slot_id: slot.id,
+                p_slot_id: primarySlotId,
+                p_candidate_slot_ids: slotIds.length ? slotIds : [primarySlotId],
             });
 
             if (error) {
@@ -2073,9 +2217,21 @@
                 const date = document.createElement("div");
                 date.className = "booking-confirmed-date";
                 date.textContent = formatBookingDateTime(step.booking, "en-US", PARTICIPANT_BOOKING_TIMEZONE) || "Date confirmed";
+                const consultantName = String(
+                    step.booking.consultant_name ||
+                    step.booking.project_availability_slots?.project_availability_consultants?.name ||
+                    step.booking.consultant_email ||
+                    ""
+                ).trim();
                 box.appendChild(title);
                 renderBookingTimezoneSelect(box, () => renderBookingBody(container, step));
                 box.appendChild(date);
+                if (consultantName) {
+                    const consultant = document.createElement("div");
+                    consultant.className = "booking-confirmed-consultant";
+                    consultant.textContent = `Booked with ${consultantName}`;
+                    box.appendChild(consultant);
+                }
                 container.appendChild(box);
                 return;
             }
@@ -2115,9 +2271,15 @@
 
                 const taskNote = document.createElement("p");
                 taskNote.className = "task-note";
-                taskNote.textContent = step.booking
-                    ? `Booked for ${formatBookingDateTime(step.booking, "en-US", PARTICIPANT_BOOKING_TIMEZONE)}`
-                    : getTaskNote(step.status);
+                if (step.booking) {
+                    const consultantName = String(step.booking.consultant_name || step.booking.consultant_email || "").trim();
+                    const bookingTime = formatBookingDateTime(step.booking, "en-US", PARTICIPANT_BOOKING_TIMEZONE);
+                    taskNote.textContent = consultantName
+                        ? `Booked with ${consultantName} for ${bookingTime}`
+                        : `Booked for ${bookingTime}`;
+                } else {
+                    taskNote.textContent = getTaskNote(step.status);
+                }
 
                 taskCopy.appendChild(taskName);
                 taskCopy.appendChild(taskNote);
@@ -2330,7 +2492,7 @@
 
             const { data: bookingData, error: bookingError } = await supabase
                 .from("project_availability_bookings")
-                .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone)")
+                .select("id, project_id, slot_id, record_id, field_id, consultant_id, consultant_name, consultant_email, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, consultant_id, project_availability_consultants(name,email))")
                 .eq("record_id", recordId)
                 .eq("status", "booked");
 

@@ -24,6 +24,8 @@ type EmailPayload = {
   participantName: string;
   stepLabel: string;
   slotLabel: string;
+  consultantName: string;
+  consultantEmail: string;
 };
 
 function json(body: unknown, status = 200) {
@@ -161,6 +163,8 @@ async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
       project_name: payload.projectName,
       booking_step: payload.stepLabel,
       booking_slot: payload.slotLabel,
+      consultant_name: payload.consultantName,
+      consultant_email: payload.consultantEmail,
     }),
   });
 
@@ -179,6 +183,7 @@ async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPa
         Project: ${escapeHtml(payload.projectName || "-")}<br>
         Participant: ${escapeHtml(payload.participantName || "-")}<br>
         Step: ${escapeHtml(payload.stepLabel || "-")}<br>
+        Consultant: ${escapeHtml(payload.consultantName || payload.consultantEmail || "-")}<br>
         Booking: ${escapeHtml(payload.slotLabel || "-")}
       </p>
       <a href="${escapeHtml(payload.actionUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px">
@@ -257,7 +262,7 @@ serve(async (req) => {
 
     const { data: booking, error: bookingError } = await adminClient
       .from("project_availability_bookings")
-      .select("id, project_id, record_id, field_id, slot_id, notification_sent_at")
+      .select("id, project_id, record_id, field_id, slot_id, consultant_name, consultant_email, notification_sent_at")
       .eq("id", bookingId)
       .eq("status", "booked")
       .maybeSingle();
@@ -288,7 +293,11 @@ serve(async (req) => {
     const stepLabel = String(field?.label || "Booking");
     const slotLabel = formatSlotLabel(slot || {});
     const actionUrl = `${trackerBaseUrl}/participant-status.html`;
-    const consultantRecipients = await getConsultantEmails(adminClient, booking.project_id, booking.field_id);
+    const assignedConsultantEmail = String(booking.consultant_email || "").trim().toLowerCase();
+    const consultantRecipients = isValidEmail(assignedConsultantEmail)
+      ? [assignedConsultantEmail]
+      : await getConsultantEmails(adminClient, booking.project_id, booking.field_id);
+    const consultantName = String(booking.consultant_name || assignedConsultantEmail || "").trim();
     const recipients = [recipient, ...consultantRecipients]
       .map((email) => email.trim().toLowerCase())
       .filter((email, index, list) => isValidEmail(email) && list.indexOf(email) === index);
@@ -297,13 +306,15 @@ serve(async (req) => {
       to: recipients,
       subject: `[Booking Confirmed] ${stepLabel} - ${projectName}`,
       title: "Booking confirmed",
-      body: `${participantName}'s booking for ${stepLabel} is confirmed.\n\nDate and time: ${slotLabel}`,
+      body: `${participantName}'s booking for ${stepLabel} is confirmed.\n\nConsultant: ${consultantName || "-"}\nDate and time: ${slotLabel}`,
       actionUrl,
       actionText: "View My Status",
       projectName,
       participantName,
       stepLabel,
       slotLabel,
+      consultantName,
+      consultantEmail: assignedConsultantEmail,
     });
 
     await adminClient
