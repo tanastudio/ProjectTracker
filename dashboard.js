@@ -322,7 +322,7 @@ async function loadBookingValues(recordIds) {
 
     const { data, error } = await supabase
         .from("project_availability_bookings")
-        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active)")
+        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id)")
         .in("record_id", recordIds)
         .eq("status", "booked");
 
@@ -332,7 +332,8 @@ async function loadBookingValues(recordIds) {
     }
 
     for (const booking of data || []) {
-        if (booking.project_availability_slots?.is_active === false) continue;
+        const slot = booking.project_availability_slots;
+        if (!slot || slot.is_active !== true || String(slot.field_id || "") !== String(booking.field_id || "") || !slot.consultant_id) continue;
         byRecordField.set(bookingMapKey(booking.record_id, booking.field_id), booking);
     }
     return byRecordField;

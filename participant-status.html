@@ -2492,13 +2492,14 @@
 
             const { data: bookingData, error: bookingError } = await supabase
                 .from("project_availability_bookings")
-                .select("id, project_id, slot_id, record_id, field_id, consultant_id, consultant_name, consultant_email, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, consultant_id, project_availability_consultants(name,email))")
+                .select("id, project_id, slot_id, record_id, field_id, consultant_id, consultant_name, consultant_email, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id, project_availability_consultants(name,email))")
                 .eq("record_id", recordId)
                 .eq("status", "booked");
 
             if (!bookingError) {
                 for (const booking of bookingData || []) {
-                    if (booking.project_availability_slots?.is_active === false) continue;
+                    const slot = booking.project_availability_slots;
+                    if (!slot || slot.is_active !== true || String(slot.field_id || "") !== String(booking.field_id || "") || !slot.consultant_id) continue;
                     nextBookings.set(String(booking.field_id || ""), booking);
                 }
             } else {
