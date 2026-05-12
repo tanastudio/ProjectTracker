@@ -31,6 +31,7 @@ type EmailPayload = {
   recipientRole: "participant" | "consultant";
   senderName: string;
   senderRole: string;
+  calendarInvite: CalendarInvitePayload | null;
 };
 
 type DeliveryTarget = {
@@ -39,8 +40,22 @@ type DeliveryTarget = {
   role: EmailPayload["recipientRole"];
 };
 
+type CalendarInvitePayload = {
+  filename: string;
+  content: string;
+  contentBase64: string;
+  mimeType: string;
+  uid: string;
+  startsAt: string;
+  endsAt: string;
+  timezone: string;
+  summary: string;
+  description: string;
+};
+
 const DEFAULT_SENDER_NAME = "Mentis Workflows";
 const DEFAULT_SENDER_ROLE = "System";
+const DEFAULT_ORGANIZER_EMAIL = "workflows@mentisglobal.com";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -72,6 +87,163 @@ function normalizeTimeText(value: unknown) {
   const match = text.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return text;
   return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function getZonedParts(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour) === 24 ? 0 : Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+}
+
+function zonedDateTimeToDate(dateKey: unknown, timeText: unknown, timeZone = "Asia/Bangkok") {
+  const [year, month, day] = String(dateKey || "").split("-").map(Number);
+  const [hour, minute] = normalizeTimeText(timeText).split(":").map(Number);
+  if (!year || !month || !day || !Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+
+  const targetUtc = Date.UTC(year, month - 1, day, hour, minute);
+  let instantUtc = targetUtc;
+  for (let i = 0; i < 3; i++) {
+    const parts = getZonedParts(new Date(instantUtc), timeZone);
+    const zonedAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+    instantUtc += targetUtc - zonedAsUtc;
+  }
+  return new Date(instantUtc);
+}
+
+function formatIcsUtc(date: Date) {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function escapeIcsText(value: unknown) {
+  return cleanText(value)
+    .replaceAll("\\", "\\\\")
+    .replaceAll("\r\n", "\\n")
+    .replaceAll("\n", "\\n")
+    .replaceAll(",", "\\,")
+    .replaceAll(";", "\\;");
+}
+
+function foldIcsLine(line: string) {
+  const folded: string[] = [];
+  let remaining = line;
+  while (remaining.length > 73) {
+    folded.push(remaining.slice(0, 73));
+    remaining = ` ${remaining.slice(73)}`;
+  }
+  folded.push(remaining);
+  return folded.join("\r\n");
+}
+
+function encodeBase64Utf8(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function sanitizeFilenamePart(value: unknown) {
+  return cleanText(value, "booking")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "booking";
+}
+
+function buildCalendarInvite(params: {
+  bookingId: string;
+  slot: { slot_date?: string; start_time?: string; end_time?: string; timezone?: string } | null;
+  projectName: string;
+  participantName: string;
+  participantEmail: string;
+  stepLabel: string;
+  consultantName: string;
+  consultantEmail: string;
+  actionUrl: string;
+  attendees: DeliveryTarget[];
+  organizerEmail: string;
+}) {
+  const timezone = cleanText(params.slot?.timezone, "Asia/Bangkok");
+  const start = zonedDateTimeToDate(params.slot?.slot_date, params.slot?.start_time, timezone);
+  if (!start) return null;
+  const end = params.slot?.end_time
+    ? zonedDateTimeToDate(params.slot.slot_date, params.slot.end_time, timezone)
+    : addMinutes(start, 60);
+  const safeEnd = end && end > start ? end : addMinutes(start, 60);
+  const uid = `${params.bookingId}@project-tracker.mentisglobal.com`;
+  const summary = `${params.stepLabel} - ${params.projectName}`;
+  const description = [
+    `Booking confirmed for ${params.stepLabel}.`,
+    `Project: ${params.projectName}`,
+    `Participant: ${params.participantName}`,
+    `Consultant: ${params.consultantName || params.consultantEmail || "-"}`,
+    `View booking: ${params.actionUrl}`,
+  ].join("\n");
+  const organizerEmail = isValidEmail(params.organizerEmail)
+    ? params.organizerEmail.trim().toLowerCase()
+    : DEFAULT_ORGANIZER_EMAIL;
+  const attendeeLines = params.attendees.map((target) => {
+    const cn = escapeIcsText(target.name || target.email);
+    return `ATTENDEE;CN=${cn};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:${target.email}`;
+  });
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Mentis Global//Project Tracker//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${formatIcsUtc(new Date())}`,
+    `DTSTART:${formatIcsUtc(start)}`,
+    `DTEND:${formatIcsUtc(safeEnd)}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    `DESCRIPTION:${escapeIcsText(description)}`,
+    `LOCATION:${escapeIcsText("Details provided upon confirmation")}`,
+    "STATUS:CONFIRMED",
+    "TRANSP:OPAQUE",
+    `ORGANIZER;CN=${escapeIcsText(DEFAULT_SENDER_NAME)}:mailto:${organizerEmail}`,
+    ...attendeeLines,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  const content = lines.map(foldIcsLine).join("\r\n") + "\r\n";
+  return {
+    filename: `${sanitizeFilenamePart(params.stepLabel)}-${sanitizeFilenamePart(params.projectName)}.ics`,
+    content,
+    contentBase64: encodeBase64Utf8(content),
+    mimeType: "text/calendar; method=REQUEST; charset=UTF-8",
+    uid,
+    startsAt: start.toISOString(),
+    endsAt: safeEnd.toISOString(),
+    timezone,
+    summary,
+    description,
+  };
 }
 
 function formatSlotLabel(slot: { slot_date?: string; start_time?: string; end_time?: string; timezone?: string }) {
@@ -203,6 +375,32 @@ async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
       sent_by: payload.senderName,
       from_name: payload.senderName,
       support_team_name: payload.senderName,
+      calendar_invite: payload.calendarInvite ? {
+        filename: payload.calendarInvite.filename,
+        content: payload.calendarInvite.content,
+        content_base64: payload.calendarInvite.contentBase64,
+        mime_type: payload.calendarInvite.mimeType,
+        uid: payload.calendarInvite.uid,
+        starts_at: payload.calendarInvite.startsAt,
+        ends_at: payload.calendarInvite.endsAt,
+        timezone: payload.calendarInvite.timezone,
+        summary: payload.calendarInvite.summary,
+        description: payload.calendarInvite.description,
+      } : null,
+      calendar_ics: payload.calendarInvite?.content || "",
+      calendar_ics_base64: payload.calendarInvite?.contentBase64 || "",
+      calendar_filename: payload.calendarInvite?.filename || "",
+      calendar_mime_type: payload.calendarInvite?.mimeType || "",
+      event_uid: payload.calendarInvite?.uid || "",
+      event_start_iso: payload.calendarInvite?.startsAt || "",
+      event_end_iso: payload.calendarInvite?.endsAt || "",
+      event_timezone: payload.calendarInvite?.timezone || "",
+      attachments: payload.calendarInvite ? [{
+        filename: payload.calendarInvite.filename,
+        content: payload.calendarInvite.contentBase64,
+        contentType: payload.calendarInvite.mimeType,
+        mime_type: payload.calendarInvite.mimeType,
+      }] : [],
     }),
   });
 
@@ -229,19 +427,30 @@ async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPa
       </a>
     </div>`;
 
+  const resendPayload: Record<string, unknown> = {
+    from: fromEmail,
+    to: [payload.to],
+    subject: payload.subject,
+    html,
+    text: `${payload.title}\n\n${payload.body}\n\n${payload.actionText}: ${payload.actionUrl}`,
+  };
+  if (payload.calendarInvite) {
+    resendPayload.attachments = [{
+      filename: payload.calendarInvite.filename,
+      content: payload.calendarInvite.contentBase64,
+    }];
+    resendPayload.headers = {
+      "Content-Class": "urn:content-classes:calendarmessage",
+    };
+  }
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: fromEmail,
-      to: [payload.to],
-      subject: payload.subject,
-      html,
-      text: `${payload.title}\n\n${payload.body}\n\n${payload.actionText}: ${payload.actionUrl}`,
-    }),
+    body: JSON.stringify(resendPayload),
   });
 
   if (!res.ok) {
@@ -381,6 +590,19 @@ serve(async (req) => {
         .eq("id", bookingId);
       return json({ ok: false, skipped: true, reason: "no email recipients found" });
     }
+    const calendarInvite = buildCalendarInvite({
+      bookingId,
+      slot: slot || null,
+      projectName,
+      participantName,
+      participantEmail: recipient,
+      stepLabel,
+      consultantName,
+      consultantEmail: assignedConsultantEmail,
+      actionUrl,
+      attendees: targets,
+      organizerEmail: Deno.env.get("NOTIFY_FROM_EMAIL") ?? DEFAULT_ORGANIZER_EMAIL,
+    });
 
     const sent: Array<{ email: string; provider: string; role: string }> = [];
     const errors: string[] = [];
@@ -404,6 +626,7 @@ serve(async (req) => {
           recipientRole: target.role,
           senderName: DEFAULT_SENDER_NAME,
           senderRole: DEFAULT_SENDER_ROLE,
+          calendarInvite,
         });
         sent.push({ email: target.email, provider: result.provider, role: target.role });
       } catch (err) {
