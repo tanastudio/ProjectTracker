@@ -209,6 +209,8 @@
     .field-right-type { font-size: 11px; color: #94a3b8; }
     .field-right-item.drag-over-top { border-top: 2px solid #3b82f6; }
     .field-right-item.drag-over-bottom { border-bottom: 2px solid #3b82f6; }
+    .field-create-option { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #334155; }
+    .field-create-option input { width: 16px; height: 16px; cursor: pointer; }
   </style>
     <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
@@ -411,6 +413,10 @@
                   </select>
                   <button class="btn-primary" id="addFieldBtn" style="min-height:40px;padding:0 16px;font-size:13px;white-space:nowrap;">+ Add</button>
                 </div>
+                <label class="field-create-option" id="newFieldBookingRow">
+                  <input type="checkbox" id="newFieldBooking"/>
+                  <span>Booking step</span>
+                </label>
                 <div class="muted small">Key is auto-generated from label.</div>
               </div>
             </div>
@@ -752,9 +758,31 @@ el("step1Next").addEventListener("click", () => {
 
 /* ── Step 2: Fields ── */
 let customFields = []; // [{label, key, type, field_role}]
-let fieldLibrary = []; // [{label, key, type}] loaded from DB
+let fieldLibrary = []; // [{label, key, type, field_role}] loaded from DB
+let newFieldBookingTouched = false;
 
 function isInCustom(key) { return customFields.some(f => f.key === key); }
+function isBookingLikeField(field) {
+  const key = String(field?.key || "").toLowerCase();
+  const label = String(field?.label || "").toLowerCase();
+  return key.includes("booking") || key.includes("schedule") || label.includes("booking") || label.includes("schedule");
+}
+
+function syncNewFieldBookingOption() {
+  const type = el("newFieldType").value;
+  const row = el("newFieldBookingRow");
+  const checkbox = el("newFieldBooking");
+  const isSelect = type === "select";
+  row.style.display = isSelect ? "flex" : "none";
+  if (!isSelect) {
+    checkbox.checked = false;
+    return;
+  }
+  if (!newFieldBookingTouched) {
+    const label = el("newFieldLabel").value.trim();
+    checkbox.checked = isBookingLikeField({ label, key: slugify(label) });
+  }
+}
 
 function renderFieldLibrary() {
   const list = el("fieldLibraryList");
@@ -767,7 +795,7 @@ function renderFieldLibrary() {
     return `
       <div class="field-lib-item ${added ? "field-lib-added" : ""}" data-lib-key="${escapeHtml(f.key)}" title="${escapeHtml(f.label)}">
         <span class="field-lib-label">${escapeHtml(f.label)}</span>
-        <span class="field-lib-type">${escapeHtml(f.type)}</span>
+        <span class="field-lib-type">${escapeHtml(f.field_role === "booking" ? "booking" : f.type)}</span>
         ${added ? '<span class="field-lib-added-icon">✓</span>' : '<span class="field-lib-add">+</span>'}
       </div>`;
   }).join("");
@@ -777,7 +805,7 @@ function renderFieldLibrary() {
       const key = item.dataset.libKey;
       const f = fieldLibrary.find(x => x.key === key);
       if (!f || isInCustom(f.key)) return;
-      customFields.push({ label: f.label, key: f.key, type: f.type, field_role: "step" });
+      customFields.push({ label: f.label, key: f.key, type: f.type, field_role: f.field_role === "booking" ? "booking" : "step" });
       renderFieldLibrary();
       renderCustomFields();
       clearHint();
@@ -799,7 +827,7 @@ function renderCustomFields() {
       <span class="drag-handle" style="color:#94a3b8;font-size:15px;cursor:grab;">⠿</span>
       <span class="field-right-label">${escapeHtml(f.label)}</span>
       <span class="field-key-badge" style="font-size:11px;">${escapeHtml(f.key)}</span>
-      <span class="field-right-type">${escapeHtml(f.type)}</span>
+      <span class="field-right-type">${escapeHtml(f.field_role === "booking" ? "booking" : f.type)}</span>
       <button class="btn-danger" data-del-field="${i}" style="min-height:28px;padding:0 10px;font-size:12px;">✕</button>
     </div>
   `).join("");
@@ -858,8 +886,8 @@ async function loadFieldLibrary() {
   list.innerHTML = "<div class='muted small'>Loading...</div>";
   const { data } = await supabase
     .from("fields")
-    .select("key, label, type")
-    .eq("field_role", "step")
+    .select("key, label, type, field_role")
+    .in("field_role", ["step", "booking"])
     .eq("is_active", true)
     .order("label");
 
@@ -869,7 +897,7 @@ async function loadFieldLibrary() {
   for (const f of (data || [])) {
     if (!seen.has(f.key)) {
       seen.add(f.key);
-      fieldLibrary.push({ key: f.key, label: f.label, type: f.type });
+      fieldLibrary.push({ key: f.key, label: f.label, type: f.type, field_role: f.field_role === "booking" ? "booking" : "step" });
     }
   }
   // Sort by label
@@ -884,19 +912,29 @@ el("addFieldBtn").addEventListener("click", () => {
   const key = slugify(label);
   if (!key) { showHint("Invalid label — can't generate a key.", true); return; }
   if (isInCustom(key)) { showHint(`"${key}" is already in the project fields.`, true); return; }
+  const fieldRole = type === "select" && el("newFieldBooking").checked ? "booking" : "step";
   // Add to library if not there
   if (!fieldLibrary.some(f => f.key === key)) {
-    fieldLibrary.push({ label, key, type });
+    fieldLibrary.push({ label, key, type, field_role: fieldRole });
     fieldLibrary.sort((a, b) => a.label.localeCompare(b.label));
   }
-  customFields.push({ label, key, type, field_role: "step" });
+  customFields.push({ label, key, type, field_role: fieldRole });
   el("newFieldLabel").value = "";
+  newFieldBookingTouched = false;
+  syncNewFieldBookingOption();
   clearHint();
   renderFieldLibrary();
   renderCustomFields();
 });
 
+el("newFieldType").addEventListener("change", () => {
+  newFieldBookingTouched = false;
+  syncNewFieldBookingOption();
+});
+el("newFieldLabel").addEventListener("input", syncNewFieldBookingOption);
+el("newFieldBooking").addEventListener("change", () => { newFieldBookingTouched = true; });
 el("newFieldLabel").addEventListener("keydown", e => { if (e.key === "Enter") el("addFieldBtn").click(); });
+syncNewFieldBookingOption();
 
 el("step2Back").addEventListener("click", () => { clearHint(); setStep(1); saveDraft(); });
 el("step2Next").addEventListener("click", () => { clearHint(); setStep(3); loadUsers(); saveDraft(); });
@@ -1117,7 +1155,7 @@ el("createBtn").addEventListener("click", async () => {
       label: f.label,
       type: f.type,
       sort_order: 20 + i * 10,
-      field_role: "step",
+      field_role: f.type === "select" && f.field_role === "booking" ? "booking" : "step",
       is_active: true,
       show_in_participant_status: true,
       show_in_dashboard: true,

@@ -114,7 +114,7 @@
     /* Fields list */
     .field-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .field-row {
-      display: grid; grid-template-columns: 24px 1fr auto auto auto;
+      display: grid; grid-template-columns: 24px 1fr auto auto auto auto;
       gap: 10px; align-items: center; background: rgba(248,250,252,.8);
       border: 1px solid rgba(15,23,42,.08); border-radius: 10px; padding: 10px 12px;
     }
@@ -1102,7 +1102,7 @@
       <div class="tab-panel" id="tab-fields">
         <div class="card">
           <div class="card-title">Fields</div>
-          <div class="card-desc">Drag to reorder process steps. Participant, Client, and Internal toggles control where each field is visible. System fields cannot be moved; email visibility for Client can be toggled.</div>
+          <div class="card-desc">Drag to reorder process steps. Booking marks a select field as a booking calendar step. Participant, Client, and Internal toggles control where each field is visible.</div>
 
           <div class="field-list" id="fieldList">
             <div class="muted">Loading fields...</div>
@@ -1134,6 +1134,13 @@
               <option value="text">text — free text</option>
               <option value="date">date — date picker</option>
             </select>
+          </div>
+          <div class="form-group" id="newFieldBookingGroup">
+            <label class="option-item" style="width:fit-content;">
+              <input type="checkbox" id="newFieldBooking"/>
+              <span>Booking step</span>
+            </label>
+            <div class="muted small">Adds a booking date column and enables this field in Availability.</div>
           </div>
           <div class="form-group" id="newFieldOptionsGroup">
             <label>Options</label>
@@ -3893,6 +3900,7 @@ function renderFields() {
   list.innerHTML = fields.map((f) => {
     const role = String(f.field_role || "").toLowerCase();
     const isFixed = FIXED_ROLES.has(role);
+    const canToggleBooking = !isFixed && String(f.type || "").toLowerCase() === "select";
     const canToggleClient = !isFixed || DASHBOARD_TOGGLE_ALLOWED_ROLES.has(role);
     const canToggleAudience = !isFixed;
     const rowClass = [
@@ -3913,6 +3921,15 @@ function renderFields() {
             </button>` : ""}
           </div>
           <span class="field-key">${escapeHtml(f.key)}</span>
+        </div>
+        <div class="toggle-wrap" title="Use as Booking Step">
+          <label class="toggle">
+            <input type="checkbox" data-toggle-booking="${escapeHtml(f.id)}"
+              ${isBookingField(f) ? "checked" : ""}
+              ${canToggleBooking ? "" : "disabled"}/>
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Booking</span>
         </div>
         <div class="toggle-wrap" title="Show in Participant Status">
           <label class="toggle">
@@ -4037,12 +4054,14 @@ el("saveFieldsBtn").addEventListener("click", async () => {
     const id = row.dataset.fieldId;
     const f  = fields.find(x => x.id === id);
     if (!f) return;
+    const bookingToggle     = row.querySelector("[data-toggle-booking]");
     const participantToggle = row.querySelector("[data-toggle-participant]");
     const clientToggle    = row.querySelector("[data-toggle-client]");
     const internalToggle  = row.querySelector("[data-toggle-internal]");
     updates.push({
       id,
       sort_order:               (idx + 1) * 10,
+      field_role:               bookingToggle && !bookingToggle.disabled ? (bookingToggle.checked ? "booking" : "step") : (f.field_role || "step"),
       show_in_participant_status: participantToggle ? participantToggle.checked : (f.show_in_participant_status !== false),
       show_in_dashboard:        clientToggle    ? clientToggle.checked    : (f.show_in_dashboard !== false),
       show_in_internal:         internalToggle  ? internalToggle.checked  : (f.show_in_internal !== false),
@@ -4055,11 +4074,13 @@ el("saveFieldsBtn").addEventListener("click", async () => {
   const results = await Promise.all(updates.map(u => {
     const payload = supportsVisibilityChannels ? {
       sort_order:               u.sort_order,
+      field_role:               u.field_role,
       show_in_participant_status: u.show_in_participant_status,
       show_in_dashboard:        u.show_in_dashboard,
       show_in_internal:         u.show_in_internal,
     } : {
       sort_order:        u.sort_order,
+      field_role:        u.field_role,
       show_in_dashboard: u.show_in_dashboard,
       is_active:         u.show_in_internal,
     };
@@ -4089,9 +4110,15 @@ el("newFieldLabel").addEventListener("input", () => {
   el("newFieldKey").value = labelToKey(el("newFieldLabel").value);
 });
 
-el("newFieldType").addEventListener("change", () => {
-  el("newFieldOptionsGroup").style.display = el("newFieldType").value === "select" ? "" : "none";
-});
+function syncNewFieldTypeOptions() {
+  const isSelect = el("newFieldType").value === "select";
+  el("newFieldOptionsGroup").style.display = isSelect ? "" : "none";
+  el("newFieldBookingGroup").style.display = isSelect ? "" : "none";
+  if (!isSelect) el("newFieldBooking").checked = false;
+}
+
+el("newFieldType").addEventListener("change", syncNewFieldTypeOptions);
+syncNewFieldTypeOptions();
 
 function addCustomOption() {
   const val = el("customOptionInput").value.trim();
@@ -4149,7 +4176,7 @@ el("addFieldBtn").addEventListener("click", async () => {
     type,
     options,
     sort_order:       maxSort + 10,
-    field_role:       "step",
+    field_role:       type === "select" && el("newFieldBooking").checked ? "booking" : "step",
     is_active:        true,
     show_in_participant_status: true,
     show_in_dashboard: true,
@@ -4170,7 +4197,9 @@ el("addFieldBtn").addEventListener("click", async () => {
   el("newFieldLabel").value = "";
   el("newFieldKey").value   = "";
   el("newFieldType").value  = "select";
+  el("newFieldBooking").checked = false;
   el("newFieldOptionsGroup").style.display = "";
+  syncNewFieldTypeOptions();
   el("optionsList").querySelectorAll(".custom-opt-item").forEach(item => item.remove());
   el("optionsList").querySelectorAll("input[type='checkbox']").forEach(cb => { cb.checked = true; });
   el("customOptionInput").value = "";

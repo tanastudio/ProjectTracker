@@ -13,10 +13,15 @@ import {
 } from "../lib/booking-utils.js";
 
 describe("isBookingField", () => {
-    it("detects booking and schedule fields by key or label", () => {
+    it("uses the explicit booking role when present", () => {
+        expect(isBookingField({ key: "interview", label: "Interview", field_role: "booking" })).toBe(true);
+        expect(isBookingField({ key: "cbi_booking", label: "CBI Booking", field_role: "step" })).toBe(false);
+        expect(isBookingField({ key: "hogan_status", label: "Hogan Status", field_role: "step" })).toBe(false);
+    });
+
+    it("keeps label and key detection only for legacy fields without a role", () => {
         expect(isBookingField({ key: "cbi_booking", label: "CBI" })).toBe(true);
         expect(isBookingField({ key: "interview", label: "Interview Schedule" })).toBe(true);
-        expect(isBookingField({ key: "hogan_status", label: "Hogan Status" })).toBe(false);
     });
 });
 
