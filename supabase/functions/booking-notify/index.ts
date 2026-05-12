@@ -10,7 +10,12 @@ const corsHeaders = {
 };
 
 type BookingNotifyBody = {
-  bookingId: string;
+  action?: "send_booking_confirmation" | "send_session_followups" | "get_session_feedback" | "submit_session_feedback";
+  source?: string;
+  bookingId?: string;
+  token?: string;
+  sessionStatus?: "completed" | "not_completed";
+  comment?: string;
 };
 
 type EmailPayload = {
@@ -32,6 +37,8 @@ type EmailPayload = {
   senderName: string;
   senderRole: string;
   calendarInvite: CalendarInvitePayload | null;
+  emailType?: string;
+  eventType?: string;
 };
 
 type DeliveryTarget = {
@@ -51,6 +58,16 @@ type CalendarInvitePayload = {
   timezone: string;
   summary: string;
   description: string;
+};
+
+type BookingSlotRow = {
+  slot_date?: string;
+  start_time?: string;
+  end_time?: string;
+  timezone?: string;
+  is_active?: boolean;
+  field_id?: string;
+  consultant_id?: string;
 };
 
 const DEFAULT_SENDER_NAME = "Mentis Workflows";
@@ -165,6 +182,18 @@ function encodeBase64Utf8(value: string) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   }
   return btoa(binary);
+}
+
+function generatePublicToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function sanitizeFilenamePart(value: unknown) {
@@ -354,8 +383,8 @@ async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
       message_body: payload.body,
       action_url: payload.actionUrl,
       action_text: payload.actionText,
-      event_type: "Booking Confirmed",
-      email_type: "booking_confirmed",
+      event_type: payload.eventType || "Booking Confirmed",
+      email_type: payload.emailType || "booking_confirmed",
       candidate_name: payload.participantName,
       candidate_email: payload.participantEmail,
       participant_name: payload.participantName,
@@ -527,13 +556,196 @@ function buildBodyForTarget(target: DeliveryTarget, participantName: string, ste
   return `Your booking for ${stepLabel} is confirmed.\n\nConsultant: ${consultantName || "-"}\nDate and time: ${slotLabel}`;
 }
 
+function getSessionStatusLabel(status: unknown) {
+  const normalized = String(status || "pending").trim().toLowerCase();
+  if (normalized === "completed") return "Completed";
+  if (normalized === "not_completed") return "Not Complete";
+  return "Pending Confirmation";
+}
+
+function getSlotEndInstant(slot: { slot_date?: string; start_time?: string; end_time?: string; timezone?: string } | null) {
+  if (!slot) return null;
+  const timezone = cleanText(slot.timezone, "Asia/Bangkok");
+  const end = slot.end_time
+    ? zonedDateTimeToDate(slot.slot_date, slot.end_time, timezone)
+    : null;
+  if (end) return end;
+  const start = zonedDateTimeToDate(slot.slot_date, slot.start_time, timezone);
+  return start ? addMinutes(start, 60) : null;
+}
+
+async function loadBookingContext(
+  adminClient: ReturnType<typeof createClient>,
+  booking: Record<string, string>,
+) {
+  const [{ data: record }, { data: field }, { data: slot }, { data: project }] = await Promise.all([
+    adminClient.from("records").select("id, code, title").eq("id", booking.record_id).maybeSingle(),
+    adminClient.from("fields").select("label").eq("id", booking.field_id).maybeSingle(),
+    adminClient.from("project_availability_slots").select("slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id").eq("id", booking.slot_id).maybeSingle(),
+    adminClient.from("projects").select("name").eq("id", booking.project_id).maybeSingle(),
+  ]);
+
+  const participantEmail = await getParticipantEmail(adminClient, booking.record_id, booking.project_id);
+  const assignedConsultantEmail = String(booking.consultant_email || "").trim().toLowerCase();
+  const consultantName = cleanText(booking.consultant_name, assignedConsultantEmail || "Consultant");
+
+  return {
+    record,
+    field,
+    slot,
+    project,
+    projectName: cleanText(project?.name, "Project"),
+    participantName: cleanText(record?.title, cleanText(record?.code, "Participant")),
+    participantEmail: participantEmail || "",
+    stepLabel: cleanText(field?.label, "Booking"),
+    slotLabel: formatSlotLabel(slot || {}),
+    consultantEmail: assignedConsultantEmail,
+    consultantName,
+  };
+}
+
+async function sendSessionFollowupForBooking(
+  adminClient: ReturnType<typeof createClient>,
+  trackerBaseUrl: string,
+  booking: Record<string, string>,
+) {
+  const context = await loadBookingContext(adminClient, booking);
+  if (!context.consultantEmail || !isValidEmail(context.consultantEmail)) {
+    throw new Error("Consultant email not found");
+  }
+
+  const token = generatePublicToken();
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  const feedbackUrl = `${trackerBaseUrl}/booking-session-feedback.html?token=${encodeURIComponent(token)}`;
+
+  const { error: tokenError } = await adminClient
+    .from("project_availability_bookings")
+    .update({
+      session_followup_token_hash: tokenHash,
+      session_followup_token_expires_at: expiresAt,
+      session_followup_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", booking.id)
+    .eq("status", "booked")
+    .eq("session_status", "pending");
+  if (tokenError) throw tokenError;
+
+  const result = await sendEmail({
+    to: context.consultantEmail,
+    subject: `[Session Confirmation] ${context.stepLabel} - ${context.projectName}`,
+    title: "Confirm session completion",
+    body: [
+      `Please confirm whether the session is complete.`,
+      ``,
+      `Participant: ${context.participantName}`,
+      `Step: ${context.stepLabel}`,
+      `Date and time: ${context.slotLabel}`,
+      ``,
+      `You can also add a short comment for the project team.`,
+    ].join("\n"),
+    actionUrl: feedbackUrl,
+    actionText: "Confirm Session",
+    projectName: context.projectName,
+    participantName: context.participantName,
+    participantEmail: context.participantEmail,
+    stepLabel: context.stepLabel,
+    slotLabel: context.slotLabel,
+    consultantName: context.consultantName,
+    consultantEmail: context.consultantEmail,
+    recipientName: context.consultantName,
+    recipientRole: "consultant",
+    senderName: DEFAULT_SENDER_NAME,
+    senderRole: DEFAULT_SENDER_ROLE,
+    calendarInvite: null,
+    eventType: "Booking Session Follow-up",
+    emailType: "booking_session_followup",
+  });
+
+  await adminClient
+    .from("project_availability_bookings")
+    .update({
+      session_followup_sent_at: new Date().toISOString(),
+      session_followup_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", booking.id);
+
+  return { bookingId: booking.id, provider: result.provider, consultantEmail: context.consultantEmail };
+}
+
+async function sendDueSessionFollowups(
+  adminClient: ReturnType<typeof createClient>,
+  trackerBaseUrl: string,
+) {
+  const { data, error } = await adminClient
+    .from("project_availability_bookings")
+    .select("id, project_id, record_id, field_id, slot_id, consultant_name, consultant_email, session_status, session_followup_sent_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id)")
+    .eq("status", "booked")
+    .eq("session_status", "pending")
+    .is("session_followup_sent_at", null)
+    .limit(100);
+  if (error) throw error;
+
+  const now = new Date();
+  const sent: unknown[] = [];
+  const skipped: unknown[] = [];
+  const errors: string[] = [];
+
+  for (const booking of data || []) {
+    const slot = booking.project_availability_slots as BookingSlotRow | null;
+    if (!slot || slot.is_active !== true || String(slot.field_id || "") !== String(booking.field_id || "")) {
+      skipped.push({ bookingId: booking.id, reason: "inactive slot" });
+      continue;
+    }
+    const slotEnd = getSlotEndInstant(slot);
+    if (!slotEnd || slotEnd > now) {
+      skipped.push({ bookingId: booking.id, reason: "not due" });
+      continue;
+    }
+
+    try {
+      sent.push(await sendSessionFollowupForBooking(adminClient, trackerBaseUrl, booking as Record<string, string>));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${booking.id}: ${message}`);
+      await adminClient
+        .from("project_availability_bookings")
+        .update({ session_followup_error: message, updated_at: new Date().toISOString() })
+        .eq("id", booking.id);
+    }
+  }
+
+  return { ok: errors.length === 0, sent, skipped, errors };
+}
+
+async function loadSessionFeedbackByToken(
+  adminClient: ReturnType<typeof createClient>,
+  token: string,
+) {
+  const tokenHash = await sha256Hex(token);
+  const { data: booking, error } = await adminClient
+    .from("project_availability_bookings")
+    .select("id, project_id, record_id, field_id, slot_id, consultant_name, consultant_email, session_status, session_comment, session_status_submitted_at, session_followup_token_expires_at")
+    .eq("session_followup_token_hash", tokenHash)
+    .eq("status", "booked")
+    .maybeSingle();
+  if (error) throw error;
+  if (!booking) return null;
+  const expiresAt = booking.session_followup_token_expires_at ? new Date(booking.session_followup_token_expires_at) : null;
+  if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt < new Date()) return null;
+  const context = await loadBookingContext(adminClient, booking as Record<string, string>);
+  return { booking, context };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const trackerBaseUrl = Deno.env.get("TRACKER_BASE_URL") ?? "https://tracker.mentisglobal.com";
+  const trackerBaseUrl = Deno.env.get("TRACKER_BASE_URL") ?? "https://tanastudio.github.io/ProjectTracker";
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -541,6 +753,80 @@ serve(async (req) => {
   let bookingId = "";
   try {
     const body = (await req.json()) as BookingNotifyBody;
+    const action = body?.action || "send_booking_confirmation";
+
+    if (action === "send_session_followups") {
+      const cronSecret = Deno.env.get("BOOKING_FOLLOWUP_CRON_SECRET") || Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "";
+      const cronHeader = req.headers.get("x-booking-followup-cron-secret") || req.headers.get("x-project-update-cron-secret") || "";
+      const requestedByCron = cronSecret
+        ? cronHeader === cronSecret
+        : Boolean(cronHeader) && String(body?.source || "").trim().toLowerCase() === "cron";
+      if (!requestedByCron) return json({ error: "Unauthorized" }, 401);
+      const result = await sendDueSessionFollowups(adminClient, trackerBaseUrl);
+      return json(result, result.ok ? 200 : 207);
+    }
+
+    if (action === "get_session_feedback") {
+      const token = String(body?.token || "").trim();
+      if (!token) return json({ error: "token is required" }, 400);
+      const loaded = await loadSessionFeedbackByToken(adminClient, token);
+      if (!loaded) return json({ error: "This confirmation link is invalid or expired" }, 404);
+      const { booking, context } = loaded;
+      return json({
+        ok: true,
+        projectName: context.projectName,
+        participantName: context.participantName,
+        stepLabel: context.stepLabel,
+        slotLabel: context.slotLabel,
+        consultantName: context.consultantName,
+        consultantEmail: context.consultantEmail,
+        sessionStatus: booking.session_status || "pending",
+        sessionStatusLabel: getSessionStatusLabel(booking.session_status),
+        sessionComment: booking.session_comment || "",
+        submittedAt: booking.session_status_submitted_at || null,
+      });
+    }
+
+    if (action === "submit_session_feedback") {
+      const token = String(body?.token || "").trim();
+      const sessionStatus = String(body?.sessionStatus || "").trim().toLowerCase();
+      if (!token) return json({ error: "token is required" }, 400);
+      if (!["completed", "not_completed"].includes(sessionStatus)) {
+        return json({ error: "sessionStatus must be completed or not_completed" }, 400);
+      }
+      const loaded = await loadSessionFeedbackByToken(adminClient, token);
+      if (!loaded) return json({ error: "This confirmation link is invalid or expired" }, 404);
+      const { booking, context } = loaded;
+      const comment = cleanText(body?.comment, "").slice(0, 2000) || null;
+      const submittedAt = new Date().toISOString();
+      const { error: updateError } = await adminClient
+        .from("project_availability_bookings")
+        .update({
+          session_status: sessionStatus,
+          session_comment: comment,
+          session_status_submitted_at: submittedAt,
+          session_status_submitted_by_email: context.consultantEmail,
+          session_followup_error: null,
+          updated_at: submittedAt,
+        })
+        .eq("id", booking.id)
+        .eq("status", "booked");
+      if (updateError) throw updateError;
+
+      await adminClient
+        .from("records")
+        .update({ updated_at: submittedAt })
+        .eq("id", booking.record_id);
+
+      return json({
+        ok: true,
+        sessionStatus,
+        sessionStatusLabel: getSessionStatusLabel(sessionStatus),
+        sessionComment: comment || "",
+        submittedAt,
+      });
+    }
+
     bookingId = String(body?.bookingId || "").trim();
     if (!bookingId) return json({ error: "bookingId is required" }, 400);
 

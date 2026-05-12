@@ -444,6 +444,21 @@
             font-weight: 800;
         }
 
+        .booking-session-status {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #0f3d75;
+            font-weight: 900;
+        }
+
+        .booking-session-comment {
+            margin-top: 6px;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #557095;
+            font-weight: 700;
+        }
+
         .booking-calendar-title {
             margin: 0 0 12px;
             text-align: center;
@@ -1648,6 +1663,7 @@
             BOOKING_TIMEZONES,
             formatDateKeyInTimezone,
             formatBookingDateTime,
+            formatBookingSessionStatus,
             formatSlotTimeInTimezone,
             formatTimezoneLabel,
             getDateKeyForTimezone,
@@ -2242,6 +2258,19 @@
                     consultant.textContent = `Booked with ${consultantName}`;
                     box.appendChild(consultant);
                 }
+                const sessionStatus = formatBookingSessionStatus(step.booking);
+                if (sessionStatus) {
+                    const session = document.createElement("div");
+                    session.className = "booking-session-status";
+                    session.textContent = `Session status: ${sessionStatus}`;
+                    box.appendChild(session);
+                }
+                if (step.booking.session_comment) {
+                    const comment = document.createElement("div");
+                    comment.className = "booking-session-comment";
+                    comment.textContent = `Consultant comment: ${step.booking.session_comment}`;
+                    box.appendChild(comment);
+                }
                 container.appendChild(box);
                 return;
             }
@@ -2284,9 +2313,10 @@
                 if (step.booking) {
                     const consultantName = String(step.booking.consultant_name || step.booking.consultant_email || "").trim();
                     const bookingTime = formatBookingDateTime(step.booking, "en-US", PARTICIPANT_BOOKING_TIMEZONE);
+                    const sessionStatus = formatBookingSessionStatus(step.booking);
                     taskNote.textContent = consultantName
-                        ? `Booked with ${consultantName} for ${bookingTime}`
-                        : `Booked for ${bookingTime}`;
+                        ? `Booked with ${consultantName} for ${bookingTime}. Session: ${sessionStatus}`
+                        : `Booked for ${bookingTime}. Session: ${sessionStatus}`;
                 } else {
                     taskNote.textContent = getTaskNote(step.status);
                 }
@@ -2526,7 +2556,7 @@
 
             const { data: bookingData, error: bookingError } = await supabase
                 .from("project_availability_bookings")
-                .select("id, project_id, slot_id, record_id, field_id, consultant_id, consultant_name, consultant_email, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id, project_availability_consultants(name,email))")
+                .select("id, project_id, slot_id, record_id, field_id, consultant_id, consultant_name, consultant_email, status, booked_at, session_status, session_comment, session_status_submitted_at, session_status_submitted_by_email, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id, project_availability_consultants(name,email))")
                 .eq("record_id", recordId)
                 .eq("status", "booked");
 

@@ -7,6 +7,7 @@ import {
     formatSlotTime,
     formatSlotTimeInTimezone,
     formatTimezoneLabel,
+    getBookingSessionStatusLabel,
     getTodayKey,
     isBookingField,
     normalizeTimeText,
@@ -28,6 +29,15 @@ describe("isBookingField", () => {
 describe("bookingMapKey", () => {
     it("builds a stable composite key", () => {
         expect(bookingMapKey("record", "field")).toBe("record::field");
+    });
+});
+
+describe("getBookingSessionStatusLabel", () => {
+    it("formats consultant session confirmation status", () => {
+        expect(getBookingSessionStatusLabel("completed")).toBe("Completed");
+        expect(getBookingSessionStatusLabel("not_completed")).toBe("Not Complete");
+        expect(getBookingSessionStatusLabel("pending")).toBe("Pending Confirmation");
+        expect(getBookingSessionStatusLabel("")).toBe("Pending Confirmation");
     });
 });
 

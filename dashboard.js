@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
-import { bookingMapKey, formatBookingDateTime, isBookingField } from "./lib/booking-utils.js";
+import { bookingMapKey, formatBookingDateTime, formatBookingSessionStatus, isBookingField } from "./lib/booking-utils.js";
 
 /* ---------- Config ---------- */
 const DEFAULT_PROJECT_NAME = "Project ABC";
@@ -322,7 +322,7 @@ async function loadBookingValues(recordIds) {
 
     const { data, error } = await supabase
         .from("project_availability_bookings")
-        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id)")
+        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, session_status, session_comment, session_status_submitted_at, session_status_submitted_by_email, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id)")
         .in("record_id", recordIds)
         .eq("status", "booked");
 
@@ -364,6 +364,8 @@ function buildItems(records, recordValues, fieldsById, bookingsByRecordField = n
         const step = {};
         const bookings = {};
         const bookingDates = {};
+        const bookingSessionStatuses = {};
+        const bookingSessionComments = {};
         const stepStatuses = [];
         for (const s of STEP_KEYS) {
             const field = fieldsByKey.get(String(s.key || ""));
@@ -373,6 +375,8 @@ function buildItems(records, recordValues, fieldsById, bookingsByRecordField = n
             if (booking) {
                 bookings[s.key] = booking;
                 bookingDates[s.key] = formatBookingDateTime(booking);
+                bookingSessionStatuses[s.key] = formatBookingSessionStatus(booking);
+                bookingSessionComments[s.key] = String(booking.session_comment || "");
             }
             stepStatuses.push(norm);
         }
@@ -401,6 +405,8 @@ function buildItems(records, recordValues, fieldsById, bookingsByRecordField = n
             step,
             bookings,
             bookingDates,
+            bookingSessionStatuses,
+            bookingSessionComments,
             overallStatus,
 
             // issue/decision now works even if stored in records table
@@ -600,6 +606,7 @@ function buildHeaderFromFields(fieldsList) {
         headRow.insertAdjacentHTML("beforeend", `<th style="min-width:120px;">${escapeHtml(label)}</th>`);
         if (isBookingField(f)) {
             headRow.insertAdjacentHTML("beforeend", `<th style="min-width:160px;">${escapeHtml(label)} Date</th>`);
+            headRow.insertAdjacentHTML("beforeend", `<th style="min-width:160px;">${escapeHtml(label)} Session</th>`);
         }
     }
 
@@ -680,6 +687,12 @@ function renderTable(items) {
                 const tdDate = document.createElement("td");
                 tdDate.textContent = String(it.bookingDates?.[f.key] || "");
                 tr.appendChild(tdDate);
+                const tdSession = document.createElement("td");
+                tdSession.innerHTML = it.bookingSessionStatuses?.[f.key]
+                    ? statusPill(it.bookingSessionStatuses[f.key], "")
+                    : "";
+                if (it.bookingSessionComments?.[f.key]) tdSession.title = it.bookingSessionComments[f.key];
+                tr.appendChild(tdSession);
             }
         }
 
@@ -739,6 +752,11 @@ function getVisibleDashboardFields() {
                 key: `${f.key}__booking_date`,
                 label: `${f.label || f.key} Date`,
                 getValue: (it) => String(it.bookingDates?.[f.key] || ""),
+            });
+            columns.push({
+                key: `${f.key}__session_status`,
+                label: `${f.label || f.key} Session`,
+                getValue: (it) => String(it.bookingSessionStatuses?.[f.key] || ""),
             });
         }
     }

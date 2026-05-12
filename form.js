@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient.js";
 import { STEP_STATUS, normalizeStatus, computeOverall } from "./lib/form-utils.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
-import { bookingMapKey, formatBookingDateTime, isBookingField } from "./lib/booking-utils.js";
+import { bookingMapKey, formatBookingDateTime, formatBookingSessionStatus, isBookingField } from "./lib/booking-utils.js";
 
 const UUID_PAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -361,7 +361,7 @@ async function loadBookingValues(recordIds) {
 
     const { data, error } = await supabase
         .from("project_availability_bookings")
-        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id)")
+        .select("id, project_id, slot_id, record_id, field_id, status, booked_at, session_status, session_comment, session_status_submitted_at, session_status_submitted_by_email, project_availability_slots(slot_date, start_time, end_time, timezone, is_active, field_id, consultant_id)")
         .in("record_id", recordIds)
         .eq("status", "booked");
 
@@ -408,6 +408,8 @@ function buildModel(records, recordValues, bookingsByRecordField = new Map()) {
             steps:     {},
             bookings:  {},
             bookingDates: {},
+            bookingSessionStatuses: {},
+            bookingSessionComments: {},
             _bookingStatusNeedsSync: {},
             issue:     String(vals.issue    ?? ""),
             decision:  String(vals.decision ?? ""),
@@ -419,6 +421,8 @@ function buildModel(records, recordValues, bookingsByRecordField = new Map()) {
             if (booking) {
                 row.bookings[f.key] = booking;
                 row.bookingDates[f.key] = formatBookingDateTime(booking);
+                row.bookingSessionStatuses[f.key] = formatBookingSessionStatus(booking);
+                row.bookingSessionComments[f.key] = String(booking.session_comment || "");
                 row.steps[f.key] = "Completed";
                 if (normalizeStatus(vals[f.key], f.options) !== "Completed") {
                     row._bookingStatusNeedsSync[f.key] = true;
@@ -791,6 +795,7 @@ function renderTableHead() {
         tr.appendChild(makeSortTh(f.key, f.label, null, null));
         if (isBookingField(f)) {
             tr.appendChild(makeSortTh(`${f.key}__booking_date`, `${f.label} Date`, "180px", null));
+            tr.appendChild(makeSortTh(`${f.key}__session_status`, `${f.label} Session`, "180px", null));
         }
     }
 
@@ -881,6 +886,10 @@ function getSortValue(row, key) {
     if (key.endsWith("__booking_date")) {
         const stepKey = key.replace(/__booking_date$/, "");
         return row.bookingDates?.[stepKey] || "";
+    }
+    if (key.endsWith("__session_status")) {
+        const stepKey = key.replace(/__session_status$/, "");
+        return row.bookingSessionStatuses?.[stepKey] || "";
     }
 
     const f = SELECT_FIELDS.find(f => f.key === key);
@@ -1061,6 +1070,14 @@ function buildRow(r) {
             tdDate.appendChild(makeTextCell(r.bookingDates?.[f.key] || "", { key: `${f.key}__booking_date` }));
             tdDate.querySelector("[data-cell-key]")?.classList.add("booking-date-cell");
             tr.appendChild(tdDate);
+
+            const tdSession = document.createElement("td");
+            const sessionStatus = r.bookingSessionStatuses?.[f.key] || "";
+            const sessionCell = makeTextCell(sessionStatus, { key: `${f.key}__session_status` });
+            sessionCell.classList.add("booking-session-status-cell");
+            if (r.bookingSessionComments?.[f.key]) sessionCell.title = r.bookingSessionComments[f.key];
+            tdSession.appendChild(sessionCell);
+            tr.appendChild(tdSession);
         }
     }
 
@@ -1167,6 +1184,13 @@ function updateRowCells(tr, r) {
             const stepKey = key.replace(/__booking_date$/, "");
             cell.textContent = r.bookingDates?.[stepKey] || "";
             cell.classList.add("booking-date-cell");
+            continue;
+        }
+        if (key.endsWith("__session_status")) {
+            const stepKey = key.replace(/__session_status$/, "");
+            cell.textContent = r.bookingSessionStatuses?.[stepKey] || "";
+            cell.title = r.bookingSessionComments?.[stepKey] || "";
+            cell.classList.add("booking-session-status-cell");
             continue;
         }
         const newVal =
