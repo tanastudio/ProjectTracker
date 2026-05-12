@@ -452,6 +452,7 @@
     .availability-day-btn.today { border-color: #93c5fd; }
     .availability-day-btn.has-slot { background: #eff6ff; color: #075ac9; }
     .availability-day-btn.selected { background: #0d6efd; color: #fff; box-shadow: 0 8px 18px rgba(13,110,253,.24); }
+    .availability-day-btn.active { outline: 2px solid #0f172a; outline-offset: 2px; }
     .availability-day-btn.has-slot::after {
       content: ""; position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 50%;
       background: currentColor;
@@ -460,6 +461,38 @@
       border: 1px solid rgba(59,130,246,.16); border-radius: 10px; background: #fff;
       padding: 9px 11px; font-size: 12px; color: #1e3a8a; line-height: 1.45; margin-bottom: 10px;
     }
+    .availability-selected-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .availability-selected-title { font-size: 12px; font-weight: 900; color: #1e3a8a; }
+    .availability-clear-btn {
+      border: none; background: transparent; color: #64748b; font-size: 11px; font-weight: 900; cursor: pointer;
+      padding: 0;
+    }
+    .availability-date-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .availability-date-chip {
+      display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 8px;
+      border-radius: 999px; border: 1px solid rgba(37,99,235,.20); background: #eff6ff;
+      color: #1d4ed8; font-size: 11px; font-weight: 900; cursor: pointer;
+    }
+    .availability-date-chip.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+    .availability-date-chip-remove {
+      border: none; background: transparent; color: inherit; font-size: 14px; line-height: 1; cursor: pointer; padding: 0;
+    }
+    .availability-active-day-panel {
+      border: 1px solid rgba(15,23,42,.10); border-radius: 10px; background: #fff; padding: 10px; margin-bottom: 12px;
+    }
+    .availability-active-day-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px;
+    }
+    .availability-active-day-title { font-size: 13px; font-weight: 900; color: #0f172a; }
+    .availability-active-day-sub { font-size: 11px; color: #64748b; font-weight: 800; }
+    .availability-active-slot-list { display: grid; gap: 8px; }
+    .availability-active-slot-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
+      border: 1px solid rgba(15,23,42,.08); border-radius: 9px; background: #f8fafc; padding: 8px;
+    }
+    .availability-active-slot-row.booked { border-color: rgba(13,148,136,.22); background: #f8fffd; }
+    .availability-active-slot-time { font-size: 13px; font-weight: 900; color: #0f172a; }
+    .availability-active-slot-meta { font-size: 11px; color: #64748b; margin-top: 2px; }
     .availability-consultant-picker { margin-bottom: 10px; }
     .availability-consultant-picker .form-select { min-height: 44px; border-radius: 10px; background: #fff; }
     .availability-editor-note {
@@ -469,6 +502,10 @@
     .availability-timezone-group { margin-bottom: 12px; }
     .availability-timezone-group .form-select { min-height: 44px; border-radius: 10px; background: #fff; }
     .availability-hours { display: grid; gap: 8px; }
+    .availability-hours-empty {
+      border: 1px dashed rgba(15,23,42,.16); border-radius: 10px; background: #fff;
+      padding: 12px; color: #64748b; font-size: 12px; line-height: 1.45;
+    }
     .availability-hour-row { display: grid; grid-template-columns: 1fr auto 1fr 34px; gap: 8px; align-items: center; }
     .availability-hour-row .form-input { height: 36px; }
     .availability-time-separator { color: #64748b; font-size: 16px; font-weight: 900; line-height: 1; }
@@ -1013,6 +1050,7 @@
                 <div class="availability-editor-note" id="availabilityConsultantNotice">Add and save a consultant before creating availability.</div>
               </div>
               <div class="availability-selected" id="availabilitySelectedSummary">No dates selected.</div>
+              <div class="availability-active-day-panel" id="availabilityActiveDayPanel"></div>
               <div class="form-group availability-timezone-group">
                 <label>Time zone</label>
                 <select class="form-select" id="availabilityTimezone"></select>
@@ -2364,7 +2402,8 @@ let availabilityTimezone = getDefaultBookingTimezone("Asia/Bangkok");
 let availabilityMonth = new Date();
 availabilityMonth = new Date(availabilityMonth.getFullYear(), availabilityMonth.getMonth(), 1);
 let availabilitySelectedDates = new Set();
-let availabilityHourRows = [{ start: "09:00", end: "17:00" }];
+let availabilityActiveDate = "";
+let availabilityHourRows = [];
 let availabilitySlots = [];
 let availabilityBookingsBySlot = new Map();
 let availabilitySlotsSupported = true;
@@ -2388,6 +2427,38 @@ function parseDateKey(dateKey) {
   const [year, month, day] = String(dateKey || "").split("-").map(Number);
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day);
+}
+
+function formatAvailabilityDateLabel(dateKey, options = { month: "short", day: "numeric", year: "numeric" }) {
+  const date = parseDateKey(dateKey);
+  return date ? new Intl.DateTimeFormat("en-US", options).format(date) : String(dateKey || "");
+}
+
+function getSortedAvailabilitySelectedDates() {
+  return [...availabilitySelectedDates].sort();
+}
+
+function setAvailabilityActiveDate(dateKey) {
+  availabilityActiveDate = String(dateKey || "");
+}
+
+function removeAvailabilitySelectedDate(dateKey) {
+  const key = String(dateKey || "");
+  availabilitySelectedDates.delete(key);
+  if (availabilityActiveDate === key) {
+    availabilityActiveDate = getSortedAvailabilitySelectedDates()[0] || "";
+  }
+  renderAvailabilityCalendar();
+  renderAvailabilitySelectedSummary();
+  renderAvailabilityActiveDaySlots();
+}
+
+function clearAvailabilitySelectedDates() {
+  availabilitySelectedDates = new Set();
+  availabilityActiveDate = "";
+  renderAvailabilityCalendar();
+  renderAvailabilitySelectedSummary();
+  renderAvailabilityActiveDaySlots();
 }
 
 function getAvailabilityBookingFields() {
@@ -2517,18 +2588,24 @@ function renderAvailabilityCalendar() {
     btn.className = [
       "availability-day-btn",
       availabilitySelectedDates.has(dateKey) ? "selected" : "",
+      availabilityActiveDate === dateKey ? "active" : "",
       slotCounts.has(dateKey) ? "has-slot" : "",
       dateKey === todayKey ? "today" : "",
     ].filter(Boolean).join(" ");
     btn.textContent = String(day);
     btn.title = slotCounts.has(dateKey) ? `${slotCounts.get(dateKey)} active slot(s)` : dateKey;
     btn.disabled = !selectedFieldId || !stepEnabled || !canEditSlots;
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (event) => {
       if (!selectedFieldId || !stepEnabled || !canEditSlots) return;
-      if (availabilitySelectedDates.has(dateKey)) availabilitySelectedDates.delete(dateKey);
-      else availabilitySelectedDates.add(dateKey);
+      if ((event.ctrlKey || event.metaKey || event.altKey) && availabilitySelectedDates.has(dateKey)) {
+        removeAvailabilitySelectedDate(dateKey);
+        return;
+      }
+      availabilitySelectedDates.add(dateKey);
+      setAvailabilityActiveDate(dateKey);
       renderAvailabilityCalendar();
       renderAvailabilitySelectedSummary();
+      renderAvailabilityActiveDaySlots();
     });
 
     cell.appendChild(btn);
@@ -2539,25 +2616,178 @@ function renderAvailabilityCalendar() {
 function renderAvailabilitySelectedSummary() {
   const node = el("availabilitySelectedSummary");
   if (!node) return;
-  const dates = [...availabilitySelectedDates].sort();
+  const dates = getSortedAvailabilitySelectedDates();
   if (!dates.length) {
     node.textContent = "No dates selected.";
     return;
   }
-  const labels = dates
-    .map((dateKey) => parseDateKey(dateKey))
-    .filter(Boolean)
-    .map((date) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date));
-  node.textContent = `Selected ${dates.length} date${dates.length === 1 ? "" : "s"}: ${labels.join(", ")}`;
+  node.innerHTML = "";
+
+  const head = document.createElement("div");
+  head.className = "availability-selected-head";
+  const title = document.createElement("div");
+  title.className = "availability-selected-title";
+  title.textContent = `Selected ${dates.length} date${dates.length === 1 ? "" : "s"} for Apply Slots`;
+  const clear = document.createElement("button");
+  clear.className = "availability-clear-btn";
+  clear.type = "button";
+  clear.textContent = "Clear";
+  clear.addEventListener("click", clearAvailabilitySelectedDates);
+  head.appendChild(title);
+  head.appendChild(clear);
+  node.appendChild(head);
+
+  const chips = document.createElement("div");
+  chips.className = "availability-date-chips";
+  for (const dateKey of dates) {
+    const chip = document.createElement("button");
+    chip.className = ["availability-date-chip", availabilityActiveDate === dateKey ? "active" : ""].filter(Boolean).join(" ");
+    chip.type = "button";
+    chip.title = "Click to preview this date";
+    const label = document.createElement("span");
+    label.textContent = formatAvailabilityDateLabel(dateKey);
+    const remove = document.createElement("span");
+    remove.className = "availability-date-chip-remove";
+    remove.textContent = "x";
+    remove.title = "Remove from selected dates";
+    remove.addEventListener("click", (event) => {
+      event.stopPropagation();
+      removeAvailabilitySelectedDate(dateKey);
+    });
+    chip.addEventListener("click", () => {
+      setAvailabilityActiveDate(dateKey);
+      renderAvailabilityCalendar();
+      renderAvailabilitySelectedSummary();
+      renderAvailabilityActiveDaySlots();
+    });
+    chip.appendChild(label);
+    chip.appendChild(remove);
+    chips.appendChild(chip);
+  }
+  node.appendChild(chips);
+}
+
+function getAvailabilitySlotsForActiveDate() {
+  if (!availabilityActiveDate) return [];
+  const consultant = getAvailabilitySelectedConsultant();
+  const consultantId = String(consultant?.id || "");
+  return (availabilitySlots || [])
+    .filter((slot) => (
+      slot.is_active !== false &&
+      String(slot.slot_date || "") === availabilityActiveDate &&
+      (!consultantId || String(slot.consultant_id || "") === consultantId)
+    ))
+    .sort((a, b) => `${a.start_time}`.localeCompare(`${b.start_time}`));
+}
+
+function renderAvailabilityActiveDaySlots() {
+  const panel = el("availabilityActiveDayPanel");
+  if (!panel) return;
+  const selectedField = getAvailabilitySelectedField();
+  const consultant = getAvailabilitySelectedConsultant();
+  panel.innerHTML = "";
+
+  const head = document.createElement("div");
+  head.className = "availability-active-day-head";
+  const copy = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "availability-active-day-title";
+  title.textContent = availabilityActiveDate
+    ? `Viewing slots for ${formatAvailabilityDateLabel(availabilityActiveDate, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}`
+    : "Viewing slots";
+  const sub = document.createElement("div");
+  sub.className = "availability-active-day-sub";
+  sub.textContent = consultant
+    ? formatAvailabilityConsultantLabel(consultant)
+    : "Select a consultant and date to preview saved slots.";
+  copy.appendChild(title);
+  copy.appendChild(sub);
+  head.appendChild(copy);
+  panel.appendChild(head);
+
+  if (!selectedField) {
+    const empty = document.createElement("div");
+    empty.className = "muted small";
+    empty.textContent = "Select a booking step first.";
+    panel.appendChild(empty);
+    return;
+  }
+
+  if (!availabilityActiveDate) {
+    const empty = document.createElement("div");
+    empty.className = "muted small";
+    empty.textContent = "No date selected.";
+    panel.appendChild(empty);
+    return;
+  }
+
+  const slots = getAvailabilitySlotsForActiveDate();
+  if (!slots.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted small";
+    empty.textContent = "No saved slots for this day and consultant yet.";
+    panel.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "availability-active-slot-list";
+  for (const slot of slots) {
+    const booking = availabilityBookingsBySlot.get(String(slot.id || ""));
+    const row = document.createElement("div");
+    row.className = ["availability-active-slot-row", booking ? "booked" : ""].filter(Boolean).join(" ");
+
+    const text = document.createElement("div");
+    const time = document.createElement("div");
+    time.className = "availability-active-slot-time";
+    const startLabel = normalizeTimeText(slot.start_time);
+    const endLabel = normalizeTimeText(slot.end_time);
+    time.textContent = endLabel ? `${startLabel} - ${endLabel}` : startLabel;
+    const meta = document.createElement("div");
+    meta.className = "availability-active-slot-meta";
+    const record = booking?.records || {};
+    meta.textContent = booking
+      ? `Booked by ${record.title || record.code || "participant"}`
+      : `${selectedField.label || selectedField.key} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
+    text.appendChild(time);
+    text.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "availability-slot-actions";
+    if (booking) {
+      const cancel = document.createElement("button");
+      cancel.className = "btn-ghost";
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => cancelAvailabilityBooking(booking, cancel));
+      actions.appendChild(cancel);
+    }
+    const remove = document.createElement("button");
+    remove.className = "btn-danger-sm";
+    remove.type = "button";
+    remove.textContent = booking ? "Cancel & Remove" : "Remove";
+    remove.addEventListener("click", () => removeAvailabilitySlot(slot, booking, remove));
+    actions.appendChild(remove);
+
+    row.appendChild(text);
+    row.appendChild(actions);
+    list.appendChild(row);
+  }
+  panel.appendChild(list);
 }
 
 function renderAvailabilityHours() {
   const rows = el("availabilityHourRows");
   if (!rows) return;
   rows.innerHTML = "";
-  const selectedFieldId = requireAvailabilityFieldId();
-  const stepEnabled = selectedFieldId ? isAvailabilityStepEnabled(selectedFieldId) : false;
   const canEditSlots = canEditAvailabilitySlots();
+
+  if (!availabilityHourRows.length) {
+    const empty = document.createElement("div");
+    empty.className = "availability-hours-empty";
+    empty.textContent = "No draft time ranges yet.";
+    rows.appendChild(empty);
+  }
 
   availabilityHourRows.forEach((row, index) => {
     const wrap = document.createElement("div");
@@ -2586,7 +2816,7 @@ function renderAvailabilityHours() {
     remove.type = "button";
     remove.textContent = "x";
     remove.title = "Remove time range";
-    remove.disabled = !canEditSlots || availabilityHourRows.length <= 1;
+    remove.disabled = !canEditSlots;
     remove.addEventListener("click", () => {
       availabilityHourRows.splice(index, 1);
       renderAvailabilityHours();
@@ -2602,7 +2832,7 @@ function renderAvailabilityHours() {
   const addButton = el("availabilityAddHourBtn");
   if (addButton) addButton.disabled = !canEditSlots || availabilityHourRows.length >= MAX_AVAILABILITY_TIME_ROWS;
   const applyButton = el("availabilityApplyBtn");
-  if (applyButton) applyButton.disabled = !canEditSlots;
+  if (applyButton) applyButton.disabled = !canEditSlots || !availabilityHourRows.length;
 }
 
 function getValidAvailabilityHours() {
@@ -2616,6 +2846,23 @@ function getValidAvailabilityHours() {
   }
   if (!valid.length) throw new Error("Add at least one valid time range.");
   return valid;
+}
+
+function getNextAvailabilityDraftRange() {
+  const last = availabilityHourRows[availabilityHourRows.length - 1];
+  if (!last?.end) return { start: "09:00", end: "10:00" };
+  const [hour, minute] = normalizeTimeText(last.end).split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return { start: "09:00", end: "10:00" };
+  const startMinutes = hour * 60 + minute;
+  const endMinutes = Math.min(startMinutes + 60, 24 * 60);
+  const formatMinutes = (total) => {
+    const clamped = Math.max(0, Math.min(total, 24 * 60));
+    const h = Math.floor(clamped / 60);
+    const m = clamped % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  };
+  if (startMinutes >= 23 * 60) return { start: "09:00", end: "10:00" };
+  return { start: formatMinutes(startMinutes), end: formatMinutes(endMinutes) };
 }
 
 function populateAvailabilityTimezoneSelect() {
@@ -2670,8 +2917,10 @@ function renderAvailabilityConsultantSelect() {
   select.onchange = () => {
     if (fieldId) availabilitySelectedConsultantByField.set(fieldId, select.value || "");
     availabilitySelectedDates = new Set();
+    availabilityActiveDate = "";
     renderAvailabilityCalendar();
     renderAvailabilitySelectedSummary();
+    renderAvailabilityActiveDaySlots();
     renderAvailabilityHours();
     renderAvailabilitySlotList();
   };
@@ -2825,6 +3074,7 @@ function renderAvailabilityStepSummary() {
     availabilitySelectedFieldId = "";
     renderAvailabilityStepConfig();
     renderAvailabilityCalendar();
+    renderAvailabilityActiveDaySlots();
     renderAvailabilitySlotList();
     return;
   }
@@ -2847,8 +3097,10 @@ function renderAvailabilityStepSummary() {
     button.addEventListener("click", async () => {
       availabilitySelectedFieldId = fieldId;
       availabilitySelectedDates = new Set();
+      availabilityActiveDate = "";
       renderAvailabilityStepSummary();
       renderAvailabilitySelectedSummary();
+      renderAvailabilityActiveDaySlots();
       renderAvailabilityHours();
       renderAvailabilityStepConfig();
       await loadAvailabilitySlots();
@@ -3020,10 +3272,14 @@ async function setAvailabilityStepEnabled(enabled) {
     return;
   }
   availabilityStepSettings.set(fieldId, { ...data, is_enabled: data?.is_enabled === true });
-  if (!enabled) availabilitySelectedDates = new Set();
+  if (!enabled) {
+    availabilitySelectedDates = new Set();
+    availabilityActiveDate = "";
+  }
   renderAvailabilityStepSummary();
   renderAvailabilitySelectedSummary();
   renderAvailabilityCalendar();
+  renderAvailabilityActiveDaySlots();
   renderAvailabilityHours();
   await loadAvailabilitySlots();
   showHint(`${enabled ? "Enabled" : "Disabled"} booking calendar for this step.`, false);
@@ -3402,6 +3658,7 @@ async function loadAvailabilitySlots() {
     availabilitySlots = [];
     availabilityBookingsBySlot = new Map();
     renderAvailabilityCalendar();
+    renderAvailabilityActiveDaySlots();
     renderAvailabilitySlotList();
     return;
   }
@@ -3419,6 +3676,7 @@ async function loadAvailabilitySlots() {
     availabilitySlots = [];
     availabilityBookingsBySlot = new Map();
     renderAvailabilityCalendar();
+    renderAvailabilityActiveDaySlots();
     renderAvailabilitySlotList();
     return;
   }
@@ -3440,6 +3698,7 @@ async function loadAvailabilitySlots() {
     console.warn("Failed to load slot bookings:", bookingError.message || bookingError);
   }
   renderAvailabilityCalendar();
+  renderAvailabilityActiveDaySlots();
   renderAvailabilitySlotList();
 }
 
@@ -3524,8 +3783,9 @@ async function applyAvailabilitySlots() {
     return;
   }
 
-  availabilitySelectedDates = new Set();
   renderAvailabilitySelectedSummary();
+  renderAvailabilityCalendar();
+  renderAvailabilityActiveDaySlots();
   showHint(`${payload.length} slot${payload.length === 1 ? "" : "s"} saved.`, false);
 }
 
@@ -3542,7 +3802,7 @@ el("availabilityAddHourBtn")?.addEventListener("click", () => {
     showHint(`Maximum ${MAX_AVAILABILITY_TIME_ROWS} time ranges per apply.`, true);
     return;
   }
-  availabilityHourRows.push({ start: "09:00", end: "17:00" });
+  availabilityHourRows.push(getNextAvailabilityDraftRange());
   renderAvailabilityHours();
 });
 el("availabilityApplyBtn")?.addEventListener("click", () => applyAvailabilitySlots().catch(console.error));
@@ -3560,6 +3820,7 @@ el("availabilityPreviewModal")?.addEventListener("click", (event) => {
 populateAvailabilityTimezoneSelect();
 renderAvailabilityHours();
 renderAvailabilitySelectedSummary();
+renderAvailabilityActiveDaySlots();
 
 /* ═══════════════════
    FIELDS TAB
