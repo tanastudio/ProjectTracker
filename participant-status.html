@@ -1772,6 +1772,7 @@
         let BOOKINGS_BY_FIELD = new Map();
         let BOOKING_ENABLED_FIELD_IDS = new Set();
         let BOOKING_SETTINGS_SUPPORTED = true;
+        let RENDERED_STEPS = [];
         const BOOKING_CALENDAR_STATE = new Map();
         const BOOKING_SELECTED_SLOT_BY_FIELD = new Map();
         const BOOKING_CONSULTANT_FILTER_BY_FIELD = new Map();
@@ -2188,10 +2189,19 @@
             if (message) {
                 message.className = notifyResult.ok ? "booking-message" : "booking-message error";
                 message.textContent = notifyResult.ok
-                    ? "Booking confirmed. Refreshing status..."
-                    : "Booking saved, but email notification failed. Refreshing status...";
+                    ? "Booking confirmed. Updating status..."
+                    : "Booking saved, but email notification failed. Updating status...";
             }
-            setTimeout(() => window.location.reload(), 700);
+
+            try {
+                await refreshParticipantStatusAfterBooking();
+            } catch (refreshError) {
+                console.warn("Booking status refresh failed:", refreshError);
+                if (message) {
+                    message.className = "booking-message error";
+                    message.textContent = "Booking saved. Status could not update automatically, please refresh if it does not appear.";
+                }
+            }
         }
 
         async function notifyBookingViaEdge(bookingId) {
@@ -2312,6 +2322,30 @@
                 }
                 stepsEl.appendChild(row);
             });
+        }
+
+        function buildParticipantSteps() {
+            return (fields || []).map((f) => {
+                const booking = BOOKINGS_BY_FIELD.get(String(f.id || ""));
+                const isEnabledBookingStep = isBookingField(f) && (
+                    BOOKING_SETTINGS_SUPPORTED ? BOOKING_ENABLED_FIELD_IDS.has(String(f.id || "")) : true
+                );
+                return {
+                    id: f.id,
+                    key: f.key,
+                    label: f.label,
+                    isBooking: isEnabledBookingStep || Boolean(booking),
+                    booking,
+                    status: booking ? "Completed" : normalizeStatus(vals[f.key] || ""),
+                };
+            });
+        }
+
+        async function refreshParticipantStatusAfterBooking() {
+            await loadParticipantBookingData(rec.project_id, rec.id);
+            RENDERED_STEPS = buildParticipantSteps();
+            renderSteps(RENDERED_STEPS);
+            renderStats(RENDERED_STEPS);
         }
 
         const PREVIEW_RECORD_SAFE_PAT = /^[A-Za-z0-9_-]{1,120}$/;
@@ -2568,23 +2602,9 @@
 
         el("summary").textContent = `${rec.code || ""} - ${rec.title || ""}`;
 
-        const renderedSteps = (fields || []).map((f) => {
-            const booking = BOOKINGS_BY_FIELD.get(String(f.id || ""));
-            const isEnabledBookingStep = isBookingField(f) && (
-                BOOKING_SETTINGS_SUPPORTED ? BOOKING_ENABLED_FIELD_IDS.has(String(f.id || "")) : true
-            );
-            return {
-                id: f.id,
-                key: f.key,
-                label: f.label,
-                isBooking: isEnabledBookingStep || Boolean(booking),
-                booking,
-                status: booking ? "Completed" : normalizeStatus(vals[f.key] || ""),
-            };
-        });
-
-        renderSteps(renderedSteps);
-        renderStats(renderedSteps);
+        RENDERED_STEPS = buildParticipantSteps();
+        renderSteps(RENDERED_STEPS);
+        renderStats(RENDERED_STEPS);
 
         // ── Ticket system ────────────────────────────────────────────────────
 
