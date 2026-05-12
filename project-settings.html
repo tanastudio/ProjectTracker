@@ -491,6 +491,7 @@
       border: 1px solid rgba(15,23,42,.08); border-radius: 9px; background: #f8fafc; padding: 8px;
     }
     .availability-active-slot-row.booked { border-color: rgba(13,148,136,.22); background: #f8fffd; }
+    .availability-active-slot-row.other-step { border-color: rgba(245,158,11,.25); background: #fffaf0; }
     .availability-active-slot-time { font-size: 13px; font-weight: 900; color: #0f172a; }
     .availability-active-slot-meta { font-size: 11px; color: #64748b; margin-top: 2px; }
     .availability-consultant-picker { margin-bottom: 10px; }
@@ -2504,6 +2505,10 @@ function formatAvailabilityConsultantLabel(consultant) {
   return name || email || "Consultant";
 }
 
+function normalizeAvailabilityEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function getSlotConsultant(slot) {
   return slot?.project_availability_consultants || slot?.consultant || {
     id: slot?.consultant_id,
@@ -2511,6 +2516,24 @@ function getSlotConsultant(slot) {
     email: slot?.consultant_email,
     is_active: true,
   };
+}
+
+function getAvailabilitySlotField(slot) {
+  const fieldId = String(slot?.field_id || "");
+  return (fields || []).find((field) => String(field.id || "") === fieldId) || null;
+}
+
+function getAvailabilitySlotStepLabel(slot) {
+  const field = getAvailabilitySlotField(slot);
+  return field?.label || field?.key || "Booking step";
+}
+
+function doesAvailabilitySlotMatchConsultant(slot, consultant) {
+  if (!consultant) return true;
+  const selectedEmail = normalizeAvailabilityEmail(consultant.email);
+  const slotEmail = normalizeAvailabilityEmail(getSlotConsultant(slot)?.email || slot?.consultant_email);
+  if (selectedEmail && slotEmail) return selectedEmail === slotEmail;
+  return String(slot?.consultant_id || "") === String(consultant.id || "");
 }
 
 function getAvailabilitySelectedConsultant(fieldId = requireAvailabilityFieldId()) {
@@ -2537,10 +2560,9 @@ function canEditAvailabilitySlots() {
 function getAvailabilitySlotCounts() {
   const counts = new Map();
   const consultant = getAvailabilitySelectedConsultant();
-  const consultantId = String(consultant?.id || "");
   for (const slot of availabilitySlots || []) {
     if (slot.is_active === false) continue;
-    if (consultantId && String(slot.consultant_id || "") !== consultantId) continue;
+    if (!doesAvailabilitySlotMatchConsultant(slot, consultant)) continue;
     const key = String(slot.slot_date || "");
     counts.set(key, (counts.get(key) || 0) + 1);
   }
@@ -2663,14 +2685,13 @@ function renderAvailabilitySelectedSummary() {
 function getAvailabilitySlotsForActiveDate() {
   if (!availabilityActiveDate) return [];
   const consultant = getAvailabilitySelectedConsultant();
-  const consultantId = String(consultant?.id || "");
   return (availabilitySlots || [])
     .filter((slot) => (
       slot.is_active !== false &&
       String(slot.slot_date || "") === availabilityActiveDate &&
-      (!consultantId || String(slot.consultant_id || "") === consultantId)
+      doesAvailabilitySlotMatchConsultant(slot, consultant)
     ))
-    .sort((a, b) => `${a.start_time}`.localeCompare(`${b.start_time}`));
+    .sort((a, b) => `${a.start_time}`.localeCompare(`${b.start_time}`) || getAvailabilitySlotStepLabel(a).localeCompare(getAvailabilitySlotStepLabel(b)));
 }
 
 function renderAvailabilityActiveDaySlots() {
@@ -2691,7 +2712,7 @@ function renderAvailabilityActiveDaySlots() {
   const sub = document.createElement("div");
   sub.className = "availability-active-day-sub";
   sub.textContent = consultant
-    ? formatAvailabilityConsultantLabel(consultant)
+    ? `${formatAvailabilityConsultantLabel(consultant)} - all booking steps`
     : "Select a consultant and date to preview saved slots.";
   copy.appendChild(title);
   copy.appendChild(sub);
@@ -2718,7 +2739,7 @@ function renderAvailabilityActiveDaySlots() {
   if (!slots.length) {
     const empty = document.createElement("div");
     empty.className = "muted small";
-    empty.textContent = "No saved slots for this day and consultant yet.";
+    empty.textContent = "No saved slots for this day and consultant across booking steps yet.";
     panel.appendChild(empty);
     return;
   }
@@ -2727,8 +2748,14 @@ function renderAvailabilityActiveDaySlots() {
   list.className = "availability-active-slot-list";
   for (const slot of slots) {
     const booking = availabilityBookingsBySlot.get(String(slot.id || ""));
+    const isCurrentStepSlot = String(slot.field_id || "") === String(selectedField.id || "");
+    const stepLabel = getAvailabilitySlotStepLabel(slot);
     const row = document.createElement("div");
-    row.className = ["availability-active-slot-row", booking ? "booked" : ""].filter(Boolean).join(" ");
+    row.className = [
+      "availability-active-slot-row",
+      booking ? "booked" : "",
+      isCurrentStepSlot ? "" : "other-step",
+    ].filter(Boolean).join(" ");
 
     const text = document.createElement("div");
     const time = document.createElement("div");
@@ -2740,14 +2767,19 @@ function renderAvailabilityActiveDaySlots() {
     meta.className = "availability-active-slot-meta";
     const record = booking?.records || {};
     meta.textContent = booking
-      ? `Booked by ${record.title || record.code || "participant"}`
-      : `${selectedField.label || selectedField.key} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
+      ? `${stepLabel} - booked by ${record.title || record.code || "participant"}`
+      : `${stepLabel} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
     text.appendChild(time);
     text.appendChild(meta);
 
     const actions = document.createElement("div");
     actions.className = "availability-slot-actions";
-    if (booking) {
+    if (!isCurrentStepSlot) {
+      const badge = document.createElement("span");
+      badge.className = "muted small";
+      badge.textContent = "Other step";
+      actions.appendChild(badge);
+    } else if (booking) {
       const cancel = document.createElement("button");
       cancel.className = "btn-ghost";
       cancel.type = "button";
@@ -2755,12 +2787,14 @@ function renderAvailabilityActiveDaySlots() {
       cancel.addEventListener("click", () => cancelAvailabilityBooking(booking, cancel));
       actions.appendChild(cancel);
     }
-    const remove = document.createElement("button");
-    remove.className = "btn-danger-sm";
-    remove.type = "button";
-    remove.textContent = booking ? "Cancel & Remove" : "Remove";
-    remove.addEventListener("click", () => removeAvailabilitySlot(slot, booking, remove));
-    actions.appendChild(remove);
+    if (isCurrentStepSlot) {
+      const remove = document.createElement("button");
+      remove.className = "btn-danger-sm";
+      remove.type = "button";
+      remove.textContent = booking ? "Cancel & Remove" : "Remove";
+      remove.addEventListener("click", () => removeAvailabilitySlot(slot, booking, remove));
+      actions.appendChild(remove);
+    }
 
     row.appendChild(text);
     row.appendChild(actions);
@@ -2937,7 +2971,7 @@ function renderAvailabilitySlotList() {
     return;
   }
   const activeSlots = (availabilitySlots || [])
-    .filter((slot) => slot.is_active !== false)
+    .filter((slot) => slot.is_active !== false && String(slot.field_id || "") === String(selectedField.id || ""))
     .sort((a, b) => `${a.slot_date} ${a.start_time}`.localeCompare(`${b.slot_date} ${b.start_time}`));
 
   if (!availabilitySlotsSupported) {
@@ -2966,7 +3000,7 @@ function renderAvailabilitySlotList() {
     consultantLine.textContent = formatAvailabilityConsultantLabel(consultant) || "Unassigned consultant";
     const meta = document.createElement("div");
     meta.className = "availability-slot-meta";
-    meta.textContent = `${selectedField.label || selectedField.key} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
+    meta.textContent = `${getAvailabilitySlotStepLabel(slot)} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
     copy.appendChild(title);
     copy.appendChild(consultantLine);
     copy.appendChild(meta);
@@ -3360,10 +3394,12 @@ async function saveAvailabilityConsultants() {
 function getAvailabilityPreviewSlotsByDate() {
   const today = getDateKeyForTimezone(availabilityPreviewTimezone);
   const byDate = new Map();
+  const fieldId = requireAvailabilityFieldId();
   const consultantFilter = String(availabilityPreviewConsultantId || "");
   const groups = new Map();
   for (const slot of availabilitySlots || []) {
     if (slot.is_active === false) continue;
+    if (fieldId && String(slot.field_id || "") !== String(fieldId)) continue;
     if (availabilityBookingsBySlot.has(String(slot.id))) continue;
     if (consultantFilter && String(slot.consultant_id || "") !== consultantFilter) continue;
     const dateKey = formatDateKeyInTimezone(slot, availabilityPreviewTimezone);
@@ -3427,8 +3463,8 @@ function renderAvailabilityPreviewModal() {
   hero.innerHTML = `
     <h3 class="availability-preview-title">${escapeHtml(selectedField.label || selectedField.key || "Booking")}</h3>
     <div class="availability-preview-meta">
-      <span>1 hr</span>
-      <span>Confirmation email after booking</span>
+      <span>Configured time ranges</span>
+      <span>Confirmation email to participant and consultant</span>
     </div>`;
   body.appendChild(hero);
 
@@ -3653,7 +3689,6 @@ async function loadAvailabilitySlots() {
     .from("project_availability_slots")
     .select("id, project_id, field_id, consultant_id, slot_date, start_time, end_time, timezone, is_active, project_availability_consultants(id,name,email,is_active)")
     .eq("project_id", PROJECT_ID)
-    .eq("field_id", fieldId)
     .order("slot_date", { ascending: true })
     .order("start_time", { ascending: true });
 
@@ -3674,7 +3709,6 @@ async function loadAvailabilitySlots() {
     .from("project_availability_bookings")
     .select("id, project_id, slot_id, record_id, field_id, consultant_id, consultant_name, consultant_email, status, booked_at, records(code,title)")
     .eq("project_id", PROJECT_ID)
-    .eq("field_id", fieldId)
     .eq("status", "booked");
   if (!bookingError) {
     for (const booking of bookings || []) {
