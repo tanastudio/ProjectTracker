@@ -14,7 +14,7 @@ type BookingNotifyBody = {
 };
 
 type EmailPayload = {
-  to: string[];
+  to: string;
   subject: string;
   title: string;
   body: string;
@@ -22,11 +22,25 @@ type EmailPayload = {
   actionText: string;
   projectName: string;
   participantName: string;
+  participantEmail: string;
   stepLabel: string;
   slotLabel: string;
   consultantName: string;
   consultantEmail: string;
+  recipientName: string;
+  recipientRole: "participant" | "consultant";
+  senderName: string;
+  senderRole: string;
 };
+
+type DeliveryTarget = {
+  email: string;
+  name: string;
+  role: EmailPayload["recipientRole"];
+};
+
+const DEFAULT_SENDER_NAME = "Mentis Workflows";
+const DEFAULT_SENDER_ROLE = "System";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -45,6 +59,12 @@ function escapeHtml(value: string): string {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
+function cleanText(value: unknown, fallback = "") {
+  const text = String(value ?? "").trim();
+  if (!text || text.toLowerCase() === "undefined" || text.toLowerCase() === "null") return fallback;
+  return text;
 }
 
 function normalizeTimeText(value: unknown) {
@@ -151,20 +171,38 @@ async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      to_emails: payload.to,
+      to_emails: [payload.to],
+      to_email: payload.to,
       email_subject: payload.subject,
-      name: payload.participantName || "Participant",
+      name: payload.recipientName || payload.participantName || "Participant",
+      recipient_name: payload.recipientName,
+      recipient_email: payload.to,
+      recipient_role: payload.recipientRole,
       message_title: payload.title,
       message_body: payload.body,
       action_url: payload.actionUrl,
       action_text: payload.actionText,
       event_type: "Booking Confirmed",
+      email_type: "booking_confirmed",
+      candidate_name: payload.participantName,
+      candidate_email: payload.participantEmail,
       participant_name: payload.participantName,
+      participant_email: payload.participantEmail,
       project_name: payload.projectName,
       booking_step: payload.stepLabel,
       booking_slot: payload.slotLabel,
       consultant_name: payload.consultantName,
       consultant_email: payload.consultantEmail,
+      author_name: payload.senderName,
+      author_role: payload.senderRole,
+      sender_name: payload.senderName,
+      sender_role: payload.senderRole,
+      sender_display_name: payload.senderName,
+      sent_by_name: payload.senderName,
+      sent_by_role: payload.senderRole,
+      sent_by: payload.senderName,
+      from_name: payload.senderName,
+      support_team_name: payload.senderName,
     }),
   });
 
@@ -199,7 +237,7 @@ async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPa
     },
     body: JSON.stringify({
       from: fromEmail,
-      to: payload.to,
+      to: [payload.to],
       subject: payload.subject,
       html,
       text: `${payload.title}\n\n${payload.body}\n\n${payload.actionText}: ${payload.actionUrl}`,
@@ -241,6 +279,43 @@ async function sendEmail(payload: EmailPayload) {
   }
 
   throw new Error(providerErrors.join("; "));
+}
+
+function buildDeliveryTargets(
+  participantEmail: string,
+  participantName: string,
+  consultantEmails: string[],
+  consultantName: string,
+): DeliveryTarget[] {
+  const targets: DeliveryTarget[] = [];
+  const seen = new Set<string>();
+  const addTarget = (target: DeliveryTarget) => {
+    const email = String(target.email || "").trim().toLowerCase();
+    if (!isValidEmail(email) || seen.has(email)) return;
+    seen.add(email);
+    targets.push({ ...target, email });
+  };
+
+  addTarget({
+    email: participantEmail,
+    name: participantName || "Participant",
+    role: "participant",
+  });
+  for (const email of consultantEmails) {
+    addTarget({
+      email,
+      name: consultantName || "Consultant",
+      role: "consultant",
+    });
+  }
+  return targets;
+}
+
+function buildBodyForTarget(target: DeliveryTarget, participantName: string, stepLabel: string, consultantName: string, slotLabel: string) {
+  if (target.role === "consultant") {
+    return `${participantName}'s booking for ${stepLabel} is confirmed with you.\n\nCandidate: ${participantName}\nDate and time: ${slotLabel}`;
+  }
+  return `Your booking for ${stepLabel} is confirmed.\n\nConsultant: ${consultantName || "-"}\nDate and time: ${slotLabel}`;
 }
 
 serve(async (req) => {
@@ -288,41 +363,64 @@ serve(async (req) => {
       return json({ ok: false, skipped: true, reason: "participant email not found" });
     }
 
-    const projectName = String(project?.name || "Project");
-    const participantName = String(record?.title || record?.code || "Participant");
-    const stepLabel = String(field?.label || "Booking");
+    const projectName = cleanText(project?.name, "Project");
+    const participantName = cleanText(record?.title, cleanText(record?.code, "Participant"));
+    const stepLabel = cleanText(field?.label, "Booking");
     const slotLabel = formatSlotLabel(slot || {});
     const actionUrl = `${trackerBaseUrl}/participant-status.html`;
     const assignedConsultantEmail = String(booking.consultant_email || "").trim().toLowerCase();
     const consultantRecipients = isValidEmail(assignedConsultantEmail)
       ? [assignedConsultantEmail]
       : await getConsultantEmails(adminClient, booking.project_id, booking.field_id);
-    const consultantName = String(booking.consultant_name || assignedConsultantEmail || "").trim();
-    const recipients = [recipient, ...consultantRecipients]
-      .map((email) => email.trim().toLowerCase())
-      .filter((email, index, list) => isValidEmail(email) && list.indexOf(email) === index);
+    const consultantName = cleanText(booking.consultant_name, assignedConsultantEmail || "Consultant");
+    const targets = buildDeliveryTargets(recipient, participantName, consultantRecipients, consultantName);
+    if (!targets.length) {
+      await adminClient
+        .from("project_availability_bookings")
+        .update({ notification_error: "No email recipients found", updated_at: new Date().toISOString() })
+        .eq("id", bookingId);
+      return json({ ok: false, skipped: true, reason: "no email recipients found" });
+    }
 
-    const result = await sendEmail({
-      to: recipients,
-      subject: `[Booking Confirmed] ${stepLabel} - ${projectName}`,
-      title: "Booking confirmed",
-      body: `${participantName}'s booking for ${stepLabel} is confirmed.\n\nConsultant: ${consultantName || "-"}\nDate and time: ${slotLabel}`,
-      actionUrl,
-      actionText: "View My Status",
-      projectName,
-      participantName,
-      stepLabel,
-      slotLabel,
-      consultantName,
-      consultantEmail: assignedConsultantEmail,
-    });
+    const sent: Array<{ email: string; provider: string; role: string }> = [];
+    const errors: string[] = [];
+    for (const target of targets) {
+      try {
+        const result = await sendEmail({
+          to: target.email,
+          subject: `[Booking Confirmed] ${stepLabel} - ${projectName}`,
+          title: "Booking confirmed",
+          body: buildBodyForTarget(target, participantName, stepLabel, consultantName, slotLabel),
+          actionUrl,
+          actionText: target.role === "consultant" ? "View Booking" : "View My Status",
+          projectName,
+          participantName,
+          participantEmail: recipient,
+          stepLabel,
+          slotLabel,
+          consultantName,
+          consultantEmail: assignedConsultantEmail || (target.role === "consultant" ? target.email : ""),
+          recipientName: target.name,
+          recipientRole: target.role,
+          senderName: DEFAULT_SENDER_NAME,
+          senderRole: DEFAULT_SENDER_ROLE,
+        });
+        sent.push({ email: target.email, provider: result.provider, role: target.role });
+      } catch (err) {
+        errors.push(`${target.email}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    if (errors.length) {
+      throw new Error(errors.join("; "));
+    }
 
     await adminClient
       .from("project_availability_bookings")
       .update({ notification_sent_at: new Date().toISOString(), notification_error: null, updated_at: new Date().toISOString() })
       .eq("id", bookingId);
 
-    return json({ ok: true, sent_to: recipients, provider: result.provider });
+    return json({ ok: true, sent_to: sent.map((item) => item.email), sent });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unexpected error";
     console.error("booking-notify error:", err);
