@@ -2536,6 +2536,14 @@ function doesAvailabilitySlotMatchConsultant(slot, consultant) {
   return String(slot?.consultant_id || "") === String(consultant.id || "");
 }
 
+function getAvailabilitySlotDisplayDateKey(slot) {
+  return formatDateKeyInTimezone(slot, availabilityTimezone || "Asia/Bangkok");
+}
+
+function getAvailabilitySlotDisplayTimeLabel(slot) {
+  return formatSlotTimeInTimezone(slot, availabilityTimezone || "Asia/Bangkok") || formatSlotTimeInTimezone(slot, slot?.timezone || "Asia/Bangkok");
+}
+
 function getAvailabilitySelectedConsultant(fieldId = requireAvailabilityFieldId()) {
   const targetFieldId = String(fieldId || "");
   if (!targetFieldId) return null;
@@ -2563,7 +2571,7 @@ function getAvailabilitySlotCounts() {
   for (const slot of availabilitySlots || []) {
     if (slot.is_active === false) continue;
     if (!doesAvailabilitySlotMatchConsultant(slot, consultant)) continue;
-    const key = String(slot.slot_date || "");
+    const key = getAvailabilitySlotDisplayDateKey(slot);
     counts.set(key, (counts.get(key) || 0) + 1);
   }
   return counts;
@@ -2688,10 +2696,10 @@ function getAvailabilitySlotsForActiveDate() {
   return (availabilitySlots || [])
     .filter((slot) => (
       slot.is_active !== false &&
-      String(slot.slot_date || "") === availabilityActiveDate &&
+      getAvailabilitySlotDisplayDateKey(slot) === availabilityActiveDate &&
       doesAvailabilitySlotMatchConsultant(slot, consultant)
     ))
-    .sort((a, b) => `${a.start_time}`.localeCompare(`${b.start_time}`) || getAvailabilitySlotStepLabel(a).localeCompare(getAvailabilitySlotStepLabel(b)));
+    .sort((a, b) => getAvailabilitySlotDisplayTimeLabel(a).localeCompare(getAvailabilitySlotDisplayTimeLabel(b)) || getAvailabilitySlotStepLabel(a).localeCompare(getAvailabilitySlotStepLabel(b)));
 }
 
 function renderAvailabilityActiveDaySlots() {
@@ -2760,15 +2768,13 @@ function renderAvailabilityActiveDaySlots() {
     const text = document.createElement("div");
     const time = document.createElement("div");
     time.className = "availability-active-slot-time";
-    const startLabel = normalizeTimeText(slot.start_time);
-    const endLabel = normalizeTimeText(slot.end_time);
-    time.textContent = endLabel ? `${startLabel} - ${endLabel}` : startLabel;
+    time.textContent = getAvailabilitySlotDisplayTimeLabel(slot);
     const meta = document.createElement("div");
     meta.className = "availability-active-slot-meta";
     const record = booking?.records || {};
     meta.textContent = booking
       ? `${stepLabel} - booked by ${record.title || record.code || "participant"}`
-      : `${stepLabel} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
+      : `${stepLabel} - ${formatTimezoneLabel(availabilityTimezone || "Asia/Bangkok")}`;
     text.appendChild(time);
     text.appendChild(meta);
 
@@ -2898,6 +2904,8 @@ function populateAvailabilityTimezoneSelect() {
   select.value = availabilityTimezone;
   select.addEventListener("change", () => {
     availabilityTimezone = select.value || "Asia/Bangkok";
+    renderAvailabilityCalendar();
+    renderAvailabilityActiveDaySlots();
   });
 }
 
