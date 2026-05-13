@@ -406,6 +406,7 @@
 
     <script type="module">
         import { supabase } from "./supabaseClient.js";
+        import { getAdminAccessDecision } from "./lib/access-control-utils.js";
         import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
         import { showToast } from "./lib/toast-notifications.js";
 
@@ -493,8 +494,9 @@
             }
 
             const role = resolveRole(profile?.role, session);
-            if (role !== "admin") {
-                window.location.replace("./projects.html");
+            const access = getAdminAccessDecision(role);
+            if (!access.ok) {
+                window.location.replace(access.redirectTo);
                 return null;
             }
 

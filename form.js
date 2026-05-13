@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient.js";
 import { STEP_STATUS, normalizeStatus, computeOverall } from "./lib/form-utils.js";
+import { getFormAccessDecision } from "./lib/access-control-utils.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 import { bookingMapKey, formatBookingDateTime, formatBookingSessionStatus, isBookingField } from "./lib/booking-utils.js";
 
@@ -93,17 +94,13 @@ async function requireInternalAccess() {
 
     const role = (!error && profile?.role) ? String(profile.role).trim().toLowerCase() : "external";
 
-    if (role === "participant") {
-        window.location.replace("./participant-status.html");
+    const access = getFormAccessDecision(role);
+    if (!access.ok) {
+        window.location.replace(access.redirectTo);
         return null;
     }
 
-    if (role !== "admin" && role !== "internal") {
-        window.location.replace("./projects.html");
-        return null;
-    }
-
-    return { session, role, displayName: profile?.display_name || "" };
+    return { session, role: access.role, displayName: profile?.display_name || "" };
 }
 
 const __auth = await requireInternalAccess();

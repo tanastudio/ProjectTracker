@@ -1437,6 +1437,7 @@
 <script type="module">
 import { supabase } from "./supabaseClient.js";
 import { SUPABASE_URL } from "./js/config.js";
+import { getProjectSettingsAccessDecision } from "./lib/access-control-utils.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
 import { showToast } from "./lib/toast-notifications.js";
 import {
@@ -1572,18 +1573,14 @@ async function requireProjectSettingsAccess() {
 
   const role = String(prof?.role || session.user.user_metadata?.role || "").trim().toLowerCase();
   const memberRole = String(member?.role || "").trim().toLowerCase();
-  const canManageProject =
-    role === "admin" ||
-    (
-      role === "internal" &&
-      (
-        project?.created_by === session.user.id ||
-        memberRole === "admin" ||
-        memberRole === "editor"
-      )
-    );
+  const access = getProjectSettingsAccessDecision({
+    profileRole: role,
+    memberRole,
+    projectCreatedBy: project?.created_by,
+    userId: session.user.id,
+  });
 
-  if (!canManageProject) { window.location.replace("./projects.html"); return null; }
+  if (!access.ok) { window.location.replace(access.redirectTo); return null; }
 
   CURRENT_PROFILE_ROLE = role || "viewer";
   sessionStorage.setItem("user_role", CURRENT_PROFILE_ROLE);

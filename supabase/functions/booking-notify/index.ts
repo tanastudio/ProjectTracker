@@ -2,6 +2,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveCronSecretAccess } from "../../../lib/access-control-utils.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -825,13 +826,14 @@ serve(async (req) => {
     if (action === "send_session_followups") {
       const cronSecret = (Deno.env.get("BOOKING_FOLLOWUP_CRON_SECRET") || Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "").trim();
       const cronHeader = (req.headers.get("x-booking-followup-cron-secret") || req.headers.get("x-project-update-cron-secret") || "").trim();
-      const source = String(body?.source || "").trim().toLowerCase();
-      const wantsCron = Boolean(cronHeader) || source === "cron";
-      if (wantsCron && !cronSecret) {
-        return json({ error: "BOOKING_FOLLOWUP_CRON_SECRET is not configured" }, 500);
-      }
-      const requestedByCron = wantsCron && cronHeader === cronSecret;
-      if (!requestedByCron) return json({ error: "Unauthorized" }, 401);
+      const cronAccess = resolveCronSecretAccess({
+        secret: cronSecret,
+        header: cronHeader,
+        source: body?.source,
+        secretName: "BOOKING_FOLLOWUP_CRON_SECRET",
+      });
+      if (cronAccess.error) return json({ error: cronAccess.error.message }, cronAccess.error.status);
+      if (!cronAccess.requestedByCron) return json({ error: "Unauthorized" }, 401);
       const result = await sendDueSessionFollowups(adminClient, trackerBaseUrl);
       return json(result, result.ok ? 200 : 207);
     }

@@ -2,6 +2,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveCronSecretAccess, resolveManualProjectEmailAccess } from "../../../lib/access-control-utils.js";
 import { describeProjectUpdateSchedule } from "../../../lib/project-update-email-utils.js";
 
 const corsHeaders = {
@@ -989,15 +990,16 @@ serve(async (req) => {
       ? "internal"
       : "client";
     const cronHeader = req.headers.get("x-project-update-cron-secret") || "";
-    const source = String(body?.source || "").trim().toLowerCase();
-    const wantsCron = Boolean(cronHeader) || source === "cron";
-    if (wantsCron && !cronSecret) {
-      return jsonResponse({ error: "PROJECT_UPDATE_CRON_SECRET is not configured" }, 500);
+    const cronAccess = resolveCronSecretAccess({
+      secret: cronSecret,
+      header: cronHeader,
+      source: body?.source,
+      secretName: "PROJECT_UPDATE_CRON_SECRET",
+    });
+    if (cronAccess.error) {
+      return jsonResponse({ error: cronAccess.error.message }, cronAccess.error.status);
     }
-    const requestedByCron = wantsCron && cronHeader === cronSecret;
-    if (wantsCron && !requestedByCron) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
+    const requestedByCron = cronAccess.requestedByCron;
 
     if (!webhookUrl) {
       return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);
@@ -1006,15 +1008,24 @@ serve(async (req) => {
     let manualUser: AuthorizedUser | null = null;
     if (!requestedByCron) {
       manualUser = await authorizeManualRequest(req, adminClient);
-      if (!manualUser?.id) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
+      let manualAccess = resolveManualProjectEmailAccess({
+        requestedByCron,
+        manualUserId: manualUser?.id,
+        projectId,
+        canManageProject: true,
+      });
+      if (!manualAccess.ok) {
+        return jsonResponse({ error: manualAccess.error }, manualAccess.status);
       }
-      if (!projectId) {
-        return jsonResponse({ error: "projectId is required for manual sends" }, 400);
-      }
-      const canManage = await canUserManageProject(adminClient, projectId, manualUser.id, manualUser.role);
-      if (!canManage) {
-        return jsonResponse({ error: "Forbidden" }, 403);
+      const canManage = await canUserManageProject(adminClient, projectId, manualUser!.id, manualUser!.role);
+      manualAccess = resolveManualProjectEmailAccess({
+        requestedByCron,
+        manualUserId: manualUser!.id,
+        projectId,
+        canManageProject: canManage,
+      });
+      if (!manualAccess.ok) {
+        return jsonResponse({ error: manualAccess.error }, manualAccess.status);
       }
     }
 

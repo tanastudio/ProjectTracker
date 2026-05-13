@@ -807,6 +807,7 @@
 
     <script type="module">
         import { supabase } from "./supabaseClient.js";
+        import { getProjectsAccessDecision } from "./lib/access-control-utils.js";
         import { attachTicketNavBadge, loadUnreadTicketCountsByProject } from "./lib/ticket-nav-badge.js";
 
         const el = (id) => document.getElementById(id);
@@ -1019,8 +1020,9 @@
         const chip = document.getElementById("userChip");
         if (chip) chip.textContent = `${displayName} (${userRole})`;
 
-        if (userRole === "participant") {
-            window.location.replace("./participant-status.html");
+        const projectAccess = getProjectsAccessDecision(userRole);
+        if (!projectAccess.ok) {
+            window.location.replace(projectAccess.redirectTo);
             throw new Error("participant redirected");
         }
 
