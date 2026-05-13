@@ -4481,6 +4481,8 @@ function normalizeProjectMember(row) {
       display_name: row?.display_name || "",
       email: row?.email || "",
       role: row?.profile_role || row?.user_role || "",
+      participant_record_id: row?.participant_record_id || null,
+      participant_active: row?.participant_active,
     },
   };
 }
@@ -4750,38 +4752,61 @@ async function loadParticipants() {
   const list = el("participantList");
   list.innerHTML = "<div class='muted'>Loading...</div>";
 
-  const { data: memberData } = await supabase
-    .from("project_members")
-    .select("user_id")
-    .eq("project_id", PROJECT_ID);
+  let participants = [];
+  const { data: rpcRows, error: rpcError } = await supabase.rpc("get_project_members_for_settings", { p_project_id: PROJECT_ID });
 
-  const ids = (memberData || []).map(m => m.user_id);
-  if (ids.length === 0) {
-    list.innerHTML = "<div class='muted'>No participants yet.</div>";
-    el("participantCount").textContent = "";
-    participantsLoaded = true;
-    return;
-  }
+  if (!rpcError && Array.isArray(rpcRows)) {
+    members = rpcRows.map(normalizeProjectMember);
+    participants = members
+      .filter((member) => String(member?.profile?.role || "").trim().toLowerCase() === "participant")
+      .map((member) => ({
+        id: member.user_id,
+        display_name: member.profile?.display_name || member.user_id,
+        email: member.profile?.email || member.user_id,
+        role: "participant",
+        participant_record_id: member.profile?.participant_record_id || null,
+        participant_active: member.profile?.participant_active,
+      }));
+  } else {
+    if (rpcError) console.warn("Falling back to participant membership query:", rpcError);
 
-  const { data: profs, error } = await supabase
-    .from("profiles")
-    .select("id, display_name, email, role, participant_record_id")
-    .in("id", ids)
-    .eq("role", "participant");
-
-  if (error) { list.innerHTML = "<div class='muted'>Failed to load participants.</div>"; return; }
-
-  const participants = profs || [];
-  const recordIds = participants.map(c => c.participant_record_id).filter(Boolean);
-  let activeByRecordId = new Map();
-  if (recordIds.length > 0) {
-    const { data: records, error: recordError } = await supabase
-      .from("records")
-      .select("id, active")
-      .in("id", recordIds)
+    const { data: memberData } = await supabase
+      .from("project_members")
+      .select("user_id")
       .eq("project_id", PROJECT_ID);
-    if (recordError) { list.innerHTML = "<div class='muted'>Failed to load participant status.</div>"; return; }
-    activeByRecordId = new Map((records || []).map(record => [record.id, record.active !== false]));
+
+    const ids = (memberData || []).map(m => m.user_id);
+    if (ids.length === 0) {
+      list.innerHTML = "<div class='muted'>No participants yet.</div>";
+      el("participantCount").textContent = "";
+      participantsLoaded = true;
+      return;
+    }
+
+    const { data: profs, error } = await supabase
+      .from("profiles")
+      .select("id, display_name, email, role, participant_record_id")
+      .in("id", ids)
+      .eq("role", "participant");
+
+    if (error) { list.innerHTML = "<div class='muted'>Failed to load participants.</div>"; return; }
+
+    participants = profs || [];
+    const recordIds = participants.map(c => c.participant_record_id).filter(Boolean);
+    let activeByRecordId = new Map();
+    if (recordIds.length > 0) {
+      const { data: records, error: recordError } = await supabase
+        .from("records")
+        .select("id, active")
+        .in("id", recordIds)
+        .eq("project_id", PROJECT_ID);
+      if (recordError) { list.innerHTML = "<div class='muted'>Failed to load participant status.</div>"; return; }
+      activeByRecordId = new Map((records || []).map(record => [record.id, record.active !== false]));
+    }
+    participants = participants.map((participant) => ({
+      ...participant,
+      participant_active: activeByRecordId.get(participant.participant_record_id) === true,
+    }));
   }
 
   el("participantCount").textContent = `${participants.length} participant${participants.length !== 1 ? "s" : ""} in this project`;
@@ -4795,7 +4820,7 @@ async function loadParticipants() {
   const rowsHtml = participants.map(c => {
     const name = c.display_name || c.id;
     const email = c.email || c.id;
-    const isActive = activeByRecordId.get(c.participant_record_id) === true;
+    const isActive = c.participant_active === true;
     return `
       <div class="participant-row" role="row">
         <div class="participant-role-cell" role="cell">
