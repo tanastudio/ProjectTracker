@@ -195,6 +195,10 @@
       display: grid; grid-template-columns: 120px minmax(150px, 1fr) minmax(220px, 1.2fr) 110px 82px;
       gap: 12px; align-items: center;
     }
+    .member-table-head.member-readonly,
+    .member-row.member-readonly {
+      grid-template-columns: 120px minmax(150px, 1fr) minmax(220px, 1.2fr);
+    }
     .member-table-head {
       padding: 0 16px 4px; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase;
     }
@@ -1197,18 +1201,20 @@
             <div class="muted">Loading members...</div>
           </div>
 
-          <div class="section-title" style="margin-top:20px;">Add Member</div>
-          <div class="add-member-row">
-            <select class="add-member-select" id="addMemberSelect">
-              <option value="">Select a user to add...</option>
-            </select>
-            <select class="form-select" id="addMemberRole">
-              <option value="viewer">viewer</option>
-              <option value="editor">editor</option>
-            </select>
-            <button class="btn-primary" id="addMemberBtn">Add</button>
+          <div id="memberManagementPanel">
+            <div class="section-title" style="margin-top:20px;">Add Member</div>
+            <div class="add-member-row">
+              <select class="add-member-select" id="addMemberSelect">
+                <option value="">Select a user to add...</option>
+              </select>
+              <select class="form-select" id="addMemberRole">
+                <option value="viewer">viewer</option>
+                <option value="editor">editor</option>
+              </select>
+              <button class="btn-primary" id="addMemberBtn">Add</button>
+            </div>
+            <p class="muted small" style="margin-top:6px;">viewer = read-only · editor = can update status</p>
           </div>
-          <p class="muted small" style="margin-top:6px;">viewer = read-only · editor = can update status</p>
         </div>
       </div>
 
@@ -4456,7 +4462,50 @@ function updateMemberSummary(filteredMembers) {
   summary.textContent = total === visible ? `${total} member${total !== 1 ? "s" : ""}` : `Showing ${visible} of ${total} members`;
 }
 
+function canManageProjectMembers() {
+  return CURRENT_PROFILE_ROLE === "admin";
+}
+
+function syncMemberManagementAccess() {
+  const panel = el("memberManagementPanel");
+  if (panel) panel.style.display = canManageProjectMembers() ? "" : "none";
+}
+
+function normalizeProjectMember(row) {
+  const userId = row?.user_id || row?.id || "";
+  return {
+    user_id: userId,
+    role: row?.member_role || row?.role || "viewer",
+    profile: {
+      id: userId,
+      display_name: row?.display_name || "",
+      email: row?.email || "",
+      role: row?.profile_role || row?.user_role || "",
+    },
+  };
+}
+
+function renderMemberAccessControl(member) {
+  const access = member.role || "viewer";
+  return `
+    <select class="member-role-select" data-role-uid="${escapeHtml(member.user_id)}">
+      <option value="viewer" ${access === "viewer" ? "selected" : ""}>viewer</option>
+      <option value="editor" ${access === "editor" ? "selected" : ""}>editor</option>
+    </select>
+  `;
+}
+
 async function loadMembers() {
+  const { data: rpcRows, error: rpcError } = await supabase.rpc("get_project_members_for_settings", { p_project_id: PROJECT_ID });
+  if (!rpcError && Array.isArray(rpcRows)) {
+    members = rpcRows.map(normalizeProjectMember);
+    renderMembers();
+    renderProjectUpdateRecipients();
+    renderResetPasswordList();
+    return;
+  }
+  if (rpcError) console.warn("Falling back to project_members query:", rpcError);
+
   const { data, error } = await supabase
     .from("project_members")
     .select("user_id, role")
@@ -4481,6 +4530,14 @@ async function loadMembers() {
 }
 
 async function loadAllProfiles() {
+  syncMemberManagementAccess();
+  if (!canManageProjectMembers()) {
+    allProfiles = [];
+    refreshAddMemberSelect();
+    renderProjectUpdateRecipients();
+    return;
+  }
+
   const { data } = await supabase
     .from("profiles")
     .select("id, display_name, email, role")
@@ -4493,6 +4550,9 @@ async function loadAllProfiles() {
 
 function renderMembers() {
   const list = el("memberList");
+  const canManage = canManageProjectMembers();
+  syncMemberManagementAccess();
+
   if (members.length === 0) {
     list.innerHTML = "<div class='muted'>No members yet.</div>";
     updateMemberSummary([]);
@@ -4515,32 +4575,35 @@ function renderMembers() {
     const role = p.role || "";
     const email = p.email || m.email || m.user_email || m.user_id;
     return `
-      <div class="member-row" data-uid="${escapeHtml(m.user_id)}" role="row">
+      <div class="member-row ${canManage ? "" : "member-readonly"}" data-uid="${escapeHtml(m.user_id)}" role="row">
         <div class="member-role-cell" role="cell">
           <span class="pill pill-${escapeHtml(role)}">${escapeHtml(role || "-")}</span>
         </div>
         <div class="member-name" role="cell" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
         <div class="member-email" role="cell" title="${escapeHtml(email)}">${escapeHtml(email)}</div>
-        <div class="member-access-cell" role="cell">
-          <select class="member-role-select" data-role-uid="${escapeHtml(m.user_id)}">
-            <option value="viewer" ${m.role === "viewer" ? "selected" : ""}>viewer</option>
-            <option value="editor" ${m.role === "editor" ? "selected" : ""}>editor</option>
-          </select>
-        </div>
-        <button class="btn-danger-sm" data-remove-uid="${escapeHtml(m.user_id)}" type="button">Remove</button>
+        ${canManage ? `
+          <div class="member-access-cell" role="cell">
+            ${renderMemberAccessControl(m)}
+          </div>
+          <button class="btn-danger-sm" data-remove-uid="${escapeHtml(m.user_id)}" type="button">Remove</button>
+        ` : ""}
       </div>`;
   }).join("");
 
   list.innerHTML = `
-    <div class="member-table-head" role="row">
+    <div class="member-table-head ${canManage ? "" : "member-readonly"}" role="row">
       <div>Role</div>
       <div>Name</div>
       <div>Email</div>
-      <div>Access</div>
-      <div>Remove</div>
+      ${canManage ? "<div>Access</div><div>Remove</div>" : ""}
     </div>
     ${rowsHtml}
   `;
+
+  if (!canManage) {
+    refreshAddMemberSelect();
+    return;
+  }
 
   list.querySelectorAll("[data-role-uid]").forEach(sel => {
     sel.addEventListener("change", async () => {
@@ -4614,6 +4677,7 @@ document.addEventListener("keydown", (event) => {
 
 function refreshAddMemberSelect() {
   const sel      = el("addMemberSelect");
+  if (!sel || !canManageProjectMembers()) return;
   const existing = new Set(members.map(m => m.user_id));
   const available = allProfiles.filter(p => !existing.has(p.id));
   sel.innerHTML = available.length
@@ -4625,6 +4689,7 @@ function refreshAddMemberSelect() {
 }
 
 el("addMemberBtn").addEventListener("click", async () => {
+  if (!canManageProjectMembers()) return;
   const uid = el("addMemberSelect").value;
   if (!uid) { showHint("Select a user to add.", true); return; }
   const role = el("addMemberRole").value;
