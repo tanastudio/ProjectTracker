@@ -117,8 +117,10 @@ document.documentElement.setAttribute("data-user-role", PROFILE_ROLE);
     const isAdmin    = PROFILE_ROLE === "admin";
     const isInternal = PROFILE_ROLE === "internal";
     const navUpdate  = document.getElementById("navUpdateStatus");
+    const navSettings = document.getElementById("navProjectSettings");
     const navAdmin   = document.getElementById("navAdmin");
     if (navUpdate) navUpdate.style.display = isAdmin || isInternal ? "" : "none";
+    if (navSettings) navSettings.style.display = isAdmin || isInternal ? "" : "none";
     if (navAdmin)  navAdmin.style.display  = isAdmin ? "" : "none";
 })();
 
@@ -257,6 +259,7 @@ await ticketNavBadge.refresh();
     wire("navDashboard",    `./dashboard.html?project=${pid}`);
     wire("navTickets",      `./tickets.html?project=${pid}`);
     wire("navUpdateStatus", `./form.html?project=${pid}`);
+    wire("navProjectSettings", `./project-settings.html?project=${pid}`);
     wire("navAdmin",        `./admin.html?project=${pid}`);
 
     document.getElementById("logoutBtn")?.addEventListener("click", async () => {

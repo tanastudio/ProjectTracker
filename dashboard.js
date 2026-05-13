@@ -110,6 +110,7 @@ const navProjects = document.getElementById("navProjects");
 const navDashboard = document.getElementById("navDashboard");
 const navTickets = document.getElementById("navTickets");
 const navUpdateStatus = document.getElementById("navUpdateStatus");
+const navProjectSettings = document.getElementById("navProjectSettings");
 const navAdmin = document.getElementById("navAdmin");
 
 let USER_ROLE = "unknown";
@@ -128,11 +129,17 @@ function setSidebarAccess(role) {
     const r = String(role || "").trim().toLowerCase();
 
     const canSeeUpdate = r === "admin" || r === "internal";
+    const canSeeProjectSettings = r === "admin" || r === "internal";
     const canSeeAdmin = r === "admin";
 
     if (navUpdateStatus) {
         navUpdateStatus.style.display = canSeeUpdate ? "flex" : "none";
         navUpdateStatus.classList.toggle("is-hidden", !canSeeUpdate);
+    }
+
+    if (navProjectSettings) {
+        navProjectSettings.style.display = canSeeProjectSettings ? "flex" : "none";
+        navProjectSettings.classList.toggle("is-hidden", !canSeeProjectSettings);
     }
 
     if (navAdmin) {
@@ -268,6 +275,10 @@ navTickets?.addEventListener("click", () => {
 
 navUpdateStatus?.addEventListener("click", () => {
     goProjectPage("form.html", PROJECT_CTX.project_id);
+});
+
+navProjectSettings?.addEventListener("click", () => {
+    goProjectPage("project-settings.html", PROJECT_CTX.project_id);
 });
 
 navAdmin?.addEventListener("click", () => {

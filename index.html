@@ -502,6 +502,10 @@
             signInBtn.textContent = loading ? "Signing in..." : "Sign in";
         }
 
+        function projectsPageUrl() {
+            return `./projects.html?v=${Date.now()}`;
+        }
+
         function renderEyeIcon(visible) {
             togglePasswordBtn.innerHTML = visible
                 ? `
@@ -544,7 +548,7 @@
                 return true;
             }
 
-            window.location.replace("./projects.html");
+            window.location.replace(projectsPageUrl());
             return true;
         }
 
@@ -579,7 +583,7 @@
 
                 const redirected = await redirectLoggedInUser(data?.session);
                 if (!redirected) {
-                    window.location.replace("./projects.html");
+                    window.location.replace(projectsPageUrl());
                 }
             } catch (err) {
                 showMsg(String(err?.message || err || "Sign in failed."));

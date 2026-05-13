@@ -17,10 +17,17 @@
   </script>
 
   <style>
-    #navUpdateStatus, #navAdmin { display: none; }
+    #navUpdateStatus,
+    #navProjectSettings,
+    #navAdmin,
+    #navAdminAccess { display: none; }
     html[data-user-role="internal"] #navUpdateStatus,
     html[data-user-role="admin"]    #navUpdateStatus { display: flex; }
-    html[data-user-role="admin"] #navAdmin { display: flex; }
+    html[data-user-role="internal"] #navProjectSettings,
+    html[data-user-role="admin"] #navProjectSettings { display: flex; }
+    html[data-user-role="admin"] #navAdmin,
+    html[data-user-role="admin"] #navAdminAccess { display: flex; }
+    html[data-user-role="internal"] [data-admin-only="true"] { display: none !important; }
   </style>
 
   <style>
@@ -678,7 +685,15 @@
           </svg>
           <span>Update Status</span>
         </a>
-        <a class="nav-link active" id="navAdmin" href="./admin.html">
+        <a class="nav-link active" id="navProjectSettings" href="#">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Project Settings</span>
+        </a>
+
+        <a class="nav-link" id="navAdmin" href="./admin.html">
           <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
             <path d="M9 12l2 2 4-4"></path>
@@ -719,7 +734,7 @@
           <p class="page-desc" id="pageDesc">Loading project...</p>
         </div>
         <div class="hero-actions">
-          <button class="btn btn-outline" id="backBtn" type="button">← Back to Admin</button>
+          <button class="btn btn-outline" id="backBtn" type="button">Back to Projects</button>
         </div>
       </div>
     </header>
@@ -784,7 +799,7 @@
 
           <div class="btn-row">
             <button class="btn-primary" id="saveGeneralBtn">Save Changes</button>
-            <button class="btn-ghost" id="openResetPasswordBtn" type="button">Reset Password</button>
+            <button class="btn-ghost" id="openResetPasswordBtn" type="button" data-admin-only="true">Reset Password</button>
           </div>
 
           <div style="margin-top:28px; padding-top:20px; border-top:1px solid rgba(239,68,68,.15);">
@@ -1248,7 +1263,7 @@
   </main>
 </div>
 
-<div class="modal-backdrop" id="resetPasswordModal" aria-hidden="true">
+<div class="modal-backdrop" id="resetPasswordModal" aria-hidden="true" data-admin-only="true">
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="resetPasswordTitle">
     <div class="modal-head">
       <div>
@@ -1388,21 +1403,49 @@ function ordinalDayLabel(day) {
   return `${n}th`;
 }
 
-/* ── auth guard ── */
-async function requireAdmin() {
+/* Auth guard */
+const params = new URLSearchParams(location.search);
+const PROJECT_ID = params.get("project") || sessionStorage.getItem("selected_project_id") || "";
+if (!PROJECT_ID) { window.location.replace("./projects.html"); throw new Error("no project"); }
+sessionStorage.setItem("selected_project_id", PROJECT_ID);
+
+let CURRENT_PROFILE_ROLE = "viewer";
+
+async function requireProjectSettingsAccess() {
   const { data } = await supabase.auth.getSession();
   const session = data?.session;
   if (!session) { window.location.replace("./index.html"); return null; }
   supabase.auth.onAuthStateChange((_e, s) => { if (!s) window.location.replace("./index.html"); });
-  const { data: prof } = await supabase.from("profiles").select("role, display_name").eq("id", session.user.id).maybeSingle();
-  if (prof?.role !== "admin") { window.location.replace("./projects.html"); return null; }
-  sessionStorage.setItem("user_role", "admin");
-  document.documentElement.setAttribute("data-user-role", "admin");
+
+  const [{ data: prof }, { data: project }, { data: member }] = await Promise.all([
+    supabase.from("profiles").select("role, display_name").eq("id", session.user.id).maybeSingle(),
+    supabase.from("projects").select("id, created_by").eq("id", PROJECT_ID).maybeSingle(),
+    supabase.from("project_members").select("role").eq("project_id", PROJECT_ID).eq("user_id", session.user.id).maybeSingle(),
+  ]);
+
+  const role = String(prof?.role || session.user.user_metadata?.role || "").trim().toLowerCase();
+  const memberRole = String(member?.role || "").trim().toLowerCase();
+  const canManageProject =
+    role === "admin" ||
+    (
+      role === "internal" &&
+      (
+        project?.created_by === session.user.id ||
+        memberRole === "admin" ||
+        memberRole === "editor"
+      )
+    );
+
+  if (!canManageProject) { window.location.replace("./projects.html"); return null; }
+
+  CURRENT_PROFILE_ROLE = role || "viewer";
+  sessionStorage.setItem("user_role", CURRENT_PROFILE_ROLE);
+  document.documentElement.setAttribute("data-user-role", CURRENT_PROFILE_ROLE);
   const chip = el("userChip");
-  if (chip) chip.textContent = `${prof?.display_name || session.user.email || session.user.id} (admin)`;
+  if (chip) chip.textContent = `${prof?.display_name || session.user.email || session.user.id} (${CURRENT_PROFILE_ROLE})`;
   return session;
 }
-const session = await requireAdmin();
+const session = await requireProjectSettingsAccess();
 if (!session) throw new Error("no access");
 
 el("logoutBtn").addEventListener("click", async () => {
@@ -1411,11 +1454,7 @@ el("logoutBtn").addEventListener("click", async () => {
   window.location.replace("./index.html");
 });
 
-/* ── project id from URL or session ── */
-const params = new URLSearchParams(location.search);
-const PROJECT_ID = params.get("project") || sessionStorage.getItem("selected_project_id") || "";
-if (!PROJECT_ID) { window.location.replace("./projects.html"); throw new Error("no project"); }
-sessionStorage.setItem("selected_project_id", PROJECT_ID);
+/* Ticket navigation badge */
 const ticketNavBadge = attachTicketNavBadge({
   supabase,
   navElement: document.getElementById("navTickets"),
@@ -1432,7 +1471,9 @@ function goProjectPage(page) {
 el("navDashboard")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("dashboard.html"); });
 el("navTickets")?.addEventListener("click",      (e) => { e.preventDefault(); goProjectPage("tickets.html"); });
 el("navUpdateStatus")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("form.html"); });
-el("backBtn").addEventListener("click", () => { window.location.href = "./admin.html"; });
+el("navProjectSettings")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("project-settings.html"); });
+el("navAdmin")?.addEventListener("click", (e) => { e.preventDefault(); goProjectPage("admin.html"); });
+el("backBtn").addEventListener("click", () => { window.location.href = "./projects.html"; });
 
 /* ── tabs ── */
 document.querySelectorAll(".tab-btn").forEach(btn => {

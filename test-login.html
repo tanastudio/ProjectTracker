@@ -571,7 +571,7 @@
                 await renderCurrentUser();
 
                 setTimeout(() => {
-                    window.location.href = "./projects.html";
+                    window.location.href = `./projects.html?v=${Date.now()}`;
                 }, 700);
             } catch (err) {
                 showStatus(`Unexpected error: ${err?.message || String(err)}`, "error");
@@ -608,7 +608,7 @@
             });
 
             goProjectsBtn?.addEventListener("click", () => {
-                window.location.href = "./projects.html";
+                window.location.href = `./projects.html?v=${Date.now()}`;
             });
         }
 

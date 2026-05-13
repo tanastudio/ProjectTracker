@@ -73,6 +73,30 @@ async function writeAuditLog(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function canProvisionParticipant(
+  adminClient: ReturnType<typeof createClient>,
+  callerId: string,
+  callerRole: string | null | undefined,
+  projectId: string,
+): Promise<boolean> {
+  const role = String(callerRole || "").trim().toLowerCase();
+  if (role === "admin") return true;
+  if (role !== "internal") return false;
+
+  const [{ data: project }, { data: membership }] = await Promise.all([
+    adminClient.from("projects").select("created_by").eq("id", projectId).maybeSingle(),
+    adminClient
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", callerId)
+      .maybeSingle(),
+  ]);
+
+  const memberRole = String(membership?.role || "").trim().toLowerCase();
+  return project?.created_by === callerId || memberRole === "admin" || memberRole === "editor";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST")    return json({ error: "Method not allowed" }, 405);
@@ -86,7 +110,7 @@ serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // ── Auth: verify caller is admin ──────────────────────────────────────────
+  // Auth: verify caller can manage participant provisioning for the project.
   const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
@@ -97,7 +121,6 @@ serve(async (req) => {
 
   const { data: callerProfile } = await adminClient
     .from("profiles").select("role").eq("id", caller.id).maybeSingle();
-  if (callerProfile?.role !== "admin") return json({ error: "Admin only" }, 403);
 
   // ── Parse and validate input ──────────────────────────────────────────────
   let body: Record<string, unknown>;
@@ -107,6 +130,9 @@ serve(async (req) => {
   const validated = validateInput(body);
   if (!validated.ok) return json({ error: validated.error }, 400);
   const { email, displayName, projectId } = validated;
+  if (!(await canProvisionParticipant(adminClient, caller.id, callerProfile?.role, projectId))) {
+    return json({ error: "Admin or internal project editor only" }, 403);
+  }
 
   // ── Validate project exists ───────────────────────────────────────────────
   const { data: proj } = await adminClient
@@ -223,7 +249,7 @@ serve(async (req) => {
     await writeAuditLog(adminClient, {
       actor_user_id: caller.id,
       actor_email: caller.email ?? null,
-      actor_role: "admin",
+      actor_role: callerProfile?.role || null,
       action: "INSERT",
       table_name: "auth.users",
       entity_id: userId,
