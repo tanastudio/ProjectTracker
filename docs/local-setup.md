@@ -107,19 +107,10 @@ node --env-file=.env provision-users.mjs participants
 Requires `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PROJECT_ID`, and
 `DEFAULT_PARTICIPANT_PASSWORD` in `.env`.
 
-To provision a full local test-user set (admin, internal, client, and participant):
-
-```bash
-node --env-file=.env provision-users.mjs test-users
-```
-
-This also requires `TEST_USER_PASSWORD` or `DEFAULT_PARTICIPANT_PASSWORD` in `.env`.
-
 The legacy wrappers still work:
 
 ```bash
 node --env-file=.env create-participant-users.mjs
-node --env-file=.env provision-local-test-users.mjs
 ```
 
 ## Deploying edge functions to production

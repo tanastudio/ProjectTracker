@@ -46,7 +46,6 @@ Development scripts:
 - `npm test`: runs Vitest unit tests for shared helper modules.
 - `npm run test:watch`: runs Vitest in watch mode.
 - `npm run users:participants`: provisions participant users from data.
-- `npm run users:test`: provisions a local test-user set.
 
 Supabase local development is configured in `supabase/config.toml` with local API port `55321`, database port `55322`, Studio port `55323`, and Edge Runtime enabled.
 
@@ -302,21 +301,6 @@ Main behavior:
 - Lets the user set a new password.
 - Requires only length >= 8 at the UI level.
 - Signs the user out and redirects to login after success.
-
-### `test-login.html` and `test-users.js`
-
-Purpose: local/QA user switching helper.
-
-Main behavior:
-
-- Loads `test-users.js`.
-- Renders known test users.
-- Stores typed passwords in `localStorage` by role.
-- Signs out the current user, signs in selected user, then routes to Projects.
-
-Security note:
-
-- This page should not be deployed to production. It enumerates known test accounts and stores passwords in browser storage.
 
 ## Shared Browser Modules
 
@@ -577,16 +561,12 @@ Service-role provisioning script for local or controlled environments:
 - Creates a Supabase admin client from environment variables.
 - Lists Auth users with pagination.
 - Ensures auth users, profiles, project memberships, and participant links.
-- Supports participant provisioning and full test-user provisioning.
+- Supports participant provisioning.
 - Uses namespaced local test emails for local environments.
 
 ### `create-participant-users.mjs`
 
 Compatibility wrapper that imports `provision-users.mjs` and runs participant mode.
-
-### `provision-local-test-users.mjs`
-
-Compatibility wrapper that imports `provision-users.mjs` and runs local test-user mode.
 
 ### `cleanup-local-example-users.mjs`
 
@@ -745,12 +725,11 @@ Current gap:
 1. Public Edge Functions with service-role access need stricter action-level authorization.
 2. Known fallback participant password must be removed.
 3. Cron secrets must be mandatory for cron paths.
-4. `test-login.html` and `test-users.js` should not be deployed to production.
-5. CSP uses `'unsafe-inline'`, so XSS containment is weak.
-6. CDN scripts are unpinned and have no SRI.
-7. Many `innerHTML` paths increase XSS review burden.
-8. Password complexity is mostly length-only in local UI/function checks.
-9. Dev dependency audit has known vulnerabilities. These are not production runtime dependencies, but they affect local tooling.
+4. CSP uses `'unsafe-inline'`, so XSS containment is weak.
+5. CDN scripts are unpinned and have no SRI.
+6. Many `innerHTML` paths increase XSS review burden.
+7. Password complexity is mostly length-only in local UI/function checks.
+8. Dev dependency audit has known vulnerabilities. These are not production runtime dependencies, but they affect local tooling.
 
 ## Recommended Next Steps
 
@@ -758,10 +737,9 @@ Current gap:
 2. Make cron secrets fail closed.
 3. Require `DEFAULT_PARTICIPANT_PASSWORD` in `admin-create-user`.
 4. Add authorization to `ticket-notify` and default `booking-notify` actions.
-5. Remove `test-login.html` and `test-users.js` from production deployment or gate them by environment.
-6. Replace broad `select("*")` calls with explicit columns.
-7. Add Playwright or Supabase integration tests for the QA role matrix.
-8. Start refactoring with `project-settings.html`, because it has the highest complexity and blast radius.
+5. Replace broad `select("*")` calls with explicit columns.
+6. Add Playwright or Supabase integration tests for the QA role matrix.
+7. Start refactoring with `project-settings.html`, because it has the highest complexity and blast radius.
 
 ## Verification Performed
 
@@ -780,4 +758,3 @@ Results:
 - Full dependency audit found 7 dev vulnerabilities:
   - 1 high through `fast-uri`.
   - 6 moderate through `vitest`, `vite`, `vite-node`, `@vitest/mocker`, `esbuild`, and `postcss`.
-

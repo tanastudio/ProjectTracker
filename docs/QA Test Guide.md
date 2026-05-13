@@ -8,7 +8,7 @@ Use this guide to review Project Tracker before wider rollout. The goal is to co
 
 - App URL: https://tanastudio.github.io/ProjectTracker/
 - Scope: remote Supabase environment currently connected to the deployed app.
-- Test accounts: see `docs/private/remote-test-users.md`.
+- Test accounts: use the private QA account note outside the deployable app bundle.
 - Reference manuals:
   - `docs/Project_Tracker_Manual_TH.doc`
   - `docs/Project_Tracker_Manual_TH.html`

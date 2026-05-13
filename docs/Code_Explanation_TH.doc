@@ -56,7 +56,7 @@
   <p>ไฟล์นี้กำหนดว่าโปรเจกต์ใช้ ES module ผ่าน <code>"type": "module"</code> และมี script หลักดังนี้</p>
   <ul>
     <li><code>dev</code> เปิด static server ที่พอร์ต 3000</li>
-    <li><code>users:participants</code> และ <code>users:test</code> เรียก <code>provision-users.mjs</code> ด้วย mode ต่างกัน</li>
+    <li><code>users:participants</code> calls <code>provision-users.mjs</code> in participant mode.</li>
     <li><code>test</code> และ <code>test:watch</code> ใช้ Vitest สำหรับรัน unit test</li>
   </ul>
   <p>dependency สำคัญคือ <code>serve</code> สำหรับเปิดหน้าเว็บ, <code>supabase</code> สำหรับ CLI/SDK ที่เกี่ยวข้อง, และ <code>vitest</code> สำหรับ test</p>
@@ -126,9 +126,8 @@
   </ul>
   <p>อีกจุดที่สำคัญมากคือหน้า form แยก top form กับ table view ออกจากกัน แต่ทั้งสองมองข้อมูลก้อนเดียวกันคือ <code>MODEL</code> ทำให้การคลิกเลือกแถวและอัปเดตฟอร์มด้านบนยัง sync กับตารางด้านล่างได้</p>
 
-  <h3>test-users.js</h3>
-  <p>เป็นไฟล์ข้อมูลคงที่ที่ผูกไว้กับ <code>window.TEST_USERS</code> เพื่อเก็บชุดบัญชีทดสอบ เช่น admin, internal, client และ participant พร้อม role, userId, email, displayName</p>
-  <p>ไฟล์นี้ไม่ได้มี business logic มาก แต่มีประโยชน์ต่อการทดสอบหน้า login หรือสลับ user ใน local environment</p>
+  <h3>Removed local login helpers</h3>
+  <p>The static browser login helper and its embedded account list were removed so local-only test accounts are no longer shipped with the app.</p>
 
   <h2>4. Helper library</h2>
 
@@ -182,10 +181,9 @@
 
   <h3>provision-users.mjs</h3>
   <p>เป็นสคริปต์หลักสำหรับสร้างหรืออัปเดตบัญชีใช้งานใน Supabase Auth พร้อมสร้าง profile และ project membership ให้สอดคล้องกับระบบจริง</p>
-  <p>โครงสร้างหลักของไฟล์นี้แบ่งเป็น 2 mode</p>
+  <p>โครงสร้างหลักของไฟล์นี้เป็น participant provisioning mode</p>
   <ul>
     <li><code>participants</code> สร้าง auth user ให้ผู้สมัครที่มี record อยู่ในระบบแล้ว</li>
-    <li><code>test-users</code> สร้างชุด admin/client/internal/participant สำหรับทดสอบทั้งระบบ</li>
   </ul>
   <p>ฟังก์ชันสำคัญภายในไฟล์นี้</p>
   <ul>
@@ -200,9 +198,6 @@
 
   <h3>create-participant-users.mjs</h3>
   <p>เป็น wrapper สั้น ๆ ที่เรียก <code>runProvisionUsers("participants")</code> โดยตรง เพื่อให้ใช้คำสั่งเฉพาะงานสร้าง participant user ได้ง่าย</p>
-
-  <h3>provision-local-test-users.mjs</h3>
-  <p>เป็น wrapper สั้น ๆ เช่นกัน แต่เรียก mode <code>test-users</code> เพื่อสร้าง user ทดสอบครบทุก role</p>
 
   <h3>cleanup-local-example-users.mjs</h3>
   <p>เป็นสคริปต์ลบ user ตัวอย่างจาก Supabase Auth ตาม email ที่ระบุไว้ล่วงหน้า เหมาะกับการ cleanup local environment หลังทดสอบหลายรอบ</p>

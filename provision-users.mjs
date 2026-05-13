@@ -1,25 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 const DEFAULT_SUPABASE_URL = "http://127.0.0.1:55321";
-const DEFAULT_PASSWORD =
-  process.env.TEST_USER_PASSWORD ||
-  process.env.DEFAULT_PARTICIPANT_PASSWORD;
+const DEFAULT_PASSWORD = process.env.DEFAULT_PARTICIPANT_PASSWORD;
 const MAIL_NAMESPACE = "localtest";
-
-const CLIENT_USERS = [
-  { label: "Client A", displayName: "Client A", email: namespaceEmail("client001"), role: "client", memberRole: "viewer" },
-  { label: "Client B", displayName: "Client B", email: namespaceEmail("client002"), role: "client", memberRole: "viewer" },
-  { label: "Client C", displayName: "Client C", email: namespaceEmail("client003"), role: "client", memberRole: "viewer" },
-];
-
-const INTERNAL_USERS = [
-  { label: "Internal A", displayName: "Internal A", email: namespaceEmail("internal001"), role: "internal", memberRole: "editor" },
-  { label: "Internal B", displayName: "Internal B", email: namespaceEmail("internal002"), role: "internal", memberRole: "editor" },
-];
-
-const ADMIN_USERS = [
-  { label: "Admin Test", displayName: "Admin Test", email: namespaceEmail("admin001"), role: "admin", memberRole: "editor" },
-];
 
 function namespaceEmail(tag) {
   return `${MAIL_NAMESPACE}.${tag}@inbox.testmail.app`;
@@ -51,7 +34,7 @@ function createAdminClient() {
 
 function requirePassword() {
   if (!DEFAULT_PASSWORD) {
-    throw new Error("Missing TEST_USER_PASSWORD or DEFAULT_PARTICIPANT_PASSWORD");
+    throw new Error("Missing DEFAULT_PARTICIPANT_PASSWORD");
   }
 }
 
@@ -128,16 +111,6 @@ async function ensureMemberships(supabase, userId, projectIds, role) {
   if (error) throw new Error(`project_members upsert failed for ${userId}: ${error.message}`);
 }
 
-async function getProjects(supabase) {
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, name")
-    .order("name");
-
-  if (error) throw new Error(`Failed to load projects: ${error.message}`);
-  return data || [];
-}
-
 async function getParticipantRecords(supabase, { projectId } = {}) {
   let query = supabase
     .from("records")
@@ -173,17 +146,6 @@ async function getParticipantRecords(supabase, { projectId } = {}) {
       projectId: record.project_id,
     }))
     .filter((record) => record.email);
-}
-
-function toSummaryUser(user, password) {
-  return {
-    label: user.label,
-    role: user.role,
-    userId: user.userId,
-    email: user.email,
-    displayName: user.displayName,
-    password,
-  };
 }
 
 async function runParticipantsMode() {
@@ -242,136 +204,9 @@ async function runParticipantsMode() {
   console.log("Done.");
 }
 
-async function provisionStaffLikeUsers(supabase, users, projectIds, password) {
-  const created = [];
-
-  for (const user of users) {
-    const { user: authUser } = await ensureAuthUser(supabase, {
-      email: user.email,
-      displayName: user.displayName,
-      role: user.role,
-      password,
-    });
-
-    await ensureProfile(supabase, {
-      id: authUser.id,
-      displayName: user.displayName,
-      email: user.email,
-      role: user.role,
-    });
-
-    await ensureMemberships(supabase, authUser.id, projectIds, user.memberRole);
-
-    created.push(
-      toSummaryUser(
-        {
-          label: user.label,
-          role: user.role,
-          userId: authUser.id,
-          email: user.email,
-          displayName: user.displayName,
-        },
-        password,
-      ),
-    );
-  }
-
-  return created;
-}
-
-async function provisionParticipants(supabase, password) {
-  const participants = await getParticipantRecords(supabase);
-  const testUsers = [];
-
-  for (const [index, participant] of participants.entries()) {
-    const targetEmail = shouldUseNamespacedParticipantEmails()
-      ? namespacedParticipantEmail(index)
-      : participant.email;
-
-    if (targetEmail !== participant.email && participant.emailFieldId) {
-      const { error: emailUpdateError } = await supabase
-        .from("record_values")
-        .update({ value_text: targetEmail })
-        .eq("record_id", participant.recordId)
-        .eq("field_id", participant.emailFieldId);
-      if (emailUpdateError) {
-        throw new Error(`record_values email update failed for ${participant.recordId}: ${emailUpdateError.message}`);
-      }
-    }
-
-    const { user: authUser } = await ensureAuthUser(supabase, {
-      email: targetEmail,
-      displayName: participant.displayName,
-      role: "participant",
-      password,
-    });
-
-    await ensureProfile(supabase, {
-      id: authUser.id,
-      displayName: participant.displayName,
-      email: targetEmail,
-      role: "participant",
-      participantRecordId: participant.recordId,
-    });
-
-    await ensureMemberships(supabase, authUser.id, [participant.projectId], "viewer");
-
-    testUsers.push(
-      toSummaryUser(
-        {
-          label: participant.code || participant.displayName,
-          role: "participant",
-          userId: authUser.id,
-          email: targetEmail,
-          displayName: participant.displayName,
-        },
-        password,
-      ),
-    );
-  }
-
-  return testUsers;
-}
-
-async function runTestUsersMode() {
-  requirePassword();
-
-  const supabase = createAdminClient();
-  const projects = await getProjects(supabase);
-  const projectIds = projects.map((project) => project.id);
-
-  if (!projectIds.length) {
-    throw new Error("No projects found. Create a project first, then rerun this script.");
-  }
-
-  const adminUsers = await provisionStaffLikeUsers(supabase, ADMIN_USERS, projectIds, DEFAULT_PASSWORD);
-  const clientUsers = await provisionStaffLikeUsers(supabase, CLIENT_USERS, projectIds, DEFAULT_PASSWORD);
-  const internalUsers = await provisionStaffLikeUsers(supabase, INTERNAL_USERS, projectIds, DEFAULT_PASSWORD);
-  const participantUsers = await provisionParticipants(supabase, DEFAULT_PASSWORD);
-
-  const summary = {
-    mode: "test-users",
-    password: DEFAULT_PASSWORD,
-    projectCount: projectIds.length,
-    created: {
-      admins: adminUsers,
-      clients: clientUsers,
-      internals: internalUsers,
-      participants: participantUsers,
-    },
-  };
-
-  console.log(JSON.stringify(summary, null, 2));
-}
-
 export async function runProvisionUsers(mode) {
   if (mode === "participants") {
     await runParticipantsMode();
-    return;
-  }
-
-  if (mode === "test-users") {
-    await runTestUsersMode();
     return;
   }
 
@@ -391,7 +226,6 @@ if (isDirectExecution()) {
   if (!mode || mode === "--help" || mode === "-h") {
     console.log("Usage:");
     console.log("  node --env-file=.env provision-users.mjs participants");
-    console.log("  node --env-file=.env provision-users.mjs test-users");
     process.exit(mode ? 0 : 1);
   }
 

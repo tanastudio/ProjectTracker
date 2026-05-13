@@ -3,7 +3,6 @@
   "scripts": {
     "dev": "serve . -p 3000",
     "users:participants": "node --env-file=.env provision-users.mjs participants",
-    "users:test": "node --env-file=.env provision-users.mjs test-users",
     "build:supabase-client": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --platform=browser --target=es2020 --minify --legal-comments=eof --outfile=vendor/supabase-js.js",
     "test": "vitest run",
     "test:watch": "vitest"
