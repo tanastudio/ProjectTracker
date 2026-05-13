@@ -24,6 +24,7 @@ const TEXT_KEYS = ["email", "issue", "decision"];
 /* ---------- UI ---------- */
 const el = (id) => document.getElementById(id);
 
+const pageSkeleton = el("pageSkeleton");
 const tbody = el("tbody");
 const refreshBtn = el("refreshBtn");
 const autoRefresh = el("autoRefresh");
@@ -67,6 +68,10 @@ const exportXlsxBtn = el("exportXlsxBtn");
 let CURRENT_ITEMS = [];
 let REQ_CONTEXT = null;
 let TICKET_STATS_BY_RECORD = new Map();
+
+function hidePageSkeleton() {
+    if (pageSkeleton) pageSkeleton.hidden = true;
+}
 
 /* ---------- Auth ---------- */
 async function requireSession() {
@@ -1340,6 +1345,8 @@ async function refresh() {
     } catch (err) {
         console.error(err);
         alert("Failed to load from Supabase. Check Console (RLS/Policies/Table names).");
+    } finally {
+        hidePageSkeleton();
     }
 }
 

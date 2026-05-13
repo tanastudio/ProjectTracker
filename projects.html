@@ -684,6 +684,25 @@
             </div>
 
             <div class="content-inner">
+                <section id="pageSkeleton" class="page-loading-skeleton" aria-label="Loading projects">
+                    <div class="skeleton-grid">
+                        <div class="skeleton-card">
+                            <div class="skeleton-line is-medium"></div>
+                            <div class="skeleton-line is-short"></div>
+                            <div class="skeleton-block"></div>
+                        </div>
+                        <div class="skeleton-card">
+                            <div class="skeleton-line is-medium"></div>
+                            <div class="skeleton-line is-short"></div>
+                            <div class="skeleton-block"></div>
+                        </div>
+                        <div class="skeleton-card">
+                            <div class="skeleton-line is-medium"></div>
+                            <div class="skeleton-line is-short"></div>
+                            <div class="skeleton-block"></div>
+                        </div>
+                    </div>
+                </section>
                 <div class="project-list" id="grid"></div>
             </div>
         </main>
@@ -694,6 +713,11 @@
         import { attachTicketNavBadge, loadUnreadTicketCountsByProject } from "./lib/ticket-nav-badge.js";
 
         const el = (id) => document.getElementById(id);
+        const pageSkeleton = el("pageSkeleton");
+
+        function hidePageSkeleton() {
+            if (pageSkeleton) pageSkeleton.hidden = true;
+        }
 
         async function requireSession() {
             const { data } = await supabase.auth.getSession();
@@ -911,6 +935,7 @@
 
         if (error) {
             el("msg").textContent = "Cannot load memberships: " + error.message;
+            hidePageSkeleton();
             throw error;
         }
 
@@ -952,6 +977,7 @@
 
             if (projectError) {
                 el("msg").textContent = "Cannot load projects: " + projectError.message;
+                hidePageSkeleton();
                 throw projectError;
             }
 
@@ -990,6 +1016,7 @@
                 `
                 : `<div class="empty">No projects assigned.</div>`;
             wireAdminEmptyState(userRole);
+            hidePageSkeleton();
             throw new Error(userRole === "admin" ? (simulateEmptyProjects ? "Simulated no projects" : "No projects found") : "No projects assigned");
         }
 
@@ -1265,6 +1292,7 @@
 
             grid.appendChild(div);
         });
+        hidePageSkeleton();
     </script>
 </body>
 </html>

@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-booking-followup-cron-secret, x-project-update-cron-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -45,6 +45,11 @@ type DeliveryTarget = {
   email: string;
   name: string;
   role: EmailPayload["recipientRole"];
+};
+
+type CallerProfile = {
+  role?: string | null;
+  participant_record_id?: string | null;
 };
 
 type CalendarInvitePayload = {
@@ -97,6 +102,68 @@ function cleanText(value: unknown, fallback = "") {
   const text = String(value ?? "").trim();
   if (!text || text.toLowerCase() === "undefined" || text.toLowerCase() === "null") return fallback;
   return text;
+}
+
+async function getAuthenticatedCaller(
+  adminClient: ReturnType<typeof createClient>,
+  req: Request,
+): Promise<{ id: string; email?: string | null } | null> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match?.[1]) return null;
+
+  const { data, error } = await adminClient.auth.getUser(match[1].trim());
+  if (error || !data?.user?.id) return null;
+  return data.user;
+}
+
+async function getCallerProfile(
+  adminClient: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<CallerProfile | null> {
+  const { data, error } = await adminClient
+    .from("profiles")
+    .select("role, participant_record_id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as CallerProfile;
+}
+
+async function canCallerAccessBooking(
+  adminClient: ReturnType<typeof createClient>,
+  booking: Record<string, unknown>,
+  callerId: string,
+  profile: CallerProfile | null,
+): Promise<boolean> {
+  const role = String(profile?.role || "").trim().toLowerCase();
+  if (role === "admin") return true;
+
+  const projectId = String(booking.project_id || "").trim();
+  const recordId = String(booking.record_id || "").trim();
+  if (role === "participant") {
+    return Boolean(recordId && String(profile?.participant_record_id || "") === recordId);
+  }
+  if (role !== "internal" && role !== "client") return false;
+  if (!projectId) return false;
+
+  const [{ data: member }, { data: project }] = await Promise.all([
+    adminClient
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", callerId)
+      .maybeSingle(),
+    adminClient
+      .from("projects")
+      .select("created_by")
+      .eq("id", projectId)
+      .maybeSingle(),
+  ]);
+
+  if (project?.created_by === callerId) return true;
+  const memberRole = String(member?.role || "").trim().toLowerCase();
+  return ["admin", "editor", "viewer"].includes(memberRole);
 }
 
 function normalizeTimeText(value: unknown) {
@@ -756,11 +823,14 @@ serve(async (req) => {
     const action = body?.action || "send_booking_confirmation";
 
     if (action === "send_session_followups") {
-      const cronSecret = Deno.env.get("BOOKING_FOLLOWUP_CRON_SECRET") || Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "";
-      const cronHeader = req.headers.get("x-booking-followup-cron-secret") || req.headers.get("x-project-update-cron-secret") || "";
-      const requestedByCron = cronSecret
-        ? cronHeader === cronSecret
-        : Boolean(cronHeader) && String(body?.source || "").trim().toLowerCase() === "cron";
+      const cronSecret = (Deno.env.get("BOOKING_FOLLOWUP_CRON_SECRET") || Deno.env.get("PROJECT_UPDATE_CRON_SECRET") || "").trim();
+      const cronHeader = (req.headers.get("x-booking-followup-cron-secret") || req.headers.get("x-project-update-cron-secret") || "").trim();
+      const source = String(body?.source || "").trim().toLowerCase();
+      const wantsCron = Boolean(cronHeader) || source === "cron";
+      if (wantsCron && !cronSecret) {
+        return json({ error: "BOOKING_FOLLOWUP_CRON_SECRET is not configured" }, 500);
+      }
+      const requestedByCron = wantsCron && cronHeader === cronSecret;
       if (!requestedByCron) return json({ error: "Unauthorized" }, 401);
       const result = await sendDueSessionFollowups(adminClient, trackerBaseUrl);
       return json(result, result.ok ? 200 : 207);
@@ -838,6 +908,12 @@ serve(async (req) => {
       .maybeSingle();
     if (bookingError) throw bookingError;
     if (!booking) return json({ error: "Booking not found" }, 404);
+    const caller = await getAuthenticatedCaller(adminClient, req);
+    if (!caller?.id) return json({ error: "Unauthorized" }, 401);
+    const callerProfile = await getCallerProfile(adminClient, caller.id);
+    if (!(await canCallerAccessBooking(adminClient, booking as Record<string, unknown>, caller.id, callerProfile))) {
+      return json({ error: "Forbidden" }, 403);
+    }
     if (booking.notification_sent_at) {
       return json({ ok: true, skipped: true, reason: "already notified" });
     }

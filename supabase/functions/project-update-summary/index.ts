@@ -989,9 +989,15 @@ serve(async (req) => {
       ? "internal"
       : "client";
     const cronHeader = req.headers.get("x-project-update-cron-secret") || "";
-    const requestedByCron = cronSecret
-      ? cronHeader === cronSecret
-      : Boolean(cronHeader) && String(body?.source || "").trim().toLowerCase() === "cron";
+    const source = String(body?.source || "").trim().toLowerCase();
+    const wantsCron = Boolean(cronHeader) || source === "cron";
+    if (wantsCron && !cronSecret) {
+      return jsonResponse({ error: "PROJECT_UPDATE_CRON_SECRET is not configured" }, 500);
+    }
+    const requestedByCron = wantsCron && cronHeader === cronSecret;
+    if (wantsCron && !requestedByCron) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
 
     if (!webhookUrl) {
       return jsonResponse({ error: "N8N_PROJECT_UPDATE_WEBHOOK_URL is not configured" }, 500);

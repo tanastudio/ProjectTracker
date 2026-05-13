@@ -29,6 +29,7 @@ const TABLE_SAVE_DEBOUNCE_MS = 900;
 /* ---------- UI refs ---------- */
 const el = (id) => document.getElementById(id);
 
+const pageSkeleton   = el("pageSkeleton");
 const saveState       = el("saveState");
 const lastSync        = el("lastSync");
 const reloadBtn       = el("reloadBtn");
@@ -69,6 +70,10 @@ const emailHint    = el("emailHint");
 const issueHint    = el("issueHint");
 const decisionHint = el("decisionHint");
 
+function hidePageSkeleton() {
+    if (pageSkeleton) pageSkeleton.hidden = true;
+}
+
 /* ---------- AUTH GUARD ---------- */
 async function requireInternalAccess() {
     const { data } = await supabase.auth.getSession();
@@ -85,10 +90,15 @@ async function requireInternalAccess() {
         .eq("id", session.user.id)
         .maybeSingle();
 
-    const role = (!error && profile?.role) ? String(profile.role) : "external";
+    const role = (!error && profile?.role) ? String(profile.role).trim().toLowerCase() : "external";
 
-    if (role === "participant" || role === "external") {
+    if (role === "participant") {
         window.location.replace("./participant-status.html");
+        return null;
+    }
+
+    if (role !== "admin" && role !== "internal") {
+        window.location.replace("./projects.html");
         return null;
     }
 
@@ -1469,6 +1479,8 @@ async function reloadAll() {
         buildParticipantPicker();
         buildFilterControls();
         renderTable();
+    } finally {
+        hidePageSkeleton();
     }
 }
 

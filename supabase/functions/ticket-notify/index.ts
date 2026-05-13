@@ -36,6 +36,12 @@ type EmailPayload = {
   projectName: string;
 };
 
+type CallerProfile = {
+  role?: string | null;
+  participant_record_id?: string | null;
+  display_name?: string | null;
+};
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -57,6 +63,68 @@ function eventLabel(type: NotifyBody["eventType"]): string {
   if (type === "priority_change") return "Priority Changed";
   if (type === "new_ticket") return "New Request";
   return "Ticket Updated";
+}
+
+async function getAuthenticatedCaller(
+  adminClient: ReturnType<typeof createClient>,
+  req: Request,
+): Promise<{ id: string; email?: string | null } | null> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match?.[1]) return null;
+
+  const { data, error } = await adminClient.auth.getUser(match[1].trim());
+  if (error || !data?.user?.id) return null;
+  return data.user;
+}
+
+async function getCallerProfile(
+  adminClient: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<CallerProfile | null> {
+  const { data, error } = await adminClient
+    .from("profiles")
+    .select("role, participant_record_id, display_name")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as CallerProfile;
+}
+
+async function canCallerAccessTicket(
+  adminClient: ReturnType<typeof createClient>,
+  ticket: Record<string, unknown>,
+  callerId: string,
+  profile: CallerProfile | null,
+): Promise<boolean> {
+  const role = String(profile?.role || "").trim().toLowerCase();
+  if (role === "admin") return true;
+
+  const projectId = String(ticket.project_id || "").trim();
+  const recordId = String(ticket.record_id || "").trim();
+  if (role === "participant") {
+    return String(ticket.created_by || "") === callerId || Boolean(recordId && String(profile?.participant_record_id || "") === recordId);
+  }
+  if (role !== "internal" && role !== "client") return false;
+  if (!projectId) return false;
+
+  const [{ data: member }, { data: project }] = await Promise.all([
+    adminClient
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", callerId)
+      .maybeSingle(),
+    adminClient
+      .from("projects")
+      .select("created_by")
+      .eq("id", projectId)
+      .maybeSingle(),
+  ]);
+
+  if (project?.created_by === callerId) return true;
+  const memberRole = String(member?.role || "").trim().toLowerCase();
+  return ["admin", "editor", "viewer"].includes(memberRole);
 }
 
 async function getProfileEmail(
@@ -243,8 +311,17 @@ serve(async (req) => {
     });
 
     const body = (await req.json()) as NotifyBody;
-    const { ticketId, eventType, authorId, authorRole, projectId } = body;
-    if (!ticketId || !eventType) return json({ error: "ticketId and eventType are required" }, 400);
+    const { ticketId, eventType, authorId, projectId } = body;
+    if (!ticketId || !eventType || !authorId) return json({ error: "ticketId, eventType, and authorId are required" }, 400);
+
+    const caller = await getAuthenticatedCaller(adminClient, req);
+    if (!caller?.id) return json({ error: "Unauthorized" }, 401);
+    if (String(authorId) !== String(caller.id)) return json({ error: "Forbidden" }, 403);
+
+    const callerProfile = await getCallerProfile(adminClient, caller.id);
+    const callerRole = String(callerProfile?.role || "").trim().toLowerCase();
+    if (!callerRole) return json({ error: "Forbidden" }, 403);
+    const callerName = String(callerProfile?.display_name || caller.email || body.authorName || "Unknown").trim();
 
     const { data: ticket } = await adminClient
       .from("requests")
@@ -252,17 +329,23 @@ serve(async (req) => {
       .eq("id", ticketId)
       .maybeSingle();
     if (!ticket) return json({ error: "Ticket not found" }, 404);
+    if (projectId && String(projectId) !== String(ticket.project_id)) {
+      return json({ error: "Ticket project mismatch" }, 400);
+    }
+    if (!(await canCallerAccessTicket(adminClient, ticket as Record<string, unknown>, caller.id, callerProfile))) {
+      return json({ error: "Forbidden" }, 403);
+    }
 
-    const resolvedProjectId = projectId || ticket.project_id;
-    const authorEmail = await getProfileEmail(adminClient, authorId);
+    const resolvedProjectId = String(ticket.project_id || projectId || "");
+    const authorEmail = await getProfileEmail(adminClient, caller.id);
     const recipientSet = new Set<string>();
     const participantEmailSet = new Set<string>();
 
-    if (authorRole === "participant") {
+    if (callerRole === "participant") {
       const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["internal", "admin", "client"]);
       for (const email of emails) recipientSet.add(email);
       if (authorEmail) participantEmailSet.add(authorEmail);
-    } else if (authorRole === "client") {
+    } else if (callerRole === "client") {
       const emails = await getProjectMemberEmailsByRole(adminClient, resolvedProjectId, ["internal", "admin"]);
       for (const email of emails) recipientSet.add(email);
       if (ticket.record_id) {
@@ -284,7 +367,7 @@ serve(async (req) => {
       for (const email of emails) recipientSet.add(email);
     }
 
-    if (authorEmail && authorRole !== "participant") recipientSet.delete(authorEmail);
+    if (authorEmail && callerRole !== "participant") recipientSet.delete(authorEmail);
 
     const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     const recipients = Array.from(recipientSet).filter((email) => Boolean(email) && isValidEmail(email));
@@ -307,8 +390,8 @@ serve(async (req) => {
           actionUrl,
           actionText: "View Ticket",
           eventType: label,
-          authorName: body.authorName,
-          authorRole,
+          authorName: callerName,
+          authorRole: callerRole,
           participantName: body.participantName,
           projectName: body.projectName,
         });

@@ -574,6 +574,33 @@
             </header>
 
             <div class="wrap">
+                <section id="pageSkeleton" class="page-loading-skeleton" aria-label="Loading tickets">
+                    <div class="skeleton-card">
+                        <div class="skeleton-line is-medium"></div>
+                        <div class="skeleton-line is-long"></div>
+                        <div class="skeleton-line is-short"></div>
+                    </div>
+                    <div class="skeleton-table">
+                        <div class="skeleton-row">
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                        </div>
+                        <div class="skeleton-row">
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                        </div>
+                        <div class="skeleton-row">
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                        </div>
+                    </div>
+                </section>
                 <div class="card">
                     <div class="toolbar">
                         <div class="tool">
@@ -634,6 +661,11 @@
         import { attachTicketNavBadge, isTicketUnreadForUser } from "./lib/ticket-nav-badge.js";
 
         const el = (id) => document.getElementById(id);
+        const pageSkeleton = el("pageSkeleton");
+
+        function hidePageSkeleton() {
+            if (pageSkeleton) pageSkeleton.hidden = true;
+        }
 
         const tbody = el("tbody");
         const msg = el("msg");
@@ -1294,67 +1326,71 @@
 
             showMsg(`Loading tickets for project: ${PROJECT_CTX.project_id}`);
 
-            const { data, error } = await supabase
-                .from("requests")
-                .select("id, project_id, record_id, code, participant_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
-                .eq("project_id", PROJECT_CTX.project_id)
-                .order("created_at", { ascending: false });
+            try {
+                const { data, error } = await supabase
+                    .from("requests")
+                    .select("id, project_id, record_id, code, participant_name, subject, message, created_by, created_at, status, priority, owner_user_id, reply_message, replied_at, replied_by, updated_at")
+                    .eq("project_id", PROJECT_CTX.project_id)
+                    .order("created_at", { ascending: false });
 
-            if (error) throw new Error(`requests select failed: ${error.message}`);
+                if (error) throw new Error(`requests select failed: ${error.message}`);
 
-            ALL_ITEMS = Array.isArray(data) ? data : [];
+                ALL_ITEMS = Array.isArray(data) ? data : [];
 
-            // Load reply threads
-            REPLIES_BY_TICKET.clear();
-            READ_STATE_BY_TICKET.clear();
-            const ticketIds = ALL_ITEMS.map((r) => r.id).filter(Boolean);
-            if (ticketIds.length > 0) {
-                const { data: replies } = await supabase
-                    .from("ticket_replies")
-                    .select("id, ticket_id, author_id, author_name, author_role, message, created_at")
-                    .in("ticket_id", ticketIds)
-                    .order("created_at", { ascending: true });
+                // Load reply threads
+                REPLIES_BY_TICKET.clear();
+                READ_STATE_BY_TICKET.clear();
+                const ticketIds = ALL_ITEMS.map((r) => r.id).filter(Boolean);
+                if (ticketIds.length > 0) {
+                    const { data: replies } = await supabase
+                        .from("ticket_replies")
+                        .select("id, ticket_id, author_id, author_name, author_role, message, created_at")
+                        .in("ticket_id", ticketIds)
+                        .order("created_at", { ascending: true });
 
-                for (const reply of (replies || [])) {
-                    const key = String(reply.ticket_id);
-                    if (!REPLIES_BY_TICKET.has(key)) REPLIES_BY_TICKET.set(key, []);
-                    REPLIES_BY_TICKET.get(key).push(reply);
-                }
+                    for (const reply of (replies || [])) {
+                        const key = String(reply.ticket_id);
+                        if (!REPLIES_BY_TICKET.has(key)) REPLIES_BY_TICKET.set(key, []);
+                        REPLIES_BY_TICKET.get(key).push(reply);
+                    }
 
-                const { data: readStates, error: readStatesError } = await supabase
-                    .from("ticket_read_states")
-                    .select("ticket_id, last_read_at")
-                    .eq("user_id", SESSION_USER_ID)
-                    .in("ticket_id", ticketIds);
-                if (readStatesError) {
-                    console.warn("ticket_read_states select failed:", readStatesError.message);
-                } else {
-                    for (const state of (readStates || [])) {
-                        READ_STATE_BY_TICKET.set(
-                            String(state.ticket_id || ""),
-                            Date.parse(state.last_read_at || "") || 0
-                        );
+                    const { data: readStates, error: readStatesError } = await supabase
+                        .from("ticket_read_states")
+                        .select("ticket_id, last_read_at")
+                        .eq("user_id", SESSION_USER_ID)
+                        .in("ticket_id", ticketIds);
+                    if (readStatesError) {
+                        console.warn("ticket_read_states select failed:", readStatesError.message);
+                    } else {
+                        for (const state of (readStates || [])) {
+                            READ_STATE_BY_TICKET.set(
+                                String(state.ticket_id || ""),
+                                Date.parse(state.last_read_at || "") || 0
+                            );
+                        }
                     }
                 }
+
+                const replyAuthorIds = [];
+                for (const list of REPLIES_BY_TICKET.values()) {
+                    for (const r of list) replyAuthorIds.push(r.author_id);
+                }
+
+                const idsToResolve = [
+                    ...ALL_ITEMS.map((r) => r.created_by),
+                    ...ALL_ITEMS.map((r) => r.owner_user_id),
+                    ...ALL_ITEMS.map((r) => r.replied_by),
+                    ...replyAuthorIds,
+                ];
+
+                NAME_BY_USER_ID = await loadDisplayNameMap(idsToResolve);
+
+                showMsg(`Loaded ${ALL_ITEMS.length} ticket(s) for project: ${PROJECT_CTX.project_id}`);
+                render();
+                await ticketNavBadge?.refresh?.();
+            } finally {
+                hidePageSkeleton();
             }
-
-            const replyAuthorIds = [];
-            for (const list of REPLIES_BY_TICKET.values()) {
-                for (const r of list) replyAuthorIds.push(r.author_id);
-            }
-
-            const idsToResolve = [
-                ...ALL_ITEMS.map((r) => r.created_by),
-                ...ALL_ITEMS.map((r) => r.owner_user_id),
-                ...ALL_ITEMS.map((r) => r.replied_by),
-                ...replyAuthorIds,
-            ];
-
-            NAME_BY_USER_ID = await loadDisplayNameMap(idsToResolve);
-
-            showMsg(`Loaded ${ALL_ITEMS.length} ticket(s) for project: ${PROJECT_CTX.project_id}`);
-            render();
-            await ticketNavBadge?.refresh?.();
         }
 
         const session = await requireSession();

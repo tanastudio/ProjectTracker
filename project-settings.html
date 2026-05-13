@@ -786,6 +786,26 @@
     <div class="wrap">
       <div id="hint" class="hint"></div>
 
+      <section id="pageSkeleton" class="page-loading-skeleton" aria-label="Loading project settings">
+        <div class="skeleton-grid">
+          <div class="skeleton-card">
+            <div class="skeleton-line is-medium"></div>
+            <div class="skeleton-line is-long"></div>
+            <div class="skeleton-block"></div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skeleton-line is-medium"></div>
+            <div class="skeleton-line is-long"></div>
+            <div class="skeleton-block"></div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skeleton-line is-medium"></div>
+            <div class="skeleton-line is-long"></div>
+            <div class="skeleton-block"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- Tabs -->
       <div class="tabs">
         <button class="tab-btn active" data-tab="general">General</button>
@@ -1440,6 +1460,11 @@ import {
 } from "./lib/booking-utils.js";
 
 const el = (id) => document.getElementById(id);
+const pageSkeleton = el("pageSkeleton");
+
+function hidePageSkeleton() {
+  if (pageSkeleton) pageSkeleton.hidden = true;
+}
 
 /* ── helpers ── */
 function showHint(text, isErr = false) {
@@ -5329,21 +5354,25 @@ el("importBtn").addEventListener("click", async () => {
 });
 
 /* ── init ── */
-await Promise.all([
-  loadProject(),
-  loadMembers(),
-  loadAllProfiles(),
-  loadProjectUpdateSettings(),
-  loadEmailRunHistory(),
-  loadInternalPortfolioContext(),
-]);
-await loadFields();
-await loadFieldLibrary();
-await loadAvailabilityStepSettings();
-await Promise.all([
-  loadAvailabilityConsultants(),
-  loadAvailabilitySlots(),
-]);
+try {
+  await Promise.all([
+    loadProject(),
+    loadMembers(),
+    loadAllProfiles(),
+    loadProjectUpdateSettings(),
+    loadEmailRunHistory(),
+    loadInternalPortfolioContext(),
+  ]);
+  await loadFields();
+  await loadFieldLibrary();
+  await loadAvailabilityStepSettings();
+  await Promise.all([
+    loadAvailabilityConsultants(),
+    loadAvailabilitySlots(),
+  ]);
+} finally {
+  hidePageSkeleton();
+}
 </script>
 </body>
 </html>

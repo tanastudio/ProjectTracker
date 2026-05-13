@@ -104,7 +104,10 @@ serve(async (req) => {
   const supabaseUrl     = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const anonKey         = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const defaultPassword = Deno.env.get("DEFAULT_PARTICIPANT_PASSWORD") ?? "Mentis2026!";
+  const defaultPassword = Deno.env.get("DEFAULT_PARTICIPANT_PASSWORD")?.trim() || "";
+  if (!defaultPassword) {
+    return json({ error: "DEFAULT_PARTICIPANT_PASSWORD is not configured" }, 500);
+  }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
