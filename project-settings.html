@@ -2687,14 +2687,90 @@ function getSlotConsultant(slot) {
   };
 }
 
+function isCurrentProjectAvailabilitySlot(slot) {
+  return String(slot?.project_id || "") === String(PROJECT_ID || "");
+}
+
 function getAvailabilitySlotField(slot) {
   const fieldId = String(slot?.field_id || "");
-  return (fields || []).find((field) => String(field.id || "") === fieldId) || null;
+  const localField = (fields || []).find((field) => String(field.id || "") === fieldId);
+  if (localField) return localField;
+  if (slot?.field_label || slot?.field_key) {
+    return {
+      id: slot?.field_id,
+      label: slot?.field_label || "",
+      key: slot?.field_key || "",
+    };
+  }
+  return null;
 }
 
 function getAvailabilitySlotStepLabel(slot) {
   const field = getAvailabilitySlotField(slot);
   return field?.label || field?.key || "Booking step";
+}
+
+function getAvailabilitySlotContextLabel(slot) {
+  const stepLabel = getAvailabilitySlotStepLabel(slot);
+  const projectLabel = String(slot?.project_name || "").trim();
+  if (!isCurrentProjectAvailabilitySlot(slot) && projectLabel) return `${projectLabel} / ${stepLabel}`;
+  return stepLabel;
+}
+
+function getAvailabilityBookingLabel(booking, slot) {
+  if (!booking?.id) return "";
+  if (!isCurrentProjectAvailabilitySlot(slot) && String(booking.project_id || "") !== String(PROJECT_ID || "")) {
+    return "booked in another project";
+  }
+  const record = booking.records || {};
+  return `booked by ${record.title || record.code || "participant"}`;
+}
+
+function normalizeAvailabilityGlobalSlot(row) {
+  const consultant = {
+    id: row?.consultant_id,
+    name: row?.consultant_name || "",
+    email: row?.consultant_email || "",
+    is_active: true,
+  };
+  return {
+    id: row?.id,
+    project_id: row?.project_id,
+    project_name: row?.project_name || "",
+    field_id: row?.field_id,
+    field_label: row?.field_label || "",
+    field_key: row?.field_key || "",
+    consultant_id: row?.consultant_id,
+    consultant_name: row?.consultant_name || "",
+    consultant_email: row?.consultant_email || "",
+    consultant_sort_order: row?.consultant_sort_order,
+    slot_date: row?.slot_date,
+    start_time: row?.start_time,
+    end_time: row?.end_time,
+    timezone: row?.timezone,
+    is_active: row?.is_active,
+    project_availability_consultants: consultant,
+  };
+}
+
+function normalizeAvailabilityGlobalBooking(row) {
+  if (!row?.booking_id) return null;
+  return {
+    id: row.booking_id,
+    project_id: row.booking_project_id,
+    slot_id: row.id,
+    record_id: row.booking_record_id,
+    field_id: row.booking_field_id,
+    consultant_id: row.booking_consultant_id,
+    consultant_name: row.booking_consultant_name,
+    consultant_email: row.booking_consultant_email,
+    status: row.booking_status,
+    booked_at: row.booked_at,
+    records: {
+      code: row.record_code || "",
+      title: row.record_title || "",
+    },
+  };
 }
 
 function doesAvailabilitySlotMatchConsultant(slot, consultant) {
@@ -2737,6 +2813,7 @@ function canEditAvailabilitySlots() {
 function getAvailabilitySlotCounts() {
   const counts = new Map();
   const consultant = getAvailabilitySelectedConsultant();
+  if (!consultant) return counts;
   for (const slot of availabilitySlots || []) {
     if (slot.is_active === false) continue;
     if (!doesAvailabilitySlotMatchConsultant(slot, consultant)) continue;
@@ -2862,6 +2939,7 @@ function renderAvailabilitySelectedSummary() {
 function getAvailabilitySlotsForActiveDate() {
   if (!availabilityActiveDate) return [];
   const consultant = getAvailabilitySelectedConsultant();
+  if (!consultant) return [];
   return (availabilitySlots || [])
     .filter((slot) => (
       slot.is_active !== false &&
@@ -2889,7 +2967,7 @@ function renderAvailabilityActiveDaySlots() {
   const sub = document.createElement("div");
   sub.className = "availability-active-day-sub";
   sub.textContent = consultant
-    ? `${formatAvailabilityConsultantLabel(consultant)} - all booking steps`
+    ? `${formatAvailabilityConsultantLabel(consultant)} - all projects and booking steps`
     : "Select a consultant and date to preview saved slots.";
   copy.appendChild(title);
   copy.appendChild(sub);
@@ -2916,7 +2994,7 @@ function renderAvailabilityActiveDaySlots() {
   if (!slots.length) {
     const empty = document.createElement("div");
     empty.className = "muted small";
-    empty.textContent = "No saved slots for this day and consultant across booking steps yet.";
+    empty.textContent = "No saved slots for this day and consultant across projects yet.";
     panel.appendChild(empty);
     return;
   }
@@ -2925,13 +3003,14 @@ function renderAvailabilityActiveDaySlots() {
   list.className = "availability-active-slot-list";
   for (const slot of slots) {
     const booking = availabilityBookingsBySlot.get(String(slot.id || ""));
+    const isCurrentProjectSlot = isCurrentProjectAvailabilitySlot(slot);
     const isCurrentStepSlot = String(slot.field_id || "") === String(selectedField.id || "");
-    const stepLabel = getAvailabilitySlotStepLabel(slot);
+    const slotContextLabel = getAvailabilitySlotContextLabel(slot);
     const row = document.createElement("div");
     row.className = [
       "availability-active-slot-row",
       booking ? "booked" : "",
-      isCurrentStepSlot ? "" : "other-step",
+      isCurrentProjectSlot && isCurrentStepSlot ? "" : "other-step",
     ].filter(Boolean).join(" ");
 
     const text = document.createElement("div");
@@ -2940,16 +3019,21 @@ function renderAvailabilityActiveDaySlots() {
     time.textContent = getAvailabilitySlotDisplayTimeLabel(slot);
     const meta = document.createElement("div");
     meta.className = "availability-active-slot-meta";
-    const record = booking?.records || {};
+    const bookingLabel = getAvailabilityBookingLabel(booking, slot);
     meta.textContent = booking
-      ? `${stepLabel} - booked by ${record.title || record.code || "participant"}`
-      : `${stepLabel} - ${formatTimezoneLabel(availabilityTimezone || "Asia/Bangkok")}`;
+      ? `${slotContextLabel} - ${bookingLabel}`
+      : `${slotContextLabel} - ${formatTimezoneLabel(availabilityTimezone || "Asia/Bangkok")}`;
     text.appendChild(time);
     text.appendChild(meta);
 
     const actions = document.createElement("div");
     actions.className = "availability-slot-actions";
-    if (!isCurrentStepSlot) {
+    if (!isCurrentProjectSlot) {
+      const badge = document.createElement("span");
+      badge.className = "muted small";
+      badge.textContent = "Other project";
+      actions.appendChild(badge);
+    } else if (!isCurrentStepSlot) {
       const badge = document.createElement("span");
       badge.className = "muted small";
       badge.textContent = "Other step";
@@ -2962,7 +3046,7 @@ function renderAvailabilityActiveDaySlots() {
       cancel.addEventListener("click", () => cancelAvailabilityBooking(booking, cancel));
       actions.appendChild(cancel);
     }
-    if (isCurrentStepSlot) {
+    if (isCurrentProjectSlot && isCurrentStepSlot) {
       const remove = document.createElement("button");
       remove.className = "btn-danger-sm";
       remove.type = "button";
@@ -3148,7 +3232,11 @@ function renderAvailabilitySlotList() {
     return;
   }
   const activeSlots = (availabilitySlots || [])
-    .filter((slot) => slot.is_active !== false && String(slot.field_id || "") === String(selectedField.id || ""))
+    .filter((slot) => (
+      slot.is_active !== false &&
+      isCurrentProjectAvailabilitySlot(slot) &&
+      String(slot.field_id || "") === String(selectedField.id || "")
+    ))
     .sort((a, b) => `${a.slot_date} ${a.start_time}`.localeCompare(`${b.slot_date} ${b.start_time}`));
 
   if (!availabilitySlotsSupported) {
@@ -3177,7 +3265,7 @@ function renderAvailabilitySlotList() {
     consultantLine.textContent = formatAvailabilityConsultantLabel(consultant) || "Unassigned consultant";
     const meta = document.createElement("div");
     meta.className = "availability-slot-meta";
-    meta.textContent = `${getAvailabilitySlotStepLabel(slot)} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
+    meta.textContent = `${getAvailabilitySlotContextLabel(slot)} - ${formatTimezoneLabel(slot.timezone || "Asia/Bangkok")}`;
     copy.appendChild(title);
     copy.appendChild(consultantLine);
     copy.appendChild(meta);
@@ -3562,6 +3650,7 @@ async function saveAvailabilityConsultants() {
       .find((consultant) => String(consultant.email || "").trim().toLowerCase() === previousSelectedEmail);
     if (restored?.id) availabilitySelectedConsultantByField.set(fieldId, String(restored.id));
   }
+  await loadAvailabilitySlots();
   renderAvailabilityStepConfig();
   renderAvailabilityCalendar();
   renderAvailabilitySlotList();
@@ -3576,6 +3665,7 @@ function getAvailabilityPreviewSlotsByDate() {
   const groups = new Map();
   for (const slot of availabilitySlots || []) {
     if (slot.is_active === false) continue;
+    if (!isCurrentProjectAvailabilitySlot(slot)) continue;
     if (fieldId && String(slot.field_id || "") !== String(fieldId)) continue;
     if (availabilityBookingsBySlot.has(String(slot.id))) continue;
     if (consultantFilter && String(slot.consultant_id || "") !== consultantFilter) continue;
@@ -3861,6 +3951,26 @@ async function loadAvailabilitySlots() {
     renderAvailabilitySlotList();
     return;
   }
+
+  const { data: globalData, error: globalError } = await supabase.rpc("get_project_global_consultant_availability_slots_for_settings", {
+    p_project_id: PROJECT_ID,
+  });
+
+  if (!globalError) {
+    availabilitySlotsSupported = true;
+    availabilitySlots = (globalData || []).map(normalizeAvailabilityGlobalSlot);
+    availabilityBookingsBySlot = new Map();
+    for (const row of globalData || []) {
+      const booking = normalizeAvailabilityGlobalBooking(row);
+      if (booking) availabilityBookingsBySlot.set(String(row.id || ""), booking);
+    }
+    renderAvailabilityCalendar();
+    renderAvailabilityActiveDaySlots();
+    renderAvailabilitySlotList();
+    return;
+  }
+
+  console.warn("Global availability slots unavailable:", globalError.message || globalError);
 
   const { data, error } = await supabase
     .from("project_availability_slots")
