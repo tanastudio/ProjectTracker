@@ -14,7 +14,7 @@
             --panel-bg: rgba(255, 255, 255, 0.88);
             --panel-border: rgba(15, 23, 42, 0.10);
             --panel-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
-            --hero-bg: linear-gradient(180deg, rgba(255,255,255,0.75), rgba(248,250,252,0.92));
+            --hero-bg: linear-gradient(155deg, rgba(255,255,255,0.86) 0%, rgba(239,246,255,0.90) 48%, rgba(236,253,245,0.78) 100%);
             --text-strong: #0f172a;
             --text-body: #1e293b;
             --text-muted: #64748b;
@@ -55,15 +55,18 @@
             display: grid;
             place-items: center;
             padding: 28px;
+            overflow-x: hidden;
         }
 
         .login-shell {
-            width: min(1140px, 100%);
+            width: min(1140px, calc(100vw - 56px));
+            max-width: 1140px;
         }
 
         .login-card {
             display: grid;
             grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
+            width: 100%;
             min-height: 720px;
             background: var(--panel-bg);
             border: 1px solid var(--panel-border);
@@ -73,16 +76,33 @@
             backdrop-filter: blur(14px);
         }
 
+            .login-card > * {
+                min-width: 0;
+            }
+
         .login-hero {
             position: relative;
-            padding: 42px 40px;
+            padding: 46px 46px 42px;
             background: var(--hero-bg);
             border-right: 1px solid var(--line-soft);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             gap: 28px;
+            overflow: hidden;
+            isolation: isolate;
         }
+
+            .login-hero::before {
+                content: "";
+                position: absolute;
+                inset: auto -18% -24% 18%;
+                height: 58%;
+                background: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(20, 184, 166, 0.20));
+                transform: rotate(-8deg);
+                transform-origin: center;
+                z-index: -1;
+            }
 
         .hero-top {
             max-width: 620px;
@@ -100,14 +120,21 @@
             color: var(--text-body);
             font-size: 12px;
             font-weight: 700;
-            letter-spacing: 0.01em;
+            letter-spacing: 0;
+        }
+
+        .eyebrow-mark {
+            width: 18px;
+            height: 18px;
+            object-fit: contain;
+            display: block;
         }
 
         .hero-title {
             margin: 22px 0 0;
-            font-size: clamp(40px, 5vw, 64px);
+            font-size: 64px;
             line-height: 0.98;
-            letter-spacing: -0.05em;
+            letter-spacing: 0;
             font-weight: 800;
             color: var(--text-strong);
             max-width: 620px;
@@ -120,6 +147,55 @@
             line-height: 1.75;
             color: var(--text-muted);
         }
+
+        .brand-visual {
+            position: relative;
+            display: grid;
+            place-items: center;
+            min-height: 360px;
+            margin: 20px 0 0;
+        }
+
+            .brand-visual::before,
+            .brand-visual::after {
+                content: "";
+                position: absolute;
+                inset: 10% 8%;
+                border: 1px solid rgba(14, 165, 233, 0.18);
+                border-radius: 36px;
+                transform: rotate(-7deg);
+            }
+
+            .brand-visual::after {
+                inset: 18% 16%;
+                border-color: rgba(20, 184, 166, 0.22);
+                transform: rotate(9deg);
+            }
+
+        .mentis-mark {
+            position: relative;
+            width: min(390px, 78%);
+            height: auto;
+            display: block;
+            filter: drop-shadow(0 28px 44px rgba(15, 23, 42, 0.18));
+        }
+
+        .brand-caption {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding-top: 20px;
+            border-top: 1px solid var(--line-soft);
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+            .brand-caption strong {
+                color: var(--text-strong);
+                font-size: 14px;
+            }
 
         .hero-grid {
             display: grid;
@@ -160,7 +236,8 @@
         }
 
         .auth-panel-inner {
-            width: min(420px, 100%);
+            width: 100%;
+            max-width: 420px;
         }
 
         .panel-head {
@@ -171,7 +248,7 @@
             margin: 0 0 10px;
             font-size: 13px;
             font-weight: 700;
-            letter-spacing: 0.02em;
+            letter-spacing: 0;
             color: #3b82f6;
         }
 
@@ -179,7 +256,7 @@
             margin: 0;
             font-size: 34px;
             line-height: 1.05;
-            letter-spacing: -0.04em;
+            letter-spacing: 0;
             font-weight: 800;
             color: var(--text-strong);
         }
@@ -310,7 +387,7 @@
             color: #ffffff;
             font-size: 15px;
             font-weight: 800;
-            letter-spacing: 0.01em;
+            letter-spacing: 0;
             transition: transform .08s ease, background .16s ease, box-shadow .16s ease;
             box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
         }
@@ -381,7 +458,17 @@
             }
 
             .hero-title {
+                font-size: 48px;
                 max-width: none;
+            }
+
+            .brand-visual {
+                min-height: 260px;
+                margin-top: 8px;
+            }
+
+            .mentis-mark {
+                width: min(300px, 76%);
             }
         }
 
@@ -390,13 +477,65 @@
                 padding: 16px;
             }
 
+            .login-shell {
+                width: calc(100vw - 32px);
+            }
+
             .login-hero,
             .auth-panel {
                 padding: 22px 20px;
             }
 
+            .login-hero {
+                gap: 18px;
+            }
+
+            .eyebrow {
+                max-width: 100%;
+                min-height: 36px;
+                padding: 0 12px;
+                font-size: 11px;
+            }
+
             .panel-title {
                 font-size: 30px;
+            }
+
+            .hero-title {
+                font-size: 34px;
+                line-height: 1.08;
+            }
+
+            .hero-text {
+                font-size: 14px;
+                line-height: 1.55;
+            }
+
+            .brand-visual {
+                min-height: 160px;
+                margin-top: 0;
+            }
+
+                .brand-visual::before {
+                    inset: 6% 4%;
+                    border-radius: 28px;
+                }
+
+                .brand-visual::after {
+                    inset: 15% 10%;
+                    border-radius: 24px;
+                }
+
+            .mentis-mark {
+                width: min(220px, 72%);
+                filter: drop-shadow(0 20px 32px rgba(15, 23, 42, 0.16));
+            }
+
+            .brand-caption {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 4px;
+                padding-top: 14px;
             }
 
             .hero-point {
@@ -416,13 +555,24 @@
             <div class="login-card">
                 <section class="login-hero">
                     <div class="hero-top">
-                        <div class="eyebrow">Project Tracker Workspace</div>
+                        <div class="eyebrow">
+                            <img class="eyebrow-mark" src="./assets/mentis-mark-2025.png" alt="" />
+                            Project Tracker Workspace
+                        </div>
                         <h1 class="hero-title">Project Tracker.</h1>
                         <p class="hero-text">
                             Access dashboards, update participant status, and manage project tickets in one place with role-based access.
                         </p>
                     </div>
 
+                    <div class="brand-visual">
+                        <img class="mentis-mark" src="./assets/mentis-mark-2025.png" alt="Mentis logo" />
+                    </div>
+
+                    <div class="brand-caption">
+                        <strong>Mentis Global</strong>
+                        <span>Secure project coordination hub</span>
+                    </div>
                 </section>
 
                 <section class="auth-panel">
