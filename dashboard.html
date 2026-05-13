@@ -390,7 +390,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
     <link rel="manifest" href="favicon/site.webmanifest" />
 </head>
-<body>
+<body class="is-page-loading">
     <div class="layout">
         <aside class="sidebar">
             <div class="sidebar-sticky">
@@ -484,6 +484,10 @@
             </div>
 
             <section id="pageSkeleton" class="page-loading-skeleton" aria-label="Loading dashboard data">
+                <div class="skeleton-action-row">
+                    <div class="skeleton-pill"></div>
+                    <div class="skeleton-pill"></div>
+                </div>
                 <div class="skeleton-grid">
                     <div class="skeleton-card is-tall">
                         <div class="skeleton-line is-medium"></div>
@@ -518,7 +522,7 @@
                 </div>
             </section>
 
-            <div class="dashboard-wrap">
+            <div class="dashboard-wrap" data-loading-content>
                 <!-- View tabs -->
                 <div class="view-tabs" role="tablist" aria-label="Dashboard views">
                     <button class="view-tab active" type="button" data-tab="overview" role="tab" aria-selected="true" aria-controls="viewOverview">

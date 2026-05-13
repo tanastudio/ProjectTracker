@@ -690,7 +690,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
     <link rel="manifest" href="favicon/site.webmanifest" />
 </head>
-<body>
+<body class="is-page-loading">
 <div class="layout">
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -807,7 +807,7 @@
       </section>
 
       <!-- Tabs -->
-      <div class="tabs">
+      <div class="tabs" data-loading-content>
         <button class="tab-btn active" data-tab="general">General</button>
         <button class="tab-btn" data-tab="updates">Reports</button>
         <button class="tab-btn" data-tab="availability">Availability</button>
@@ -817,7 +817,7 @@
       </div>
 
       <!-- Tab: General -->
-      <div class="tab-panel active" id="tab-general">
+      <div class="tab-panel active" id="tab-general" data-loading-content>
         <div class="card">
           <div class="card-title">Project Information</div>
           <div class="card-desc">Update the project name, description, and timeline.</div>
@@ -875,7 +875,7 @@
       </div>
 
       <!-- Tab: Reports -->
-      <div class="tab-panel" id="tab-updates">
+      <div class="tab-panel" id="tab-updates" data-loading-content>
         <div class="report-shell">
           <div class="subtabs">
             <button class="subtab-btn active" data-subtab="client-reports">Client Reports</button>
@@ -1091,7 +1091,7 @@
       </div>
 
       <!-- Tab: Availability -->
-      <div class="tab-panel" id="tab-availability">
+      <div class="tab-panel" id="tab-availability" data-loading-content>
         <div class="card">
           <div class="card-title">Available Slot Calendar</div>
           <div class="card-desc">Choose which booking steps use a calendar, then create separate date and time slots for each step.</div>
@@ -1178,7 +1178,7 @@
       </div>
 
       <!-- Tab: Fields -->
-      <div class="tab-panel" id="tab-fields">
+      <div class="tab-panel" id="tab-fields" data-loading-content>
         <div class="card">
           <div class="card-title">Fields</div>
           <div class="card-desc">Drag to reorder process steps. Booking marks a select field as a booking calendar step. Participant, Client, and Internal toggles control where each field is visible.</div>
@@ -1256,7 +1256,7 @@
       </div>
 
       <!-- Tab: Members -->
-      <div class="tab-panel" id="tab-members">
+      <div class="tab-panel" id="tab-members" data-loading-content>
         <div class="card">
           <div class="card-title">Members</div>
           <div class="card-desc">Manage who has access to this project. Role controls edit permissions. Participants are managed separately via CSV upload.</div>
@@ -1293,7 +1293,7 @@
       </div>
 
       <!-- Tab: Participants -->
-      <div class="tab-panel" id="tab-participants">
+      <div class="tab-panel" id="tab-participants" data-loading-content>
         <div class="card">
           <div class="card-title">Current Participants</div>
           <div class="card-desc">Participants linked to this project. Each participant has a user account for the assessment portal.</div>
@@ -1464,6 +1464,7 @@ const pageSkeleton = el("pageSkeleton");
 
 function hidePageSkeleton() {
   if (pageSkeleton) pageSkeleton.hidden = true;
+  document.body.classList.remove("is-page-loading");
 }
 
 /* ── helpers ── */

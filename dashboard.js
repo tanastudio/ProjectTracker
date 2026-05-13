@@ -71,6 +71,7 @@ let TICKET_STATS_BY_RECORD = new Map();
 
 function hidePageSkeleton() {
     if (pageSkeleton) pageSkeleton.hidden = true;
+    document.body.classList.remove("is-page-loading");
 }
 
 /* ---------- Auth ---------- */

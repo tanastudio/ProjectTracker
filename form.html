@@ -46,7 +46,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
     <link rel="manifest" href="favicon/site.webmanifest" />
 </head>
-<body>
+<body class="is-page-loading">
     <div class="layout">
         <!-- Sidebar (shared via sidebar.css) -->
         <aside class="sidebar">
@@ -146,37 +146,46 @@
             <!-- Keep your existing form content unchanged -->
             <div class="container">
                 <section id="pageSkeleton" class="page-loading-skeleton" aria-label="Loading participant data">
-                    <div class="skeleton-grid">
-                        <div class="skeleton-card is-tall">
-                            <div class="skeleton-line is-medium"></div>
-                            <div class="skeleton-line is-long"></div>
-                            <div class="skeleton-line is-long"></div>
-                            <div class="skeleton-block"></div>
+                    <div class="skeleton-card is-table-view">
+                        <div class="skeleton-toolbar-grid">
+                            <div>
+                                <div class="skeleton-line is-short"></div>
+                                <div class="skeleton-pill"></div>
+                            </div>
+                            <div>
+                                <div class="skeleton-line is-short"></div>
+                                <div class="skeleton-pill"></div>
+                            </div>
+                            <div>
+                                <div class="skeleton-line is-short"></div>
+                                <div class="skeleton-pill"></div>
+                            </div>
+                            <div>
+                                <div class="skeleton-line is-short"></div>
+                                <div class="skeleton-pill"></div>
+                            </div>
                         </div>
-                        <div class="skeleton-card is-tall">
-                            <div class="skeleton-line is-medium"></div>
-                            <div class="skeleton-line is-long"></div>
-                            <div class="skeleton-line is-long"></div>
-                            <div class="skeleton-block"></div>
-                        </div>
-                    </div>
-                    <div class="skeleton-table">
-                        <div class="skeleton-row">
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                        </div>
-                        <div class="skeleton-row">
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
+                        <div class="skeleton-table-frame">
+                            <div class="skeleton-table">
+                                <div class="skeleton-row">
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                </div>
+                                <div class="skeleton-row">
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                </div>
+                                <div class="skeleton-block is-table-body"></div>
+                            </div>
                         </div>
                     </div>
                 </section>
                 <!-- TOP AREA (fit in one viewport without scrolling) -->
-                <section class="top-area" id="topArea">
+                <section class="top-area" id="topArea" data-loading-content>
                     <div class="card form-card">
 
                         <div class="form-grid">
@@ -264,7 +273,7 @@
                 </section>
 
                 <!-- TABLE AREA (scroll to see) -->
-                <section class="card table-card">
+                <section class="card table-card" data-loading-content>
                     <div class="table-toolbar">
 
                         <div class="tool tool-grow">

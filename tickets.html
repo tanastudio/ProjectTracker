@@ -478,7 +478,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
     <link rel="manifest" href="favicon/site.webmanifest" />
 </head>
-<body>
+<body class="is-page-loading">
     <div class="layout">
         <!-- Sidebar (same structure as projects/dashboard) -->
         <aside class="sidebar">
@@ -575,33 +575,40 @@
 
             <div class="wrap">
                 <section id="pageSkeleton" class="page-loading-skeleton" aria-label="Loading tickets">
-                    <div class="skeleton-card">
-                        <div class="skeleton-line is-medium"></div>
-                        <div class="skeleton-line is-long"></div>
-                        <div class="skeleton-line is-short"></div>
-                    </div>
-                    <div class="skeleton-table">
-                        <div class="skeleton-row">
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
+                    <div class="skeleton-card is-table-view">
+                        <div class="skeleton-toolbar-grid">
+                            <div>
+                                <div class="skeleton-line is-short"></div>
+                                <div class="skeleton-pill"></div>
+                            </div>
+                            <div>
+                                <div class="skeleton-line is-short"></div>
+                                <div class="skeleton-pill"></div>
+                            </div>
+                            <div>
+                                <div class="skeleton-line is-short"></div>
+                                <div class="skeleton-pill"></div>
+                            </div>
                         </div>
-                        <div class="skeleton-row">
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                        </div>
-                        <div class="skeleton-row">
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
-                            <div class="skeleton-line"></div>
+                        <div class="skeleton-table-frame">
+                            <div class="skeleton-table">
+                                <div class="skeleton-row">
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                </div>
+                                <div class="skeleton-row">
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                    <div class="skeleton-line"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
-                <div class="card">
+                <div class="card" data-loading-content>
                     <div class="toolbar">
                         <div class="tool">
                             <label class="label" for="searchInput">Search</label>
@@ -665,6 +672,7 @@
 
         function hidePageSkeleton() {
             if (pageSkeleton) pageSkeleton.hidden = true;
+            document.body.classList.remove("is-page-loading");
         }
 
         const tbody = el("tbody");

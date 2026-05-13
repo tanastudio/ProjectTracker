@@ -72,6 +72,7 @@ const decisionHint = el("decisionHint");
 
 function hidePageSkeleton() {
     if (pageSkeleton) pageSkeleton.hidden = true;
+    document.body.classList.remove("is-page-loading");
 }
 
 /* ---------- AUTH GUARD ---------- */
