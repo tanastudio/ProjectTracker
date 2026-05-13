@@ -151,6 +151,29 @@
       font-size: 13px; font-weight: 700; border: 1.5px solid #3b82f6; border-radius: 7px;
       padding: 2px 8px; outline: none; font-family: inherit; min-width: 0; width: 180px;
     }
+    .field-add-layout {
+      display: grid; grid-template-columns: minmax(260px, .9fr) minmax(320px, 1.1fr);
+      gap: 14px; align-items: start;
+    }
+    .fields-panel {
+      border: 1px solid rgba(15,23,42,.10); border-radius: 12px;
+      padding: 14px 16px; background: rgba(248,250,252,.55);
+    }
+    .fields-panel-title { font-size: 14px; font-weight: 900; color: #0f172a; margin: 0 0 2px; }
+    .fields-panel-subtitle { font-size: 12px; color: #64748b; margin: 0 0 12px; }
+    .field-library-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+    .field-lib-item {
+      display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 10px;
+      border-radius: 10px; border: 1px solid rgba(15,23,42,.08); background: #fff;
+      cursor: pointer; transition: border-color .15s, background .15s, opacity .15s;
+    }
+    .field-lib-item:hover:not(.field-lib-added) { border-color: #3b82f6; background: #eff6ff; }
+    .field-lib-item.field-lib-added { opacity: .48; cursor: default; pointer-events: none; }
+    .field-lib-label { font-size: 13px; font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .field-lib-type { font-size: 11px; color: #64748b; flex-shrink: 0; }
+    .field-lib-action { font-size: 16px; font-weight: 900; color: #3b82f6; line-height: 1; flex-shrink: 0; }
+    .field-lib-added .field-lib-action { color: #16a34a; font-size: 11px; }
+    .fields-create-sep { border: none; border-top: 1px solid rgba(15,23,42,.08); margin: 12px 0; }
 
     /* Toggle */
     .toggle-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -602,7 +625,8 @@
 
     @media (max-width: 720px) {
       .form-row2,
-      .add-member-row { grid-template-columns: 1fr; }
+      .add-member-row,
+      .field-add-layout { grid-template-columns: 1fr; }
       .schedule-layout { grid-template-columns: 1fr; }
       .availability-layout { grid-template-columns: 1fr; }
       .availability-consultant-row,
@@ -1133,9 +1157,21 @@
         </div>
 
         <div class="card">
-          <div class="card-title">Add New Field</div>
-          <div class="card-desc">Create a custom field for this project. Select-type fields appear as step columns in the participant form.</div>
+          <div class="card-title">Add Field</div>
+          <div class="card-desc">Pick an existing field from the library or create a new field for this project.</div>
 
+          <div class="field-add-layout">
+            <div class="fields-panel">
+              <div class="fields-panel-title">Field Library</div>
+              <div class="fields-panel-subtitle">Reuse fields from other projects. Fields already in this project are disabled.</div>
+              <div class="field-library-list" id="fieldLibraryList">
+                <div class="muted small">Loading library...</div>
+              </div>
+            </div>
+
+            <div class="fields-panel">
+              <div class="fields-panel-title">Create New Field</div>
+              <div class="fields-panel-subtitle">Select fields can be used as process steps or booking steps.</div>
           <div class="form-row2">
             <div class="form-group">
               <label>Label *</label>
@@ -1177,6 +1213,8 @@
 
           <div class="btn-row">
             <button class="btn-primary" id="addFieldBtn">Add Field</button>
+          </div>
+            </div>
           </div>
         </div>
       </div>
@@ -3911,7 +3949,10 @@ renderAvailabilityActiveDaySlots();
 ═══════════════════ */
 const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
 const DASHBOARD_TOGGLE_ALLOWED_ROLES = new Set(["email"]);
+const DEFAULT_SELECT_OPTIONS = ["Not Started", "In Progress", "Completed", "Issue"];
 let supportsVisibilityChannels = true;
+let fieldLibrary = [];
+let fieldLibraryLoaded = false;
 
 async function loadFields() {
   let { data, error } = await supabase
@@ -3937,6 +3978,7 @@ async function loadFields() {
   if (error) { showHint("Failed to load fields.", true); return; }
   fields = data || [];
   renderFields();
+  if (fieldLibraryLoaded) renderFieldLibrary();
   renderAvailabilityStepSummary();
 }
 
@@ -4153,6 +4195,153 @@ function labelToKey(label) {
     .slice(0, 60);
 }
 
+function isFieldInProject(key) {
+  return fields.some((field) => String(field.key || "").trim().toLowerCase() === String(key || "").trim().toLowerCase());
+}
+
+function normalizeLibraryField(field) {
+  const type = String(field?.type || "select").trim().toLowerCase();
+  const fieldRole = type === "select" && String(field?.field_role || "").trim().toLowerCase() === "booking" ? "booking" : "step";
+  let rawOptions = field?.options;
+  if (typeof rawOptions === "string") {
+    try { rawOptions = JSON.parse(rawOptions); } catch { rawOptions = []; }
+  }
+  const options = Array.isArray(rawOptions) ? rawOptions.filter(Boolean) : [];
+  return {
+    key: String(field?.key || "").trim(),
+    label: String(field?.label || "").trim(),
+    type: ["select", "text", "date"].includes(type) ? type : "select",
+    field_role: fieldRole,
+    options,
+  };
+}
+
+function renderFieldLibrary() {
+  const list = el("fieldLibraryList");
+  if (!list) return;
+  if (!fieldLibraryLoaded) {
+    list.innerHTML = "<div class='muted small'>Loading library...</div>";
+    return;
+  }
+  if (fieldLibrary.length === 0) {
+    list.innerHTML = "<div class='muted small'>No reusable fields found.</div>";
+    return;
+  }
+
+  list.innerHTML = fieldLibrary.map((field) => {
+    const added = isFieldInProject(field.key);
+    const typeLabel = field.field_role === "booking" ? "booking" : field.type;
+    return `
+      <div class="field-lib-item ${added ? "field-lib-added" : ""}" data-lib-key="${escapeHtml(field.key)}" title="${escapeHtml(field.label)}">
+        <span class="field-lib-label">${escapeHtml(field.label)}</span>
+        <span class="field-lib-type">${escapeHtml(typeLabel)}</span>
+        <span class="field-lib-action">${added ? "Added" : "+"}</span>
+      </div>`;
+  }).join("");
+
+  list.querySelectorAll(".field-lib-item:not(.field-lib-added)").forEach((item) => {
+    item.addEventListener("click", () => addFieldFromLibrary(item.dataset.libKey));
+  });
+}
+
+async function loadFieldLibrary() {
+  const list = el("fieldLibraryList");
+  if (list) list.innerHTML = "<div class='muted small'>Loading library...</div>";
+
+  let data = null;
+  let error = null;
+  const rpcResult = await supabase.rpc("get_project_field_library_for_settings", { p_project_id: PROJECT_ID });
+  if (!rpcResult.error) {
+    data = rpcResult.data || [];
+  } else {
+    console.warn("Falling back to fields query for field library:", rpcResult.error);
+    const fallback = await supabase
+      .from("fields")
+      .select("key, label, type, field_role, options")
+      .in("field_role", ["step", "booking"])
+      .eq("is_active", true)
+      .order("label");
+    data = fallback.data || [];
+    error = fallback.error;
+  }
+
+  if (error) {
+    fieldLibraryLoaded = true;
+    fieldLibrary = [];
+    renderFieldLibrary();
+    showHint("Failed to load field library.", true);
+    return;
+  }
+
+  const byKey = new Map();
+  (data || []).map(normalizeLibraryField).forEach((field) => {
+    if (!field.key || !field.label || FIXED_ROLES.has(field.field_role)) return;
+    if (!byKey.has(field.key)) byKey.set(field.key, field);
+  });
+  fieldLibrary = [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
+  fieldLibraryLoaded = true;
+  renderFieldLibrary();
+}
+
+async function confirmAddFieldWithExistingRecords(label) {
+  const { count: recordCount } = await supabase
+    .from("records")
+    .select("*", { count: "exact", head: true })
+    .eq("project_id", PROJECT_ID);
+  if (!recordCount) return true;
+  return confirm(
+    `Warning: This project already has ${recordCount} participant(s).\n\n` +
+    `Adding a new field now means all existing participants will have an empty value for "${label}" until filled in manually.\n\n` +
+    `Continue?`
+  );
+}
+
+function buildFieldPayload({ key, label, type, options, field_role }) {
+  const cleanType = ["select", "text", "date"].includes(type) ? type : "select";
+  const maxSort = fields.reduce((max, field) => Math.max(max, field.sort_order || 0), 0);
+  const payload = {
+    project_id: PROJECT_ID,
+    key,
+    label,
+    type: cleanType,
+    options: cleanType === "select" ? (Array.isArray(options) && options.length ? options : DEFAULT_SELECT_OPTIONS) : null,
+    sort_order: maxSort + 10,
+    field_role: cleanType === "select" && field_role === "booking" ? "booking" : "step",
+    is_active: true,
+    show_in_participant_status: true,
+    show_in_dashboard: true,
+    show_in_internal: true,
+  };
+  if (!supportsVisibilityChannels) {
+    delete payload.show_in_participant_status;
+    delete payload.show_in_internal;
+  }
+  return payload;
+}
+
+async function addFieldFromLibrary(key) {
+  const field = fieldLibrary.find((item) => item.key === key);
+  if (!field) return;
+  if (isFieldInProject(field.key)) {
+    renderFieldLibrary();
+    return;
+  }
+  if (!await confirmAddFieldWithExistingRecords(field.label)) return;
+
+  const item = [...(el("fieldLibraryList")?.querySelectorAll("[data-lib-key]") || [])]
+    .find((node) => node.dataset.libKey === field.key);
+  item?.classList.add("field-lib-added");
+  const { error } = await supabase.from("fields").insert(buildFieldPayload(field));
+  if (error) {
+    item?.classList.remove("field-lib-added");
+    showHint("Error: " + error.message, true);
+    renderFieldLibrary();
+    return;
+  }
+  showHint(`Field "${field.label}" added.`, false);
+  await loadFields();
+}
+
 el("newFieldLabel").addEventListener("input", () => {
   el("newFieldKey").value = labelToKey(el("newFieldLabel").value);
 });
@@ -4188,7 +4377,7 @@ el("addFieldBtn").addEventListener("click", async () => {
   if (!label) { showHint("Label is required.", true); return; }
   if (!key)   { showHint("Key is required.", true); return; }
   if (!/^[a-z][a-z0-9_]*$/.test(key)) { showHint("Key must start with a letter and contain only lowercase letters, numbers, and underscores.", true); return; }
-  if (fields.some(f => f.key === key)) { showHint(`Key "${key}" is already used by another field.`, true); return; }
+  if (isFieldInProject(key)) { showHint(`Key "${key}" is already used by another field.`, true); return; }
 
   let options = null;
   if (type === "select") {
@@ -4197,42 +4386,18 @@ el("addFieldBtn").addEventListener("click", async () => {
     if (options.length < 1) { showHint("Select at least one option for a select field.", true); return; }
   }
 
-  const maxSort = fields.reduce((m, f) => Math.max(m, f.sort_order || 0), 0);
-
-  // Warn if project already has records
-  const { count: recordCount } = await supabase
-    .from("records")
-    .select("*", { count: "exact", head: true })
-    .eq("project_id", PROJECT_ID);
-  if (recordCount > 0) {
-    const ok = confirm(
-      `Warning: This project already has ${recordCount} participant(s).\n\n` +
-      `Adding a new field now means all existing participants will have an empty value for "${label}" until filled in manually.\n\n` +
-      `Continue?`
-    );
-    if (!ok) return;
-  }
+  if (!await confirmAddFieldWithExistingRecords(label)) return;
 
   el("addFieldBtn").disabled    = true;
   el("addFieldBtn").textContent = "Adding...";
 
-  const payload = {
-    project_id:       PROJECT_ID,
+  const payload = buildFieldPayload({
     key,
     label,
     type,
     options,
-    sort_order:       maxSort + 10,
-    field_role:       type === "select" && el("newFieldBooking").checked ? "booking" : "step",
-    is_active:        true,
-    show_in_participant_status: true,
-    show_in_dashboard: true,
-    show_in_internal: true,
-  };
-  if (!supportsVisibilityChannels) {
-    delete payload.show_in_participant_status;
-    delete payload.show_in_internal;
-  }
+    field_role: type === "select" && el("newFieldBooking").checked ? "booking" : "step",
+  });
   const { error } = await supabase.from("fields").insert(payload);
 
   el("addFieldBtn").disabled    = false;
@@ -4971,6 +5136,7 @@ await Promise.all([
   loadInternalPortfolioContext(),
 ]);
 await loadFields();
+await loadFieldLibrary();
 await loadAvailabilityStepSettings();
 await Promise.all([
   loadAvailabilityConsultants(),
