@@ -9,6 +9,7 @@ import {
     formatTimezoneLabel,
     getBookingSessionStatusLabel,
     getTodayKey,
+    isAvailabilitySlotInFuture,
     isBookingField,
     normalizeTimeText,
 } from "../lib/booking-utils.js";
@@ -60,5 +61,24 @@ describe("date and time helpers", () => {
         expect(formatTimezoneLabel("Asia/Riyadh", new Date(Date.UTC(2026, 4, 21, 9, 52)))).toBe("Jeddah / KSA Time (12:52)");
         expect(formatDateKeyInTimezone(slot, "Asia/Dubai")).toBe("2026-05-21");
         expect(formatSlotTimeInTimezone(slot, "Asia/Dubai")).toBe("06:00 - 07:00");
+    });
+
+    it("checks whether an availability slot starts in the future", () => {
+        const reference = new Date("2026-05-21T02:00:00.000Z");
+        expect(isAvailabilitySlotInFuture({
+            slot_date: "2026-05-21",
+            start_time: "09:01",
+            timezone: "Asia/Bangkok",
+        }, reference)).toBe(true);
+        expect(isAvailabilitySlotInFuture({
+            slot_date: "2026-05-21",
+            start_time: "09:00",
+            timezone: "Asia/Bangkok",
+        }, reference)).toBe(false);
+        expect(isAvailabilitySlotInFuture({
+            slot_date: "2026-05-21",
+            start_time: "08:59",
+            timezone: "Asia/Bangkok",
+        }, reference)).toBe(false);
     });
 });

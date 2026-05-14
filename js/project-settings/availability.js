@@ -10,7 +10,7 @@ export function createAvailabilityController(ctx) {
     formatTimezoneLabel,
     getDateKeyForTimezone,
     getDefaultBookingTimezone,
-    getTodayKey,
+    isAvailabilitySlotInFuture,
     isBookingField,
     normalizeTimeText,
   } = ctx.bookingUtils;
@@ -291,7 +291,7 @@ export function createAvailabilityController(ctx) {
     const firstDay = new Date(year, monthIndex, 1);
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
     const slotCounts = getAvailabilitySlotCounts();
-    const todayKey = getTodayKey();
+    const todayKey = getDateKeyForTimezone(availabilityTimezone || "Asia/Bangkok");
     const selectedFieldId = requireAvailabilityFieldId();
     const stepEnabled = selectedFieldId ? isAvailabilityStepEnabled(selectedFieldId) : false;
     const canEditSlots = canEditAvailabilitySlots();
@@ -317,10 +317,13 @@ export function createAvailabilityController(ctx) {
         dateKey === todayKey ? "today" : "",
       ].filter(Boolean).join(" ");
       btn.textContent = String(day);
-      btn.title = slotCounts.has(dateKey) ? `${slotCounts.get(dateKey)} active slot(s)` : dateKey;
-      btn.disabled = !selectedFieldId || !stepEnabled || !canEditSlots;
+      const isPastDate = dateKey < todayKey;
+      btn.title = isPastDate
+        ? "Past dates cannot be selected for new slots"
+        : (slotCounts.has(dateKey) ? `${slotCounts.get(dateKey)} active slot(s)` : dateKey);
+      btn.disabled = !selectedFieldId || !stepEnabled || !canEditSlots || isPastDate;
       btn.addEventListener("click", (event) => {
-        if (!selectedFieldId || !stepEnabled || !canEditSlots) return;
+        if (!selectedFieldId || !stepEnabled || !canEditSlots || isPastDate) return;
         if ((event.ctrlKey || event.metaKey || event.altKey) && availabilitySelectedDates.has(dateKey)) {
           removeAvailabilitySelectedDate(dateKey);
           return;
@@ -579,7 +582,15 @@ export function createAvailabilityController(ctx) {
       valid.push({ start, end });
     }
     if (!valid.length) throw new Error("Add at least one valid time range.");
-    return valid;
+    const sorted = [...valid].sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+    for (let index = 1; index < sorted.length; index += 1) {
+      const previous = sorted[index - 1];
+      const current = sorted[index];
+      if (current.start < previous.end) {
+        throw new Error("Time ranges cannot overlap. Adjacent ranges like 13:00-14:00 and 14:00-15:00 are allowed.");
+      }
+    }
+    return sorted;
   }
 
   function getNextAvailabilityDraftRange() {
@@ -1124,6 +1135,7 @@ export function createAvailabilityController(ctx) {
       if (fieldId && String(slot.field_id || "") !== String(fieldId)) continue;
       if (availabilityBookingsBySlot.has(String(slot.id))) continue;
       if (consultantFilter && String(slot.consultant_id || "") !== consultantFilter) continue;
+      if (!isAvailabilitySlotInFuture(slot)) continue;
       const dateKey = formatDateKeyInTimezone(slot, availabilityPreviewTimezone);
       if (!dateKey || dateKey < today) continue;
       const timeLabel = formatSlotTimeInTimezone(slot, availabilityPreviewTimezone);
@@ -1493,8 +1505,13 @@ export function createAvailabilityController(ctx) {
     }
 
     const payload = [];
+    const timezone = availabilityTimezone || "Asia/Bangkok";
     for (const dateKey of [...availabilitySelectedDates]) {
       for (const hour of hours) {
+        if (!isAvailabilitySlotInFuture({ slot_date: dateKey, start_time: hour.start, timezone })) {
+          showHint(`Cannot apply slots in the past. First invalid slot: ${formatAvailabilityDateLabel(dateKey)} ${hour.start}.`, true);
+          return;
+        }
         payload.push({
           project_id: PROJECT_ID,
           field_id: fieldId,
@@ -1502,7 +1519,7 @@ export function createAvailabilityController(ctx) {
           slot_date: dateKey,
           start_time: hour.start,
           end_time: hour.end,
-          timezone: availabilityTimezone || "Asia/Bangkok",
+          timezone,
           is_active: true,
           created_by: session.user.id,
           updated_at: new Date().toISOString(),

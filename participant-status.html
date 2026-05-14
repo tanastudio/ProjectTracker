@@ -1668,6 +1668,7 @@
             formatTimezoneLabel,
             getDateKeyForTimezone,
             getDefaultBookingTimezone,
+            isAvailabilitySlotInFuture,
             isBookingField,
         } from "./lib/booking-utils.js";
 
@@ -1844,6 +1845,7 @@
             for (const slot of AVAILABLE_SLOTS || []) {
                 if (String(slot.field_id || "") !== targetFieldId) continue;
                 if (slot.is_booked) continue;
+                if (!isAvailabilitySlotInFuture(slot)) continue;
                 if (consultantFilter && String(slot.consultant_id || "") !== consultantFilter) continue;
                 const dateKey = formatDateKeyInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
                 if (!dateKey || dateKey < today) continue;
@@ -2168,11 +2170,22 @@
         }
 
         async function bookAvailabilitySlot(step, option, box) {
-            const slotIds = (option?.slotIds || []).filter(Boolean);
-            const primarySlotId = slotIds[0] || option?.slots?.[0]?.id;
-            if (!primarySlotId) return;
+            const futureSlots = (option?.slots || []).filter((slot) => slot?.id && isAvailabilitySlotInFuture(slot));
+            const slotIds = futureSlots.map((slot) => slot.id).filter(Boolean);
+            const primarySlotId = slotIds[0];
             const buttons = box.querySelectorAll("button");
             const message = box.querySelector("[data-booking-message]");
+            if (!primarySlotId) {
+                if (message) {
+                    message.className = "booking-message error";
+                    message.textContent = "This slot has already passed. Please choose another time.";
+                }
+                BOOKING_SELECTED_SLOT_BY_FIELD.delete(String(step.id || ""));
+                buttons.forEach((button) => {
+                    if (button.classList.contains("booking-confirm-btn")) button.disabled = true;
+                });
+                return;
+            }
             buttons.forEach((button) => { button.disabled = true; });
             if (message) {
                 message.className = "booking-message";
