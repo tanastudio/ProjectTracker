@@ -321,16 +321,17 @@ export function createAvailabilityController(ctx) {
       cell.className = "availability-day-cell";
   
       const btn = document.createElement("button");
-      btn.type = "button";
+      btn.type = "button";
+      const isTooSoonDate = dateKey < bookableDateKey;
       btn.className = [
         "availability-day-btn",
         availabilitySelectedDates.has(dateKey) ? "selected" : "",
         availabilityActiveDate === dateKey ? "active" : "",
         slotCounts.has(dateKey) ? "has-slot" : "",
         dateKey === todayKey ? "today" : "",
+        isTooSoonDate ? "unavailable" : "",
       ].filter(Boolean).join(" ");
       btn.textContent = String(day);
-      const isTooSoonDate = dateKey < bookableDateKey;
       btn.title = isTooSoonDate
         ? `Dates before the minimum booking notice cannot be selected (${getAvailabilityMinimumNoticeHours(selectedFieldId)} hours).`
         : (slotCounts.has(dateKey) ? `${slotCounts.get(dateKey)} active slot(s)` : dateKey);

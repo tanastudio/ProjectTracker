@@ -513,6 +513,14 @@
     .availability-day-btn:hover { background: #eaf2ff; color: #1d4ed8; }
     .availability-day-btn.today { border-color: #93c5fd; }
     .availability-day-btn.has-slot { background: #eff6ff; color: #075ac9; }
+    .availability-day-btn.unavailable {
+      color: #b8c2d2;
+      background: transparent;
+      cursor: not-allowed;
+      opacity: .58;
+    }
+    .availability-day-btn.unavailable:hover { background: transparent; color: #b8c2d2; }
+    .availability-day-btn.unavailable.has-slot { background: #f4f7fb; color: #9aa8bc; }
     .availability-day-btn.selected { background: #0d6efd; color: #fff; box-shadow: 0 8px 18px rgba(13,110,253,.24); }
     .availability-day-btn.active { outline: 2px solid #0f172a; outline-offset: 2px; }
     .availability-day-btn.has-slot::after {
