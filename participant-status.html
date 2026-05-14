@@ -1668,8 +1668,9 @@
             formatTimezoneLabel,
             getDateKeyForTimezone,
             getDefaultBookingTimezone,
-            isAvailabilitySlotInFuture,
+            isAvailabilitySlotBookable,
             isBookingField,
+            normalizeMinimumNoticeHours,
         } from "./lib/booking-utils.js";
 
 
@@ -1788,6 +1789,7 @@
         let AVAILABLE_SLOTS = [];
         let BOOKINGS_BY_FIELD = new Map();
         let BOOKING_ENABLED_FIELD_IDS = new Set();
+        let BOOKING_MINIMUM_NOTICE_HOURS_BY_FIELD = new Map();
         let BOOKING_SETTINGS_SUPPORTED = true;
         let RENDERED_STEPS = [];
         const BOOKING_CALENDAR_STATE = new Map();
@@ -1840,12 +1842,13 @@
             const today = getDateKeyForTimezone(PARTICIPANT_BOOKING_TIMEZONE);
             const byDate = new Map();
             const targetFieldId = String(fieldId || "");
+            const minimumNoticeHours = getBookingMinimumNoticeHours(targetFieldId);
             const consultantFilter = getSelectedBookingConsultantId(targetFieldId);
             const grouped = new Map();
             for (const slot of AVAILABLE_SLOTS || []) {
                 if (String(slot.field_id || "") !== targetFieldId) continue;
                 if (slot.is_booked) continue;
-                if (!isAvailabilitySlotInFuture(slot)) continue;
+                if (!isAvailabilitySlotBookable(slot, minimumNoticeHours)) continue;
                 if (consultantFilter && String(slot.consultant_id || "") !== consultantFilter) continue;
                 const dateKey = formatDateKeyInTimezone(slot, PARTICIPANT_BOOKING_TIMEZONE);
                 if (!dateKey || dateKey < today) continue;
@@ -1914,6 +1917,10 @@
                 day: "numeric",
                 year: "numeric",
             }).format(date);
+        }
+
+        function getBookingMinimumNoticeHours(fieldId) {
+            return normalizeMinimumNoticeHours(BOOKING_MINIMUM_NOTICE_HOURS_BY_FIELD.get(String(fieldId || "")), 24);
         }
 
         function renderBookingTimezoneSelect(container, rerender) {
@@ -2170,7 +2177,8 @@
         }
 
         async function bookAvailabilitySlot(step, option, box) {
-            const futureSlots = (option?.slots || []).filter((slot) => slot?.id && isAvailabilitySlotInFuture(slot));
+            const minimumNoticeHours = getBookingMinimumNoticeHours(step.id);
+            const futureSlots = (option?.slots || []).filter((slot) => slot?.id && isAvailabilitySlotBookable(slot, minimumNoticeHours));
             const slotIds = futureSlots.map((slot) => slot.id).filter(Boolean);
             const primarySlotId = slotIds[0];
             const buttons = box.querySelectorAll("button");
@@ -2178,7 +2186,7 @@
             if (!primarySlotId) {
                 if (message) {
                     message.className = "booking-message error";
-                    message.textContent = "This slot has already passed. Please choose another time.";
+                    message.textContent = `This slot is inside the ${minimumNoticeHours}-hour minimum notice window. Please choose another time.`;
                 }
                 BOOKING_SELECTED_SLOT_BY_FIELD.delete(String(step.id || ""));
                 buttons.forEach((button) => {
@@ -2545,16 +2553,21 @@
             const nextBookings = new Map();
             let nextSlots = [];
             const nextEnabledFieldIds = new Set();
+            const nextMinimumNoticeHoursByField = new Map();
 
             const { data: settingData, error: settingError } = await supabase
                 .from("project_availability_step_settings")
-                .select("field_id, is_enabled")
+                .select("field_id, is_enabled, minimum_notice_hours")
                 .eq("project_id", projectId)
                 .eq("is_enabled", true);
             if (!settingError) {
                 BOOKING_SETTINGS_SUPPORTED = true;
                 for (const setting of settingData || []) {
-                    if (setting.field_id) nextEnabledFieldIds.add(String(setting.field_id));
+                    if (setting.field_id) {
+                        const fieldId = String(setting.field_id);
+                        nextEnabledFieldIds.add(fieldId);
+                        nextMinimumNoticeHoursByField.set(fieldId, normalizeMinimumNoticeHours(setting.minimum_notice_hours, 24));
+                    }
                 }
             } else {
                 BOOKING_SETTINGS_SUPPORTED = false;
@@ -2586,6 +2599,7 @@
             AVAILABLE_SLOTS = nextSlots;
             BOOKINGS_BY_FIELD = nextBookings;
             BOOKING_ENABLED_FIELD_IDS = nextEnabledFieldIds;
+            BOOKING_MINIMUM_NOTICE_HOURS_BY_FIELD = nextMinimumNoticeHoursByField;
         }
 
         let { data: fieldsRaw, error: fErr } = await supabase

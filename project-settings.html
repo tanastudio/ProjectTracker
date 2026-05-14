@@ -1170,6 +1170,11 @@
               </div>
             </div>
             <div class="form-group">
+              <label for="availabilityMinimumNoticeHours">Minimum booking notice (hours)</label>
+              <input class="form-input" id="availabilityMinimumNoticeHours" type="number" min="0" max="8760" step="1" value="24">
+              <div class="muted small">Participants can only book slots that start after this notice window. Use 0 for no minimum notice.</div>
+            </div>
+            <div class="form-group">
               <label>Consultants</label>
               <div class="availability-consultant-list" id="availabilityConsultantRows"></div>
             </div>

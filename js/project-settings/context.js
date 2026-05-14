@@ -17,8 +17,10 @@ import {
   getDateKeyForTimezone,
   getDefaultBookingTimezone,
   getTodayKey,
+  isAvailabilitySlotBookable,
   isAvailabilitySlotInFuture,
   isBookingField,
+  normalizeMinimumNoticeHours,
   normalizeTimeText,
 } from "../../lib/booking-utils.js";
 
@@ -163,8 +165,10 @@ export function createProjectSettingsContext() {
       getDateKeyForTimezone,
       getDefaultBookingTimezone,
       getTodayKey,
+      isAvailabilitySlotBookable,
       isAvailabilitySlotInFuture,
       isBookingField,
+      normalizeMinimumNoticeHours,
       normalizeTimeText,
     },
   };

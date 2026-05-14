@@ -10,8 +10,9 @@ export function createAvailabilityController(ctx) {
     formatTimezoneLabel,
     getDateKeyForTimezone,
     getDefaultBookingTimezone,
-    isAvailabilitySlotInFuture,
+    isAvailabilitySlotBookable,
     isBookingField,
+    normalizeMinimumNoticeHours,
     normalizeTimeText,
   } = ctx.bookingUtils;
 
@@ -101,6 +102,16 @@ export function createAvailabilityController(ctx) {
 
   function getAvailabilityStepSetting(fieldId) {
     return availabilityStepSettings.get(String(fieldId || "")) || null;
+  }
+
+  function getAvailabilityMinimumNoticeHours(fieldId = requireAvailabilityFieldId()) {
+    const setting = getAvailabilityStepSetting(fieldId);
+    return normalizeMinimumNoticeHours(setting?.minimum_notice_hours, 24);
+  }
+
+  function getAvailabilityBookableDateKey(fieldId = requireAvailabilityFieldId(), timezone = availabilityTimezone || "Asia/Bangkok") {
+    const minimumNoticeHours = getAvailabilityMinimumNoticeHours(fieldId);
+    return getDateKeyForTimezone(timezone, new Date(Date.now() + minimumNoticeHours * 60 * 60 * 1000));
   }
 
   function isAvailabilityStepEnabled(fieldId) {
@@ -291,10 +302,12 @@ export function createAvailabilityController(ctx) {
     const firstDay = new Date(year, monthIndex, 1);
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
     const slotCounts = getAvailabilitySlotCounts();
-    const todayKey = getDateKeyForTimezone(availabilityTimezone || "Asia/Bangkok");
     const selectedFieldId = requireAvailabilityFieldId();
     const stepEnabled = selectedFieldId ? isAvailabilityStepEnabled(selectedFieldId) : false;
     const canEditSlots = canEditAvailabilitySlots();
+    const timezone = availabilityTimezone || "Asia/Bangkok";
+    const todayKey = getDateKeyForTimezone(timezone);
+    const bookableDateKey = getAvailabilityBookableDateKey(selectedFieldId, timezone);
   
     for (let i = 0; i < firstDay.getDay(); i++) {
       const cell = document.createElement("div");
@@ -317,13 +330,13 @@ export function createAvailabilityController(ctx) {
         dateKey === todayKey ? "today" : "",
       ].filter(Boolean).join(" ");
       btn.textContent = String(day);
-      const isPastDate = dateKey < todayKey;
-      btn.title = isPastDate
-        ? "Past dates cannot be selected for new slots"
+      const isTooSoonDate = dateKey < bookableDateKey;
+      btn.title = isTooSoonDate
+        ? `Dates before the minimum booking notice cannot be selected (${getAvailabilityMinimumNoticeHours(selectedFieldId)} hours).`
         : (slotCounts.has(dateKey) ? `${slotCounts.get(dateKey)} active slot(s)` : dateKey);
-      btn.disabled = !selectedFieldId || !stepEnabled || !canEditSlots || isPastDate;
+      btn.disabled = !selectedFieldId || !stepEnabled || !canEditSlots || isTooSoonDate;
       btn.addEventListener("click", (event) => {
-        if (!selectedFieldId || !stepEnabled || !canEditSlots || isPastDate) return;
+        if (!selectedFieldId || !stepEnabled || !canEditSlots || isTooSoonDate) return;
         if ((event.ctrlKey || event.metaKey || event.altKey) && availabilitySelectedDates.has(dateKey)) {
           removeAvailabilitySelectedDate(dateKey);
           return;
@@ -864,6 +877,7 @@ export function createAvailabilityController(ctx) {
   function renderAvailabilityStepConfig() {
     const selectedField = getAvailabilitySelectedField();
     const enabledInput = el("availabilityStepEnabled");
+    const minimumNoticeInput = el("availabilityMinimumNoticeHours");
     const title = el("availabilityStepConfigTitle");
     const desc = el("availabilityStepConfigDesc");
     const editor = document.querySelector(".availability-editor");
@@ -879,6 +893,10 @@ export function createAvailabilityController(ctx) {
     if (enabledInput) {
       enabledInput.checked = enabled;
       enabledInput.disabled = !selectedField || !availabilityStepSettingsSupported;
+    }
+    if (minimumNoticeInput) {
+      minimumNoticeInput.value = String(getAvailabilityMinimumNoticeHours(selectedFieldId));
+      minimumNoticeInput.disabled = !selectedField || !availabilityStepSettingsSupported;
     }
     const addConsultantButton = el("availabilityAddConsultantBtn");
     if (addConsultantButton) addConsultantButton.disabled = !selectedField || !availabilityConsultantsSupported;
@@ -960,7 +978,7 @@ export function createAvailabilityController(ctx) {
     const fieldIds = bookingFields.map((field) => field.id);
     const { data, error } = await supabase
       .from("project_availability_step_settings")
-      .select("id, project_id, field_id, is_enabled")
+      .select("id, project_id, field_id, is_enabled, minimum_notice_hours")
       .eq("project_id", PROJECT_ID)
       .in("field_id", fieldIds);
 
@@ -968,7 +986,7 @@ export function createAvailabilityController(ctx) {
       availabilityStepSettingsSupported = false;
       showHint("Availability step settings are not available. Run the latest Supabase migration.", true);
       for (const field of bookingFields) {
-        availabilityStepSettings.set(String(field.id), { field_id: field.id, is_enabled: true });
+        availabilityStepSettings.set(String(field.id), { field_id: field.id, is_enabled: true, minimum_notice_hours: 24 });
       }
       renderAvailabilityStepSummary();
       return;
@@ -976,7 +994,11 @@ export function createAvailabilityController(ctx) {
 
     availabilityStepSettingsSupported = true;
     for (const setting of data || []) {
-      availabilityStepSettings.set(String(setting.field_id), { ...setting, is_enabled: setting.is_enabled === true });
+      availabilityStepSettings.set(String(setting.field_id), {
+        ...setting,
+        is_enabled: setting.is_enabled === true,
+        minimum_notice_hours: normalizeMinimumNoticeHours(setting.minimum_notice_hours, 24),
+      });
     }
 
     const missing = bookingFields.filter((field) => !availabilityStepSettings.has(String(field.id)));
@@ -985,17 +1007,22 @@ export function createAvailabilityController(ctx) {
         project_id: PROJECT_ID,
         field_id: field.id,
         is_enabled: false,
+        minimum_notice_hours: 24,
         created_by: session.user.id,
       }));
       const { data: inserted, error: insertError } = await supabase
         .from("project_availability_step_settings")
         .upsert(payload, { onConflict: "project_id,field_id" })
-        .select("id, project_id, field_id, is_enabled");
+        .select("id, project_id, field_id, is_enabled, minimum_notice_hours");
       if (insertError) {
         showHint("Failed to initialize booking step settings: " + insertError.message, true);
       } else {
         for (const setting of inserted || []) {
-          availabilityStepSettings.set(String(setting.field_id), { ...setting, is_enabled: setting.is_enabled === true });
+          availabilityStepSettings.set(String(setting.field_id), {
+            ...setting,
+            is_enabled: setting.is_enabled === true,
+            minimum_notice_hours: normalizeMinimumNoticeHours(setting.minimum_notice_hours, 24),
+          });
         }
       }
     }
@@ -1012,17 +1039,22 @@ export function createAvailabilityController(ctx) {
         project_id: PROJECT_ID,
         field_id: fieldId,
         is_enabled: enabled,
+        minimum_notice_hours: getAvailabilityMinimumNoticeHours(fieldId),
         created_by: session.user.id,
         updated_at: new Date().toISOString(),
       }, { onConflict: "project_id,field_id" })
-      .select("id, project_id, field_id, is_enabled")
+      .select("id, project_id, field_id, is_enabled, minimum_notice_hours")
       .maybeSingle();
     if (error) {
       showHint("Failed to update booking step: " + error.message, true);
       renderAvailabilityStepConfig();
       return;
     }
-    availabilityStepSettings.set(fieldId, { ...data, is_enabled: data?.is_enabled === true });
+    availabilityStepSettings.set(fieldId, {
+      ...data,
+      is_enabled: data?.is_enabled === true,
+      minimum_notice_hours: normalizeMinimumNoticeHours(data?.minimum_notice_hours, 24),
+    });
     if (!enabled) {
       availabilitySelectedDates = new Set();
       availabilityActiveDate = "";
@@ -1034,6 +1066,45 @@ export function createAvailabilityController(ctx) {
     renderAvailabilityHours();
     await loadAvailabilitySlots();
     showHint(`${enabled ? "Enabled" : "Disabled"} booking calendar for this step.`, false);
+  }
+
+  async function setAvailabilityMinimumNoticeHours(value) {
+    const fieldId = requireAvailabilityFieldId();
+    if (!fieldId || !availabilityStepSettingsSupported) return;
+    const noticeHours = normalizeMinimumNoticeHours(value, 24);
+    const current = getAvailabilityStepSetting(fieldId) || {};
+    const { data, error } = await supabase
+      .from("project_availability_step_settings")
+      .upsert({
+        project_id: PROJECT_ID,
+        field_id: fieldId,
+        is_enabled: current.is_enabled === true,
+        minimum_notice_hours: noticeHours,
+        created_by: session.user.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "project_id,field_id" })
+      .select("id, project_id, field_id, is_enabled, minimum_notice_hours")
+      .maybeSingle();
+    if (error) {
+      showHint("Failed to update minimum booking notice: " + error.message, true);
+      renderAvailabilityStepConfig();
+      return;
+    }
+    availabilityStepSettings.set(fieldId, {
+      ...data,
+      is_enabled: data?.is_enabled === true,
+      minimum_notice_hours: normalizeMinimumNoticeHours(data?.minimum_notice_hours, 24),
+    });
+    availabilitySelectedDates = new Set([...availabilitySelectedDates].filter((dateKey) => dateKey >= getAvailabilityBookableDateKey(fieldId)));
+    if (availabilityActiveDate && !availabilitySelectedDates.has(availabilityActiveDate)) {
+      availabilityActiveDate = getSortedAvailabilitySelectedDates()[0] || "";
+    }
+    renderAvailabilityStepSummary();
+    renderAvailabilitySelectedSummary();
+    renderAvailabilityCalendar();
+    renderAvailabilityActiveDaySlots();
+    renderAvailabilityHours();
+    showHint(`Minimum booking notice set to ${noticeHours} hour${noticeHours === 1 ? "" : "s"}.`, false);
   }
 
   async function loadAvailabilityConsultants() {
@@ -1128,6 +1199,7 @@ export function createAvailabilityController(ctx) {
     const byDate = new Map();
     const fieldId = requireAvailabilityFieldId();
     const consultantFilter = String(availabilityPreviewConsultantId || "");
+    const minimumNoticeHours = getAvailabilityMinimumNoticeHours(fieldId);
     const groups = new Map();
     for (const slot of availabilitySlots || []) {
       if (slot.is_active === false) continue;
@@ -1135,7 +1207,7 @@ export function createAvailabilityController(ctx) {
       if (fieldId && String(slot.field_id || "") !== String(fieldId)) continue;
       if (availabilityBookingsBySlot.has(String(slot.id))) continue;
       if (consultantFilter && String(slot.consultant_id || "") !== consultantFilter) continue;
-      if (!isAvailabilitySlotInFuture(slot)) continue;
+      if (!isAvailabilitySlotBookable(slot, minimumNoticeHours)) continue;
       const dateKey = formatDateKeyInTimezone(slot, availabilityPreviewTimezone);
       if (!dateKey || dateKey < today) continue;
       const timeLabel = formatSlotTimeInTimezone(slot, availabilityPreviewTimezone);
@@ -1506,10 +1578,11 @@ export function createAvailabilityController(ctx) {
 
     const payload = [];
     const timezone = availabilityTimezone || "Asia/Bangkok";
+    const minimumNoticeHours = getAvailabilityMinimumNoticeHours(fieldId);
     for (const dateKey of [...availabilitySelectedDates]) {
       for (const hour of hours) {
-        if (!isAvailabilitySlotInFuture({ slot_date: dateKey, start_time: hour.start, timezone })) {
-          showHint(`Cannot apply slots in the past. First invalid slot: ${formatAvailabilityDateLabel(dateKey)} ${hour.start}.`, true);
+        if (!isAvailabilitySlotBookable({ slot_date: dateKey, start_time: hour.start, timezone }, minimumNoticeHours)) {
+          showHint(`Cannot apply slots inside the ${minimumNoticeHours}-hour minimum notice window. First invalid slot: ${formatAvailabilityDateLabel(dateKey)} ${hour.start}.`, true);
           return;
         }
         payload.push({
@@ -1590,6 +1663,9 @@ export function createAvailabilityController(ctx) {
   el("availabilityRefreshBtn")?.addEventListener("click", () => loadAvailabilitySlots().catch(console.error));
   el("availabilityStepEnabled")?.addEventListener("change", (event) => {
     setAvailabilityStepEnabled(event.target.checked).catch(console.error);
+  });
+  el("availabilityMinimumNoticeHours")?.addEventListener("change", (event) => {
+    setAvailabilityMinimumNoticeHours(event.target.value).catch(console.error);
   });
   el("availabilityAddConsultantBtn")?.addEventListener("click", () => appendAvailabilityConsultantRow());
   el("availabilitySaveConsultantsBtn")?.addEventListener("click", () => saveAvailabilityConsultants().catch(console.error));

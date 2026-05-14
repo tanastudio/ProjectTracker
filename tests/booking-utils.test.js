@@ -9,8 +9,10 @@ import {
     formatTimezoneLabel,
     getBookingSessionStatusLabel,
     getTodayKey,
+    isAvailabilitySlotBookable,
     isAvailabilitySlotInFuture,
     isBookingField,
+    normalizeMinimumNoticeHours,
     normalizeTimeText,
 } from "../lib/booking-utils.js";
 
@@ -80,5 +82,19 @@ describe("date and time helpers", () => {
             start_time: "08:59",
             timezone: "Asia/Bangkok",
         }, reference)).toBe(false);
+    });
+
+    it("checks custom minimum notice hours before booking", () => {
+        const reference = new Date("2026-05-21T02:00:00.000Z");
+        const slot = {
+            slot_date: "2026-05-22",
+            start_time: "09:00",
+            timezone: "Asia/Bangkok",
+        };
+        expect(normalizeMinimumNoticeHours("24")).toBe(24);
+        expect(normalizeMinimumNoticeHours("-1")).toBe(0);
+        expect(normalizeMinimumNoticeHours("9000")).toBe(8760);
+        expect(isAvailabilitySlotBookable(slot, 23, reference)).toBe(true);
+        expect(isAvailabilitySlotBookable(slot, 24, reference)).toBe(false);
     });
 });
