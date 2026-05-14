@@ -64,10 +64,14 @@ const exportMenuBtn = el("exportMenuBtn");
 const exportMenu = el("exportMenu");
 const exportCsvBtn = el("exportCsvBtn");
 const exportXlsxBtn = el("exportXlsxBtn");
+const dashboardPager = el("dashboardPager");
 
 let CURRENT_ITEMS = [];
 let REQ_CONTEXT = null;
 let TICKET_STATS_BY_RECORD = new Map();
+const DASHBOARD_PAGE_SIZE = 100;
+let dashboardPage = 1;
+let dashboardRenderedItems = [];
 
 function hidePageSkeleton() {
     if (pageSkeleton) pageSkeleton.hidden = true;
@@ -652,12 +656,40 @@ function statusPill(value, fallback = "Not Started") {
 // Alias for overall status pill (same styling)
 const overallPill = (status) => statusPill(status, "Not Started");
 
-function renderTable(items) {
+function getDashboardPageCount() {
+    return Math.max(1, Math.ceil(dashboardRenderedItems.length / DASHBOARD_PAGE_SIZE));
+}
+
+function renderDashboardPager() {
+    if (!dashboardPager) return;
+    const totalPages = getDashboardPageCount();
+    if (dashboardRenderedItems.length <= DASHBOARD_PAGE_SIZE) {
+        dashboardPager.hidden = true;
+        dashboardPager.innerHTML = "";
+        return;
+    }
+
+    dashboardPager.hidden = false;
+    const start = (dashboardPage - 1) * DASHBOARD_PAGE_SIZE + 1;
+    const end = Math.min(dashboardPage * DASHBOARD_PAGE_SIZE, dashboardRenderedItems.length);
+    dashboardPager.innerHTML = `
+        <button class="table-page-btn" type="button" data-dashboard-page="prev" ${dashboardPage <= 1 ? "disabled" : ""}>Previous</button>
+        <span class="table-page-info">Showing ${start}-${end} of ${dashboardRenderedItems.length}</span>
+        <button class="table-page-btn" type="button" data-dashboard-page="next" ${dashboardPage >= totalPages ? "disabled" : ""}>Next</button>
+    `;
+}
+
+function renderTable(items, { resetPage = false } = {}) {
     if (!tbody) return;
     tbody.innerHTML = "";
+    dashboardRenderedItems = Array.isArray(items) ? items : [];
+    if (resetPage) dashboardPage = 1;
+    dashboardPage = Math.min(Math.max(1, dashboardPage), getDashboardPageCount());
+    const pageStart = (dashboardPage - 1) * DASHBOARD_PAGE_SIZE;
+    const pageItems = dashboardRenderedItems.slice(pageStart, pageStart + DASHBOARD_PAGE_SIZE);
     const showEmailCol = isEmailShownInDashboard(FIELD_CACHE?.list || []);
 
-    for (const it of items || []) {
+    for (const it of pageItems) {
         const tr = document.createElement("tr");
 
         // Request (sticky-0)
@@ -726,6 +758,7 @@ function renderTable(items) {
         tbody.appendChild(tr);
     }
 
+    renderDashboardPager();
     syncTopScrollbarWidth();
 }
 
@@ -836,6 +869,42 @@ function buildExportFileBaseName() {
     return `${projectName}-participants-${datePart}`;
 }
 
+const XLSX_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js";
+let xlsxLoadPromise = null;
+
+function loadXlsxExporter() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (xlsxLoadPromise) return xlsxLoadPromise;
+
+    xlsxLoadPromise = new Promise((resolve, reject) => {
+        const existingScript = [...document.scripts].find((script) => script.src === XLSX_SCRIPT_SRC);
+        if (existingScript) {
+            existingScript.addEventListener("load", () => resolve(window.XLSX), { once: true });
+            existingScript.addEventListener("error", () => reject(new Error("Failed to load XLSX exporter.")), { once: true });
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = XLSX_SCRIPT_SRC;
+        script.async = true;
+        script.onload = () => {
+            if (window.XLSX) {
+                resolve(window.XLSX);
+                return;
+            }
+            xlsxLoadPromise = null;
+            reject(new Error("XLSX exporter did not initialize."));
+        };
+        script.onerror = () => {
+            xlsxLoadPromise = null;
+            reject(new Error("Failed to load XLSX exporter."));
+        };
+        document.head.appendChild(script);
+    });
+
+    return xlsxLoadPromise;
+}
+
 function downloadBlob(blob, fileName) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -872,15 +941,29 @@ function exportParticipantsCsv() {
     closeExportMenu();
 }
 
-function exportParticipantsXlsx() {
+async function exportParticipantsXlsx() {
     const { columns, rows } = getExportRows();
     if (!rows.length) {
         alert("No participant rows to export.");
         return;
     }
 
-    if (!window.XLSX) {
+    const previousLabel = exportXlsxBtn?.textContent || "Excel (.xlsx)";
+    if (exportXlsxBtn) {
+        exportXlsxBtn.disabled = true;
+        exportXlsxBtn.textContent = "Loading Excel...";
+    }
+
+    let XLSX;
+    try {
+        XLSX = await loadXlsxExporter();
+    } catch (error) {
+        console.warn("XLSX export unavailable:", error?.message || error);
         alert("XLSX export is unavailable right now. Please try CSV instead.");
+        if (exportXlsxBtn) {
+            exportXlsxBtn.textContent = previousLabel;
+            updateExportButtons();
+        }
         return;
     }
 
@@ -898,13 +981,13 @@ function exportParticipantsXlsx() {
         headerLabels,
     ];
 
-    const worksheet = window.XLSX.utils.aoa_to_sheet([...metaRows, ...dataRows]);
+    const worksheet = XLSX.utils.aoa_to_sheet([...metaRows, ...dataRows]);
     const headerRowIndex = metaRows.length - 1;
     const lastColumnIndex = Math.max(headerLabels.length - 1, 0);
 
     if (headerLabels.length > 0) {
         worksheet["!autofilter"] = {
-            ref: window.XLSX.utils.encode_range({
+            ref: XLSX.utils.encode_range({
                 s: { r: headerRowIndex, c: 0 },
                 e: { r: headerRowIndex + dataRows.length, c: lastColumnIndex },
             }),
@@ -925,9 +1008,11 @@ function exportParticipantsXlsx() {
         const maxLength = values.reduce((max, value) => Math.max(max, value.length), 0);
         return { wch: Math.min(Math.max(maxLength + 2, 14), 42) };
     });
-    const workbook = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(workbook, worksheet, "Participants");
-    window.XLSX.writeFile(workbook, `${buildExportFileBaseName()}.xlsx`);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Participants");
+    XLSX.writeFile(workbook, `${buildExportFileBaseName()}.xlsx`);
+    if (exportXlsxBtn) exportXlsxBtn.textContent = previousLabel;
+    updateExportButtons();
     closeExportMenu();
 }
 
@@ -1080,7 +1165,7 @@ async function sendRequestToSupabase() {
         if (error) throw error;
 
         await loadTicketStats(PROJECT_CTX.project_id);
-        renderTable(applyDashFilter());
+        renderFilteredDashboardTable();
 
         const notifyResult = await notifyViaEdge({
             ticketId,
@@ -1300,6 +1385,10 @@ function applyDashFilter() {
     });
 }
 
+function renderFilteredDashboardTable(options = {}) {
+    renderTable(applyDashFilter(), options);
+}
+
 /* ---------- Refresh flow ---------- */
 let FIELD_CACHE = null;
 
@@ -1339,7 +1428,7 @@ async function refresh() {
 
         updateChip(items);
         updateCharts(items);
-        renderTable(applyDashFilter());
+        renderFilteredDashboardTable({ resetPage: true });
         updateExportButtons();
 
         if (lastRefresh) lastRefresh.textContent = new Date().toLocaleString();
@@ -1354,15 +1443,25 @@ async function refresh() {
 /* ---------- Events ---------- */
 refreshBtn?.addEventListener("click", refresh);
 
-dashSearchInput?.addEventListener("input", () => renderTable(applyDashFilter()));
+dashSearchInput?.addEventListener("input", () => renderFilteredDashboardTable({ resetPage: true }));
 dashSearchInput?.addEventListener("input", updateExportButtons);
-dashFilterColumn?.addEventListener("change", () => { rebuildDashStatusOptions(); renderTable(applyDashFilter()); });
+dashFilterColumn?.addEventListener("change", () => { rebuildDashStatusOptions(); renderFilteredDashboardTable({ resetPage: true }); });
 dashFilterColumn?.addEventListener("change", updateExportButtons);
-dashFilterStatus?.addEventListener("change", () => renderTable(applyDashFilter()));
+dashFilterStatus?.addEventListener("change", () => renderFilteredDashboardTable({ resetPage: true }));
 dashFilterStatus?.addEventListener("change", updateExportButtons);
 exportCsvBtn?.addEventListener("click", exportParticipantsCsv);
 exportXlsxBtn?.addEventListener("click", exportParticipantsXlsx);
 exportMenuBtn?.addEventListener("click", toggleExportMenu);
+dashboardPager?.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest("[data-dashboard-page]");
+    if (!button) return;
+    const direction = button.getAttribute("data-dashboard-page");
+    const pageCount = getDashboardPageCount();
+    if (direction === "prev") dashboardPage = Math.max(1, dashboardPage - 1);
+    if (direction === "next") dashboardPage = Math.min(pageCount, dashboardPage + 1);
+    renderTable(dashboardRenderedItems);
+});
 
 document.addEventListener("click", (e) => {
     if (!exportMenu || exportMenu.hidden) return;

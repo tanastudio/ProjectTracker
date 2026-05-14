@@ -436,6 +436,43 @@ table.excel tbody td:first-child {
     border-left: 1px solid #f1f5f9;
 }
 
+.table-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.table-page-info {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.table-page-btn {
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.table-page-btn:hover:not(:disabled) {
+    background: #f8fafc;
+}
+
+.table-page-btn:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
 /* ── Status text colors (no pills) ── */
 .status-text {
     display: inline;

@@ -6,6 +6,81 @@ export function createParticipantImportController(ctx) {
   const EDGE_URL = `${SUPABASE_URL}/functions/v1/admin-create-user`;
   let csvRows = [];
   let participantsLoaded = false;
+  const PARTICIPANT_PAGE_SIZE = 50;
+  let participantRows = [];
+  let participantPage = 1;
+
+  function getParticipantPageCount() {
+    return Math.max(1, Math.ceil(participantRows.length / PARTICIPANT_PAGE_SIZE));
+  }
+
+  function renderParticipantPager() {
+    const pager = el("participantPager");
+    if (!pager) return;
+    const totalPages = getParticipantPageCount();
+    if (participantRows.length <= PARTICIPANT_PAGE_SIZE) {
+      pager.hidden = true;
+      pager.innerHTML = "";
+      return;
+    }
+
+    pager.hidden = false;
+    pager.innerHTML = `
+      <button class="participant-page-btn" type="button" data-participant-page="prev" ${participantPage <= 1 ? "disabled" : ""}>Previous</button>
+      <span class="participant-page-info">Page ${participantPage} of ${totalPages}</span>
+      <button class="participant-page-btn" type="button" data-participant-page="next" ${participantPage >= totalPages ? "disabled" : ""}>Next</button>
+    `;
+  }
+
+  function renderParticipantRows() {
+    const list = el("participantList");
+    if (!list) return;
+
+    if (participantRows.length === 0) {
+      list.innerHTML = "<div class='muted'>No participants yet.</div>";
+      el("participantCount").textContent = "";
+      renderParticipantPager();
+      return;
+    }
+
+    const totalPages = getParticipantPageCount();
+    participantPage = Math.min(Math.max(1, participantPage), totalPages);
+    const startIndex = (participantPage - 1) * PARTICIPANT_PAGE_SIZE;
+    const visibleRows = participantRows.slice(startIndex, startIndex + PARTICIPANT_PAGE_SIZE);
+
+    const rowsHtml = visibleRows.map(c => {
+      const name = c.display_name || c.id;
+      const email = c.email || c.id;
+      const isActive = c.participant_active === true;
+      return `
+        <div class="participant-row" role="row">
+          <div class="participant-role-cell" role="cell">
+            <span class="pill pill-participant">participant</span>
+          </div>
+          <div class="participant-name" role="cell" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+          <div class="participant-email" role="cell" title="${escapeHtml(email)}">${escapeHtml(email)}</div>
+          <div class="participant-status-cell" role="cell">
+            <span class="pill ${isActive ? "status-active" : "status-inactive"}">${isActive ? "active" : "inactive"}</span>
+          </div>
+        </div>`;
+    }).join("");
+
+    list.innerHTML = `
+      <div class="participant-table-head" role="row">
+        <div>Role</div>
+        <div>Name</div>
+        <div>Email</div>
+        <div>Status</div>
+      </div>
+      ${rowsHtml}
+    `;
+
+    const startLabel = startIndex + 1;
+    const endLabel = Math.min(startIndex + visibleRows.length, participantRows.length);
+    el("participantCount").textContent = `${participantRows.length} participant${participantRows.length !== 1 ? "s" : ""} in this project - showing ${startLabel}-${endLabel}`;
+    renderParticipantPager();
+  }
+
   
   async function readHttpErrorMessage(response) {
     try {
@@ -75,8 +150,9 @@ export function createParticipantImportController(ctx) {
 
       const ids = (memberData || []).map(m => m.user_id);
       if (ids.length === 0) {
-        list.innerHTML = "<div class='muted'>No participants yet.</div>";
-        el("participantCount").textContent = "";
+        participantRows = [];
+        participantPage = 1;
+        renderParticipantRows();
         participantsLoaded = true;
         return;
       }
@@ -107,49 +183,28 @@ export function createParticipantImportController(ctx) {
       }));
     }
 
-    el("participantCount").textContent = `${participants.length} participant${participants.length !== 1 ? "s" : ""} in this project`;
-  
-    if (participants.length === 0) {
-      list.innerHTML = "<div class='muted'>No participants yet.</div>";
-      participantsLoaded = true;
-      return;
-    }
-  
-    const rowsHtml = participants.map(c => {
-      const name = c.display_name || c.id;
-      const email = c.email || c.id;
-      const isActive = c.participant_active === true;
-      return `
-        <div class="participant-row" role="row">
-          <div class="participant-role-cell" role="cell">
-            <span class="pill pill-participant">participant</span>
-          </div>
-          <div class="participant-name" role="cell" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-          <div class="participant-email" role="cell" title="${escapeHtml(email)}">${escapeHtml(email)}</div>
-          <div class="participant-status-cell" role="cell">
-            <span class="pill ${isActive ? "status-active" : "status-inactive"}">${isActive ? "active" : "inactive"}</span>
-          </div>
-        </div>`;
-    }).join("");
-  
-    list.innerHTML = `
-      <div class="participant-table-head" role="row">
-        <div>Role</div>
-        <div>Name</div>
-        <div>Email</div>
-        <div>Status</div>
-      </div>
-      ${rowsHtml}
-    `;
-  
-    participantsLoaded = true;
-  }
-  
-  // Load participants when tab is opened
-  document.querySelector('[data-tab="participants"]').addEventListener("click", () => {
-    if (!participantsLoaded) loadParticipants();
-  });
-  
+    participantRows = participants;
+    participantPage = 1;
+    renderParticipantRows();
+    participantsLoaded = true;
+  }
+
+  // Load participants when tab is opened
+  document.querySelector('[data-tab="participants"]').addEventListener("click", () => {
+    if (!participantsLoaded) loadParticipants();
+  });
+
+  el("participantPager")?.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest("[data-participant-page]");
+    if (!button) return;
+    const direction = button.getAttribute("data-participant-page");
+    const totalPages = getParticipantPageCount();
+    if (direction === "prev") participantPage = Math.max(1, participantPage - 1);
+    if (direction === "next") participantPage = Math.min(totalPages, participantPage + 1);
+    renderParticipantRows();
+  });
+
   /* CSV handling */
   function parseCsv(text) {
     const lines = text.split(/\r?\n/).filter(l => l.trim());

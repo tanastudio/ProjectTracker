@@ -329,6 +329,18 @@
       padding: 8px 12px; background: rgba(248,250,252,.8);
       border: 1px solid rgba(15,23,42,.08); border-radius: 10px;
     }
+    .participant-pagination {
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+      margin-top: 10px; flex-wrap: wrap;
+    }
+    .participant-page-info { font-size: 12px; color: #64748b; font-weight: 700; }
+    .participant-page-btn {
+      min-height: 30px; padding: 0 10px; border-radius: 8px;
+      border: 1px solid rgba(15,23,42,.12); background: #fff;
+      color: #334155; font-size: 12px; font-weight: 800; cursor: pointer;
+    }
+    .participant-page-btn:hover:not(:disabled) { background: #f8fafc; }
+    .participant-page-btn:disabled { opacity: .5; cursor: default; }
     .participant-name  { font-size: 13px; font-weight: 800; color: #0f172a; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .participant-email { font-size: 12px; color: #64748b; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .status-active { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
@@ -1300,6 +1312,7 @@
           <div class="participant-list" id="participantList">
             <div class="muted">Loading participants...</div>
           </div>
+          <div class="participant-pagination" id="participantPager" hidden></div>
           <p class="muted small" id="participantCount" style="margin-top:8px;"></p>
         </div>
 
