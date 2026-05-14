@@ -453,8 +453,14 @@ async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
       action_url_plain: payload.actionUrl,
       plain_action_url: payload.actionUrl,
       direct_action_url: payload.actionUrl,
+      copyable_action_url: payload.actionUrl,
+      action_url_text: payload.actionUrl,
       action_text: payload.actionText,
+      action_target: "_self",
+      button_target: "_self",
+      link_target: "_self",
       open_in_new_tab: false,
+      disable_click_tracking: true,
       event_type: payload.eventType || "Booking Confirmed",
       email_type: payload.emailType || "booking_confirmed",
       candidate_name: payload.participantName,
@@ -523,7 +529,7 @@ async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPa
         Consultant: ${escapeHtml(payload.consultantName || payload.consultantEmail || "-")}<br>
         Booking: ${escapeHtml(payload.slotLabel || "-")}
       </p>
-      <a href="${escapeHtml(payload.actionUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px">
+      <a href="${escapeHtml(payload.actionUrl)}" target="_self" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px">
         ${escapeHtml(payload.actionText)}
       </a>
     </div>`;
@@ -715,8 +721,8 @@ async function sendSessionFollowupForBooking(
       `Step: ${context.stepLabel}`,
       `Date and time: ${context.slotLabel}`,
       ``,
-      `If the button does not open, copy this link into your browser:`,
-      feedbackUrl,
+      `Confirmation link: ${feedbackUrl}`,
+      `If the email preview blocks the button, copy and paste the link above into your browser.`,
       ``,
       `You can also add a short comment for the project team.`,
     ].join("\n"),
