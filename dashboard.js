@@ -1534,6 +1534,14 @@ function formatPercent(value, total) {
     return `${Math.round((Number(value || 0) / total) * 100)}%`;
 }
 
+function formatCountFraction(value, total) {
+    return `${Number(value || 0)}/${Number(total || 0)}`;
+}
+
+function formatCountPercent(value, total) {
+    return `${formatCountFraction(value, total)} (${formatPercent(value, total)})`;
+}
+
 function getDatasetTotal(values) {
     return (Array.isArray(values) ? values : []).reduce((sum, value) => sum + Number(value || 0), 0);
 }
@@ -1552,7 +1560,7 @@ function ensureChartPercentagePlugin() {
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
 
-            if (chart.config.type === "pie") {
+            if (chart.config.type === "doughnut") {
                 const dataset = chart.data.datasets?.[0];
                 const meta = chart.getDatasetMeta(0);
                 const total = getDatasetTotal(dataset?.data);
@@ -1571,7 +1579,7 @@ function ensureChartPercentagePlugin() {
                     const y = arc.y + Math.sin(angle) * radius;
 
                     ctx.fillStyle = "#1f2937";
-                    ctx.fillText(formatPercent(value, total), x, y);
+                    ctx.fillText(formatCountPercent(value, total), x, y);
                 });
             }
 
@@ -1592,7 +1600,7 @@ function ensureChartPercentagePlugin() {
                         if (width < 34) return;
 
                         ctx.fillStyle = "#1f2937";
-                        ctx.fillText(formatPercent(value, total), (bar.base + bar.x) / 2, bar.y);
+                        ctx.fillText(formatCountFraction(value, total), (bar.base + bar.x) / 2, bar.y);
                     });
                 });
             }
@@ -1620,9 +1628,9 @@ function initCharts() {
 
     ensureChartPercentagePlugin();
 
-    // Pie (Overall Status)
+    // Donut (Overall Status)
     window.__overallPieChart = new Chart(pieCanvas.getContext("2d"), {
-        type: "pie",
+        type: "doughnut",
         data: {
             labels: ["Completed", "In Progress", "Issue", "Not Started"],
             datasets: [{ data: [0, 0, 0, 0] }],
@@ -1630,6 +1638,7 @@ function initCharts() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            cutout: "58%",
             onClick(event, elements, chart) {
                 if (!elements?.length) return;
                 openStatusModalFromChart(chart, event);
@@ -1650,7 +1659,7 @@ function initCharts() {
                             const dataset = context.dataset?.data || [];
                             const total = getDatasetTotal(dataset);
                             const value = Number(context.raw || 0);
-                            return `${context.label}: ${value} (${formatPercent(value, total)})`;
+                            return `${context.label}: ${formatCountPercent(value, total)}`;
                         },
                     },
                 },
@@ -1685,13 +1694,23 @@ function initCharts() {
                                 0
                             );
                             const value = Number(context.raw || 0);
-                            return `${context.dataset.label}: ${value} (${formatPercent(value, total)})`;
+                            return `${context.dataset.label}: ${formatCountPercent(value, total)}`;
                         },
                     },
                 },
             },
             scales: {
-                x: { stacked: true, beginAtZero: true },
+                x: {
+                    stacked: true,
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Number of Participants",
+                        color: "#64748b",
+                        font: { size: 12, weight: "600" },
+                    },
+                    ticks: { precision: 0 },
+                },
                 y: { stacked: true },
             },
         },
