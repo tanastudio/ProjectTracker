@@ -852,3 +852,19 @@ table.excel tbody tr:hover td.sticky-col {
     }
 }
 
+html[data-supabase-env="local"] body::before {
+    content: "LOCAL SUPABASE ENVIRONMENT";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10000;
+    background: #b91c1c;
+    color: #ffffff;
+    text-align: center;
+    font: 800 12px/28px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    letter-spacing: 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+    pointer-events: none;
+}
+

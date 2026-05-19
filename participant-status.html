@@ -1541,7 +1541,7 @@
             <span class="admin-preview-badge">ADMIN PREVIEW</span>
             <span class="admin-preview-text">Viewing as participant: <span id="adminPreviewName" class="admin-preview-name">—</span></span>
         </div>
-        <button id="adminPreviewBackBtn" class="admin-preview-back" type="button">&#8592; Back to Admin</button>
+        <button id="adminPreviewBackBtn" class="admin-preview-back" type="button">Exit Preview</button>
     </div>
 
     <div class="wrap">
@@ -2177,6 +2177,7 @@
         }
 
         async function bookAvailabilitySlot(step, option, box) {
+            if (isAdminPreview) return;
             const minimumNoticeHours = getBookingMinimumNoticeHours(step.id);
             const futureSlots = (option?.slots || []).filter((slot) => slot?.id && isAvailabilitySlotBookable(slot, minimumNoticeHours));
             const slotIds = futureSlots.map((slot) => slot.id).filter(Boolean);
@@ -2255,6 +2256,13 @@
 
         function renderBookingBody(container, step) {
             container.innerHTML = "";
+            if (isAdminPreview && !step.booking) {
+                const empty = document.createElement("p");
+                empty.className = "booking-empty";
+                empty.textContent = "Booking is disabled in admin preview.";
+                container.appendChild(empty);
+                return;
+            }
             if (step.booking) {
                 const box = document.createElement("div");
                 box.className = "booking-confirmed-box";
@@ -2448,7 +2456,6 @@
         }
 
         const previewRecordIdRaw = String(new URL(window.location.href).searchParams.get("preview_record") || "").trim();
-        const previewRecordIdFromSession = String(sessionStorage.getItem("admin_preview_record_id") || "").trim();
         const isPreviewRequested = previewRecordIdRaw.length > 0;
 
         let isAdminPreview = false;
@@ -2477,20 +2484,12 @@
             recordToLoad = previewRecordIdRaw;
         } else {
             if (profile.role === "admin") {
-                if (PREVIEW_RECORD_SAFE_PAT.test(previewRecordIdFromSession)) {
-                    isAdminPreview = true;
-                    recordToLoad = previewRecordIdFromSession;
-                    const url = new URL(window.location.href);
-                    url.searchParams.set("preview_record", previewRecordIdFromSession);
-                    history.replaceState(null, "", url.toString());
-                } else {
-                    failAccess(
-                        "Preview record required",
-                        "Open a participant from the admin page to preview their status.",
-                        "./admin.html"
-                    );
-                    throw new Error("Admin preview missing preview_record");
-                }
+                failAccess(
+                    "Preview record required",
+                    "Open a participant from the admin page to preview their status.",
+                    "./admin.html"
+                );
+                throw new Error("Admin preview missing preview_record");
             } else {
                 if (profile.role !== "participant") {
                     window.location.replace("./dashboard.html");
@@ -2534,17 +2533,17 @@
             bar.classList.remove("hidden");
             el("adminPreviewName").textContent = `${rec.title || ""}${rec.code ? " (" + rec.code + ")" : ""}`;
             el("heroUserEmail").textContent = rec.title || rec.code || "Participant";
+            document.documentElement.setAttribute("data-admin-preview", "true");
             // Hide ticket submit button — admin shouldn't send tickets on participant's behalf
             document.querySelector(".open-ticket-btn")?.style.setProperty("display", "none");
             // Wire back button
             const pid = rec.project_id;
             el("adminPreviewBackBtn").addEventListener("click", () => {
-                sessionStorage.removeItem("admin_preview_record_id");
                 const url = pid ? `./admin.html?project=${encodeURIComponent(pid)}` : "./admin.html";
                 window.location.href = url;
             });
         } else {
-            sessionStorage.removeItem("admin_preview_record_id");
+            document.documentElement.removeAttribute("data-admin-preview");
         }
 
         const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
@@ -2757,10 +2756,10 @@
                       <div class="ticket-section-label">Replies</div>
                       <div class="ticket-reply-thread">${buildRepliesHtml(t.id)}</div>
                     </div>
-                    <div class="ticket-reply-form">
+                    ${isAdminPreview ? `<div class="t-reply-empty">Reply is disabled in admin preview.</div>` : `<div class="ticket-reply-form">
                       <textarea class="ticket-reply-input" placeholder="Write a reply..."></textarea>
                       <button class="ticket-reply-submit" type="button">Reply</button>
-                    </div>
+                    </div>`}
                   </div>`;
 
                 // Toggle expand
@@ -2774,6 +2773,10 @@
                 // Reply submit
                 const replyBtn = item.querySelector(".ticket-reply-submit");
                 const replyInput = item.querySelector(".ticket-reply-input");
+                if (!replyBtn || !replyInput || isAdminPreview) {
+                    list.appendChild(item);
+                    continue;
+                }
                 replyBtn.addEventListener("click", async () => {
                     const msg = String(replyInput.value || "").trim();
                     if (!msg) return;
@@ -2817,6 +2820,7 @@
 
                         const notifyResult = await notifyViaEdge({
                             ticketId:      String(t.id),
+                            eventId:       String(reply.id),
                             eventType:     "reply",
                             authorId:      session.user.id,
                             authorName:    DISPLAY_NAME,
@@ -2874,10 +2878,12 @@
         const AUTO_SUBJECT = `[${projectName}] Request for ${rec.code}`;
 
         const supportBtn = document.querySelector(".open-ticket-btn");
+        let NEW_TICKET_SAVED_ID = "";
 
         // Wire "Request Support" button
         supportBtn?.addEventListener("click", () => {
             if (isAdminPreview) return;
+            NEW_TICKET_SAVED_ID = "";
             el("ticketMessage").value = "";
             el("modalMsg").className = "modal-msg";
             el("modalMsg").textContent = "";
@@ -2899,6 +2905,11 @@
                 el("ticketModal").classList.add("hidden");
                 return;
             }
+            if (NEW_TICKET_SAVED_ID) {
+                el("modalMsg").className = "modal-msg show ok";
+                el("modalMsg").textContent = "This ticket has already been saved.";
+                return;
+            }
             const subject = AUTO_SUBJECT;
             const message = String(el("ticketMessage").value || "").trim();
             const msgEl   = el("modalMsg");
@@ -2913,10 +2924,13 @@
             btn.disabled = true;
             btn.textContent = "Submitting...";
 
+            let saved = false;
             try {
+                const ticketId = createClientUuid();
                 const { data: ticket, error } = await supabase
                     .from("requests")
                     .insert({
+                        id:             ticketId,
                         project_id:     rec.project_id,
                         record_id:      rec.id,
                         code:           rec.code,
@@ -2930,12 +2944,16 @@
                     .select().single();
 
                 if (error) throw new Error(error.message);
+                saved = true;
+                NEW_TICKET_SAVED_ID = String(ticket.id);
+                btn.textContent = "Saved";
 
                 TICKETS.unshift(ticket);
                 renderTickets();
 
                 const notifyResult = await notifyViaEdge({
                     ticketId:      String(ticket.id),
+                    eventId:       String(ticket.id),
                     eventType:     "new_ticket",
                     authorId:      session.user.id,
                     authorName:    DISPLAY_NAME,
@@ -2959,10 +2977,26 @@
                 msgEl.className = "modal-msg show error";
                 msgEl.textContent = "Failed: " + e.message;
             } finally {
-                btn.disabled = false;
-                btn.textContent = "Submit";
+                if (!saved) {
+                    btn.disabled = false;
+                    btn.textContent = "Submit";
+                }
             }
         });
+
+        function createClientUuid() {
+            if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+            const bytes = new Uint8Array(16);
+            if (globalThis.crypto?.getRandomValues) {
+                globalThis.crypto.getRandomValues(bytes);
+            } else {
+                for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+            }
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0"));
+            return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+        }
 
         await loadTickets();
     </script>

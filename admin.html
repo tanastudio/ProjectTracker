@@ -761,7 +761,6 @@
         viewBtn.addEventListener("click", () => {
             const recordId = candSel.value;
             if (!recordId) return;
-            sessionStorage.setItem("admin_preview_record_id", String(recordId));
             const previewUrl = `./participant-status.html?preview_record=${encodeURIComponent(recordId)}`;
             // Use same-tab navigation for reliability (prevents popup/query-loss issues).
             window.location.href = previewUrl;

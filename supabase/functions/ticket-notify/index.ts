@@ -11,6 +11,7 @@ const corsHeaders = {
 
 type NotifyBody = {
   ticketId: string;
+  eventId?: string;
   eventType: "reply" | "status_change" | "priority_change" | "ticket_updated" | "new_ticket";
   authorId: string;
   authorName: string;
@@ -228,6 +229,16 @@ async function sendViaN8n(n8nWebhookUrl: string, payload: EmailPayload) {
   }
 }
 
+function buildSecureTicketEmailBody(label: string, projectName: string, participantName: string): string {
+  const lines = [
+    `${label} is available in Project Tracker.`,
+    "Sign in to view the ticket message and full reply history.",
+  ];
+  if (projectName) lines.push(`Project: ${projectName}`);
+  if (participantName) lines.push(`Participant: ${participantName}`);
+  return lines.join("\n");
+}
+
 async function sendViaResend(apiKey: string, fromEmail: string, payload: EmailPayload) {
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
@@ -297,6 +308,98 @@ async function sendEmail(payload: EmailPayload) {
   throw new Error(providerErrors.join("; "));
 }
 
+function normalizeEmail(email: string): string {
+  return String(email || "").trim().toLowerCase();
+}
+
+function buildNotificationKey(ticketId: string, eventType: NotifyBody["eventType"], eventId: string) {
+  return `ticket:${ticketId}:${eventType}:${eventId}`;
+}
+
+async function getDeliveredRecipients(
+  adminClient: ReturnType<typeof createClient>,
+  notificationKey: string,
+  recipients: string[],
+): Promise<Set<string>> {
+  const emails = recipients.map(normalizeEmail).filter(Boolean);
+  if (!emails.length) return new Set();
+  const { data, error } = await adminClient
+    .from("notification_deliveries")
+    .select("recipient_email")
+    .eq("notification_key", notificationKey)
+    .not("sent_at", "is", null)
+    .in("recipient_email", emails);
+  if (error) throw error;
+  return new Set((data || []).map((row: { recipient_email?: string }) => normalizeEmail(row.recipient_email || "")));
+}
+
+async function recordDelivery(
+  adminClient: ReturnType<typeof createClient>,
+  notificationKey: string,
+  recipientEmail: string,
+  patch: { provider?: string | null; sent_at?: string | null; error?: string | null },
+) {
+  const now = new Date().toISOString();
+  const { error } = await adminClient
+    .from("notification_deliveries")
+    .upsert({
+      notification_key: notificationKey,
+      recipient_email: normalizeEmail(recipientEmail),
+      provider: patch.provider ?? null,
+      sent_at: patch.sent_at ?? null,
+      error: patch.error ?? null,
+      updated_at: now,
+    }, { onConflict: "notification_key,recipient_email" });
+  if (error) console.warn(`notification delivery log failed: ${error.message}`);
+}
+
+async function resolveNotificationContent(
+  adminClient: ReturnType<typeof createClient>,
+  body: NotifyBody,
+  ticket: Record<string, unknown>,
+  callerId: string,
+  callerRole: string,
+): Promise<{ eventId: string; message: string; eventType: NotifyBody["eventType"] } | { error: Response }> {
+  const ticketId = String(ticket.id || body.ticketId || "").trim();
+  const eventType = body.eventType;
+
+  if (eventType === "new_ticket") {
+    if (String(ticket.created_by || "") !== callerId) return { error: json({ error: "Forbidden" }, 403) };
+    return {
+      eventId: ticketId,
+      message: String(ticket.message || body.message || "").trim(),
+      eventType,
+    };
+  }
+
+  if (eventType === "reply") {
+    const replyId = String(body.eventId || "").trim();
+    if (!replyId) return { error: json({ error: "eventId is required for reply notifications" }, 400) };
+    const { data: reply, error } = await adminClient
+      .from("ticket_replies")
+      .select("id, ticket_id, author_id, message")
+      .eq("id", replyId)
+      .eq("ticket_id", ticketId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!reply || String(reply.author_id || "") !== callerId) {
+      return { error: json({ error: "Reply event not found for caller" }, 403) };
+    }
+    return {
+      eventId: String(reply.id),
+      message: String(reply.message || "").trim(),
+      eventType,
+    };
+  }
+
+  if (callerRole === "participant") return { error: json({ error: "Forbidden" }, 403) };
+  return {
+    eventId: String(body.eventId || ticket.updated_at || ticketId).trim(),
+    message: String(body.message || "").trim(),
+    eventType,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -313,6 +416,9 @@ serve(async (req) => {
     const body = (await req.json()) as NotifyBody;
     const { ticketId, eventType, authorId, projectId } = body;
     if (!ticketId || !eventType || !authorId) return json({ error: "ticketId, eventType, and authorId are required" }, 400);
+    if (!["reply", "status_change", "priority_change", "ticket_updated", "new_ticket"].includes(String(eventType))) {
+      return json({ error: "Invalid eventType" }, 400);
+    }
 
     const caller = await getAuthenticatedCaller(adminClient, req);
     if (!caller?.id) return json({ error: "Unauthorized" }, 401);
@@ -325,7 +431,7 @@ serve(async (req) => {
 
     const { data: ticket } = await adminClient
       .from("requests")
-      .select("id, project_id, created_by, owner_user_id, subject, participant_name, record_id")
+      .select("id, project_id, created_by, owner_user_id, subject, message, participant_name, record_id, updated_at, created_at")
       .eq("id", ticketId)
       .maybeSingle();
     if (!ticket) return json({ error: "Ticket not found" }, 404);
@@ -336,7 +442,18 @@ serve(async (req) => {
       return json({ error: "Forbidden" }, 403);
     }
 
+    const notification = await resolveNotificationContent(adminClient, body, ticket as Record<string, unknown>, caller.id, callerRole);
+    if ("error" in notification) return notification.error;
+
     const resolvedProjectId = String(ticket.project_id || projectId || "");
+    const { data: project } = await adminClient
+      .from("projects")
+      .select("name")
+      .eq("id", resolvedProjectId)
+      .maybeSingle();
+    const projectName = String(project?.name || body.projectName || "").trim();
+    const ticketSubject = String(ticket.subject || body.ticketSubject || "").trim();
+    const participantName = String(ticket.participant_name || body.participantName || "").trim();
     const authorEmail = await getProfileEmail(adminClient, caller.id);
     const recipientSet = new Set<string>();
     const participantEmailSet = new Set<string>();
@@ -373,36 +490,57 @@ serve(async (req) => {
     const recipients = Array.from(recipientSet).filter((email) => Boolean(email) && isValidEmail(email));
     if (recipients.length === 0) return json({ ok: false, skipped: true, reason: "no recipients" });
 
-    const label = eventLabel(eventType);
+    const label = eventLabel(notification.eventType);
+    const notificationKey = buildNotificationKey(ticketId, notification.eventType, notification.eventId);
     const ticketsUrl = `${trackerBaseUrl}/tickets.html?project=${resolvedProjectId}`;
     const participantUrl = `${trackerBaseUrl}/participant-status.html`;
+    const deliveredRecipients = await getDeliveredRecipients(adminClient, notificationKey, recipients);
+    const secureBody = buildSecureTicketEmailBody(label, projectName, participantName);
 
     const sent: Array<{ email: string; provider: string }> = [];
+    const skipped: string[] = [];
     const errors: string[] = [];
     for (const recipient of recipients) {
+      if (deliveredRecipients.has(normalizeEmail(recipient))) {
+        skipped.push(recipient);
+        continue;
+      }
       const actionUrl = participantEmailSet.has(recipient) ? participantUrl : ticketsUrl;
       try {
         const result = await sendEmail({
           to: recipient,
-          subject: `[${label}] ${body.ticketSubject} - ${body.projectName}`,
-          title: body.ticketSubject,
-          body: body.message,
+          subject: `[${label}] Project Tracker ticket${projectName ? " - " + projectName : ""}`,
+          title: "Ticket update available",
+          body: secureBody,
           actionUrl,
           actionText: "View Ticket",
           eventType: label,
           authorName: callerName,
           authorRole: callerRole,
-          participantName: body.participantName,
-          projectName: body.projectName,
+          participantName,
+          projectName,
+        });
+        await recordDelivery(adminClient, notificationKey, recipient, {
+          provider: result.provider,
+          sent_at: new Date().toISOString(),
+          error: null,
         });
         sent.push({ email: recipient, provider: result.provider });
       } catch (err) {
-        errors.push(`${recipient}: ${err instanceof Error ? err.message : String(err)}`);
+        const message = err instanceof Error ? err.message : String(err);
+        await recordDelivery(adminClient, notificationKey, recipient, {
+          provider: null,
+          sent_at: null,
+          error: message,
+        });
+        errors.push(`${recipient}: ${message}`);
       }
     }
 
-    if (errors.length > 0) throw new Error(errors.join("; "));
-    return json({ ok: true, sent_to: sent.map((item) => item.email), sent });
+    if (errors.length > 0) {
+      return json({ ok: false, partial: sent.length > 0 || skipped.length > 0, sent_to: sent.map((item) => item.email), skipped_to: skipped, sent, errors }, 207);
+    }
+    return json({ ok: true, sent_to: sent.map((item) => item.email), skipped_to: skipped, sent });
   } catch (err) {
     console.error("ticket-notify error:", err);
     return json({ error: err instanceof Error ? err.message : "Unexpected error" }, 500);

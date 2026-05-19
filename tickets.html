@@ -813,6 +813,9 @@
                 const hit = mem.find((m) => String(m.project_id) === wantedId);
                 if (hit) {
                     sessionStorage.setItem("selected_project_id", String(hit.project_id));
+                    if (String(projectParam || "") !== String(hit.project_id)) {
+                        history.replaceState(null, "", `?project=${encodeURIComponent(hit.project_id)}`);
+                    }
                     return {
                         project_id: hit.project_id,
                         project_name: hit.projects?.name || "Project",
@@ -822,6 +825,8 @@
             }
 
             const first = mem[0];
+            sessionStorage.setItem("selected_project_id", String(first.project_id));
+            history.replaceState(null, "", `?project=${encodeURIComponent(first.project_id)}`);
             return {
                 project_id: first.project_id,
                 project_name: first.projects?.name || "Project",
@@ -991,6 +996,7 @@
                 const ticket = ALL_ITEMS.find((t) => String(t.id) === String(ticketId));
                 const notifyResult = await notifyViaEdge({
                     ticketId: String(ticketId),
+                    eventId: String(reply.id),
                     eventType: "reply",
                     authorId: SESSION_USER_ID,
                     authorName: DISPLAY_NAME,
@@ -1278,11 +1284,12 @@
                         showMsg("Ticket saved.");
                         await markTicketSeen(requestId);
 
-                        // Fire status_change / priority_change notifications
+                        // Send one update notification per save so recipients are not emailed twice for one action.
                         const savedTicket = idx >= 0 ? ALL_ITEMS[idx] : null;
                         if (savedTicket) {
                             const notifyBase = {
                                 ticketId:      requestId,
+                                eventId:       String(savedTicket.updated_at || requestId),
                                 authorId:      SESSION_USER_ID,
                                 authorName:    DISPLAY_NAME,
                                 authorRole:    PROFILE_ROLE || "viewer",
@@ -1291,13 +1298,19 @@
                                 projectName:   PROJECT_CTX?.project_name || "",
                                 projectId:     savedTicket.project_id || "",
                             };
+                            const changes = [];
                             if (!IS_CLIENT && oldStatus && newStatus && oldStatus !== newStatus) {
-                                await notifyViaEdge({ ...notifyBase, eventType: "status_change",
-                                    message: `Status changed from ${oldStatus} to ${newStatus}` });
+                                changes.push(`Status changed from ${oldStatus} to ${newStatus}`);
                             }
                             if (oldPriority && newPriority && oldPriority !== newPriority) {
-                                await notifyViaEdge({ ...notifyBase, eventType: "priority_change",
-                                    message: `Priority changed from ${oldPriority} to ${newPriority}` });
+                                changes.push(`Priority changed from ${oldPriority} to ${newPriority}`);
+                            }
+                            if (changes.length) {
+                                await notifyViaEdge({
+                                    ...notifyBase,
+                                    eventType: "ticket_updated",
+                                    message: changes.join("\n"),
+                                });
                             }
                         }
 

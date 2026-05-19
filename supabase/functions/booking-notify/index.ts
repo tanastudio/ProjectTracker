@@ -164,7 +164,7 @@ async function canCallerAccessBooking(
 
   if (project?.created_by === callerId) return true;
   const memberRole = String(member?.role || "").trim().toLowerCase();
-  return ["admin", "editor", "viewer"].includes(memberRole);
+  return ["admin", "editor"].includes(memberRole);
 }
 
 function normalizeTimeText(value: unknown) {
@@ -597,6 +597,51 @@ async function sendEmail(payload: EmailPayload) {
   throw new Error(providerErrors.join("; "));
 }
 
+function normalizeEmail(email: string): string {
+  return String(email || "").trim().toLowerCase();
+}
+
+function buildNotificationKey(bookingId: string) {
+  return `booking:${bookingId}:confirmation`;
+}
+
+async function getDeliveredRecipients(
+  adminClient: ReturnType<typeof createClient>,
+  notificationKey: string,
+  recipients: string[],
+): Promise<Set<string>> {
+  const emails = recipients.map(normalizeEmail).filter(Boolean);
+  if (!emails.length) return new Set();
+  const { data, error } = await adminClient
+    .from("notification_deliveries")
+    .select("recipient_email")
+    .eq("notification_key", notificationKey)
+    .not("sent_at", "is", null)
+    .in("recipient_email", emails);
+  if (error) throw error;
+  return new Set((data || []).map((row: { recipient_email?: string }) => normalizeEmail(row.recipient_email || "")));
+}
+
+async function recordDelivery(
+  adminClient: ReturnType<typeof createClient>,
+  notificationKey: string,
+  recipientEmail: string,
+  patch: { provider?: string | null; sent_at?: string | null; error?: string | null },
+) {
+  const now = new Date().toISOString();
+  const { error } = await adminClient
+    .from("notification_deliveries")
+    .upsert({
+      notification_key: notificationKey,
+      recipient_email: normalizeEmail(recipientEmail),
+      provider: patch.provider ?? null,
+      sent_at: patch.sent_at ?? null,
+      error: patch.error ?? null,
+      updated_at: now,
+    }, { onConflict: "notification_key,recipient_email" });
+  if (error) console.warn(`notification delivery log failed: ${error.message}`);
+}
+
 function buildDeliveryTargets(
   participantEmail: string,
   participantName: string,
@@ -882,6 +927,15 @@ serve(async (req) => {
       const loaded = await loadSessionFeedbackByToken(adminClient, token);
       if (!loaded) return json({ error: "This confirmation link is invalid or expired" }, 404);
       const { booking, context } = loaded;
+      if (booking.session_status_submitted_at) {
+        return json({
+          error: "This session feedback has already been submitted",
+          submittedAt: booking.session_status_submitted_at,
+          sessionStatus: booking.session_status || "pending",
+          sessionStatusLabel: getSessionStatusLabel(booking.session_status),
+          sessionComment: booking.session_comment || "",
+        }, 409);
+      }
       const comment = cleanText(body?.comment, "").slice(0, 2000) || null;
       const submittedAt = new Date().toISOString();
       const { error: updateError } = await adminClient
@@ -982,8 +1036,19 @@ serve(async (req) => {
     });
 
     const sent: Array<{ email: string; provider: string; role: string }> = [];
+    const skipped: string[] = [];
     const errors: string[] = [];
+    const notificationKey = buildNotificationKey(bookingId);
+    const deliveredRecipients = await getDeliveredRecipients(
+      adminClient,
+      notificationKey,
+      targets.map((target) => target.email),
+    );
     for (const target of targets) {
+      if (deliveredRecipients.has(normalizeEmail(target.email))) {
+        skipped.push(target.email);
+        continue;
+      }
       try {
         const result = await sendEmail({
           to: target.email,
@@ -1005,14 +1070,30 @@ serve(async (req) => {
           senderRole: DEFAULT_SENDER_ROLE,
           calendarInvite,
         });
+        await recordDelivery(adminClient, notificationKey, target.email, {
+          provider: result.provider,
+          sent_at: new Date().toISOString(),
+          error: null,
+        });
         sent.push({ email: target.email, provider: result.provider, role: target.role });
       } catch (err) {
-        errors.push(`${target.email}: ${err instanceof Error ? err.message : String(err)}`);
+        const message = err instanceof Error ? err.message : String(err);
+        await recordDelivery(adminClient, notificationKey, target.email, {
+          provider: null,
+          sent_at: null,
+          error: message,
+        });
+        errors.push(`${target.email}: ${message}`);
       }
     }
 
     if (errors.length) {
-      throw new Error(errors.join("; "));
+      const message = errors.join("; ");
+      await adminClient
+        .from("project_availability_bookings")
+        .update({ notification_error: message, updated_at: new Date().toISOString() })
+        .eq("id", bookingId);
+      return json({ ok: false, partial: sent.length > 0 || skipped.length > 0, sent_to: sent.map((item) => item.email), skipped_to: skipped, sent, errors }, 207);
     }
 
     await adminClient
@@ -1020,7 +1101,7 @@ serve(async (req) => {
       .update({ notification_sent_at: new Date().toISOString(), notification_error: null, updated_at: new Date().toISOString() })
       .eq("id", bookingId);
 
-    return json({ ok: true, sent_to: sent.map((item) => item.email), sent });
+    return json({ ok: true, sent_to: sent.map((item) => item.email), skipped_to: skipped, sent });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unexpected error";
     console.error("booking-notify error:", err);

@@ -35,6 +35,11 @@ export function createProjectSettingsContext() {
     throw new Error("no project");
   }
   sessionStorage.setItem("selected_project_id", PROJECT_ID);
+  if (!params.get("project")) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("project", PROJECT_ID);
+    history.replaceState(null, "", url.toString());
+  }
 
   function hidePageSkeleton() {
     if (pageSkeleton) pageSkeleton.hidden = true;

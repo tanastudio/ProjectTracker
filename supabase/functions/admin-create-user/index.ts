@@ -18,13 +18,14 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// ── Input validation (pure, exported for tests) ───────────────────────────────
+// Input validation (pure, exported for tests).
 export function validateInput(body: Record<string, unknown>): {
-  ok: true; email: string; displayName: string; projectId: string;
+  ok: true; email: string; displayName: string; projectId: string; code: string;
 } | { ok: false; error: string } {
   const email       = String(body.email        ?? "").trim().toLowerCase();
   const displayName = String(body.display_name ?? "").trim();
   const projectId   = String(body.project_id   ?? "").trim();
+  const code        = String(body.code         ?? "").trim();
 
   if (!email || !displayName || !projectId) {
     return { ok: false, error: "email, display_name, and project_id are required" };
@@ -32,10 +33,13 @@ export function validateInput(body: Record<string, unknown>): {
   if (!EMAIL_RE.test(email)) {
     return { ok: false, error: `Invalid email format: ${email}` };
   }
-  return { ok: true, email, displayName, projectId };
+  if (code.length > 80) {
+    return { ok: false, error: "code must be 80 characters or fewer" };
+  }
+  return { ok: true, email, displayName, projectId, code };
 }
 
-// ── Paginated auth-user lookup by email ───────────────────────────────────────
+// Paginated auth-user lookup by email.
 // Supabase admin.listUsers does not support filter-by-email, so we paginate
 // through all pages until we find the user or exhaust all pages.
 export async function findAuthUserByEmail(
@@ -70,8 +74,6 @@ async function writeAuditLog(
     console.warn(`admin-create-user audit log failed: ${message}`);
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 async function canProvisionParticipant(
   adminClient: ReturnType<typeof createClient>,
@@ -125,19 +127,19 @@ serve(async (req) => {
   const { data: callerProfile } = await adminClient
     .from("profiles").select("role").eq("id", caller.id).maybeSingle();
 
-  // ── Parse and validate input ──────────────────────────────────────────────
+  // Parse and validate input.
   let body: Record<string, unknown>;
   try { body = await req.json(); }
   catch { return json({ error: "Invalid JSON body" }, 400); }
 
   const validated = validateInput(body);
   if (!validated.ok) return json({ error: validated.error }, 400);
-  const { email, displayName, projectId } = validated;
+  const { email, displayName, projectId, code } = validated;
   if (!(await canProvisionParticipant(adminClient, caller.id, callerProfile?.role, projectId))) {
     return json({ error: "Admin or internal project editor only" }, 403);
   }
 
-  // ── Validate project exists ───────────────────────────────────────────────
+  // Validate project exists.
   const { data: proj } = await adminClient
     .from("projects").select("id, code_prefix").eq("id", projectId).maybeSingle();
   if (!proj) {
@@ -145,18 +147,18 @@ serve(async (req) => {
     return json({ error: `Project not found: ${projectId}` }, 404);
   }
 
-  // ── Validate email field exists (required for storing participant email) ────
+  // Validate email field exists for storing participant email.
   const { data: emailField } = await adminClient
     .from("fields").select("id")
     .eq("project_id", projectId).eq("field_role", "email").maybeSingle();
   if (!emailField?.id) {
-    console.warn(`admin-create-user: no email field for project ${projectId} — email will not be stored in record_values`);
+    console.warn(`admin-create-user: no email field for project ${projectId} - email will not be stored in record_values`);
     // Non-fatal: proceed without saving email to record_values
   }
 
   console.log(`admin-create-user: processing ${email} for project ${projectId}`);
 
-  // ── Step 1: find or create auth user ─────────────────────────────────────
+  // Step 1: find or create auth user.
   // Try to create first (fast path). On conflict, paginate through users to find them.
   let userId: string;
   const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
@@ -181,7 +183,7 @@ serve(async (req) => {
     return json({ error: `createUser failed: ${createErr.message}` }, 500);
   }
 
-  // ── Steps 2-5: idempotent profile/record/member setup ────────────────────
+  // Steps 2-5: idempotent profile/record/member setup.
   // Track userId so partial failures include it in logs for easy repair.
   try {
     // Step 2: upsert profile
@@ -208,21 +210,40 @@ serve(async (req) => {
 
     if (!recordId) {
       // Generate collision-free code via DB function (uses FOR UPDATE row lock)
-      const { data: generatedCode, error: codeErr } = await adminClient
-        .rpc("generate_participant_code", { p_project_id: projectId });
-      if (codeErr) throw new Error(`[step 3] code generation failed: ${codeErr.message}`);
+      let generatedCode = code;
+      if (!generatedCode) {
+        const { data, error: codeErr } = await adminClient
+          .rpc("generate_participant_code", { p_project_id: projectId });
+        if (codeErr) throw new Error(`[step 3] code generation failed: ${codeErr.message}`);
+        generatedCode = String(data || "").trim();
+      }
 
       const { data: rec, error: recErr } = await adminClient.from("records").insert({
         project_id: projectId,
         title:      displayName,
         active:     true,
         updated_by: caller.id,
-        ...(generatedCode ? { code: generatedCode as string } : {}),
+        ...(generatedCode ? { code: generatedCode } : {}),
       }).select("id").single();
-      if (recErr) throw new Error(`[step 3] records insert failed: ${recErr.message}`);
-      recordId = rec.id;
+      if (recErr) {
+        if (generatedCode && /duplicate|unique/i.test(recErr.message)) {
+          const { data: existingRec, error: existingRecErr } = await adminClient
+            .from("records")
+            .select("id")
+            .eq("project_id", projectId)
+            .eq("code", generatedCode)
+            .maybeSingle();
+          if (existingRecErr) throw new Error(`[step 3] records lookup after duplicate failed: ${existingRecErr.message}`);
+          if (!existingRec?.id) throw new Error(`[step 3] records insert failed: ${recErr.message}`);
+          recordId = existingRec.id;
+        } else {
+          throw new Error(`[step 3] records insert failed: ${recErr.message}`);
+        }
+      } else {
+        recordId = rec.id;
+      }
 
-      // Link profile → record
+      // Link profile to record.
       const { error: linkErr } = await adminClient
         .from("profiles").update({ participant_record_id: recordId }).eq("id", userId);
       if (linkErr) throw new Error(`[step 3] profiles update (participant_record_id) failed: ${linkErr.message}`);

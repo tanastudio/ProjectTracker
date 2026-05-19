@@ -93,7 +93,7 @@ export function createAuthSidebarController(ctx) {
     const ticketNavBadge = attachTicketNavBadge({
       supabase,
       navElement: document.getElementById("navTickets"),
-      getProjectId: () => PROJECT_ID || sessionStorage.getItem("selected_project_id") || "",
+      getProjectId: () => PROJECT_ID || "",
       userId: session.user.id,
       displayMode: "unread_only",
     });

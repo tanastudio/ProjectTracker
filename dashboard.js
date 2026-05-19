@@ -68,6 +68,7 @@ const dashboardPager = el("dashboardPager");
 
 let CURRENT_ITEMS = [];
 let REQ_CONTEXT = null;
+let REQ_SAVED_TICKET_ID = "";
 let TICKET_STATS_BY_RECORD = new Map();
 const DASHBOARD_PAGE_SIZE = 100;
 let dashboardPage = 1;
@@ -127,7 +128,7 @@ let USER_ROLE = "unknown";
 let USER_DISPLAY_NAME = "";
 
 function goProjectPage(page, projectId) {
-    const pid = String(projectId || sessionStorage.getItem("selected_project_id") || "").trim();
+    const pid = String(projectId || "").trim();
     if (!pid) {
         window.location.href = "./projects.html";
         return;
@@ -256,7 +257,7 @@ if (!PROJECT_CTX) throw new Error("Redirecting...");
 const ticketNavBadge = attachTicketNavBadge({
     supabase,
     navElement: navTickets,
-    getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
+    getProjectId: () => PROJECT_CTX?.project_id || "",
     userId: __session.user.id,
     displayMode: "unread_only",
 });
@@ -1121,6 +1122,9 @@ function openRequestModal(ctx) {
     reqSubject.value = `[${PROJECT_CTX.project_name}] Request for ${ctx.code}`;
     reqMessage.value = "";
     reqHint.textContent = "";
+    REQ_SAVED_TICKET_ID = "";
+    reqSendBtn.disabled = false;
+    reqSendBtn.textContent = "Send";
 
     requestModal.classList.add("open");
     requestModal.setAttribute("aria-hidden", "false");
@@ -1134,6 +1138,10 @@ function closeRequestModal() {
 
 async function sendRequestToSupabase() {
     if (!REQ_CONTEXT) return;
+    if (REQ_SAVED_TICKET_ID) {
+        reqHint.textContent = "This request has already been saved.";
+        return;
+    }
 
     const subject = String(reqSubject.value || "").trim();
     const message = String(reqMessage.value || "").trim();
@@ -1144,9 +1152,9 @@ async function sendRequestToSupabase() {
     reqSendBtn.disabled = true;
     reqHint.textContent = "Sending...";
 
+    let saved = false;
     try {
-        const ticketId = globalThis.crypto?.randomUUID?.();
-        if (!ticketId) throw new Error("crypto.randomUUID is not available in this browser.");
+        const ticketId = createClientUuid();
 
         const payload = {
             id: ticketId,
@@ -1163,12 +1171,16 @@ async function sendRequestToSupabase() {
             .from("requests")
             .insert(payload);
         if (error) throw error;
+        saved = true;
+        REQ_SAVED_TICKET_ID = ticketId;
+        reqSendBtn.textContent = "Saved";
 
         await loadTicketStats(PROJECT_CTX.project_id);
         renderFilteredDashboardTable();
 
         const notifyResult = await notifyViaEdge({
             ticketId,
+            eventId: ticketId,
             eventType: "new_ticket",
             authorId: __session.user.id,
             authorName: USER_DISPLAY_NAME || __session.user.email || "",
@@ -1182,15 +1194,29 @@ async function sendRequestToSupabase() {
         if (!notifyResult.ok) {
             reqHint.textContent = "Saved, but email notification failed. Please check notification settings.";
         } else {
-            reqHint.textContent = "Sent ✅";
+            reqHint.textContent = "Sent.";
             setTimeout(() => closeRequestModal(), 450);
         }
     } catch (e) {
         console.error(e);
         reqHint.textContent = "Failed: requests table not found or permission denied (check RLS/policy).";
     } finally {
-        reqSendBtn.disabled = false;
+        if (!saved) reqSendBtn.disabled = false;
     }
+}
+
+function createClientUuid() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    if (globalThis.crypto?.getRandomValues) {
+        globalThis.crypto.getRandomValues(bytes);
+    } else {
+        for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
 
 // Update KPI chips from loaded items.

@@ -77,11 +77,11 @@ export function createEmailScheduleController(ctx) {
     setTimePickerValue(inputId, schedule?.send_hour, schedule?.send_minute, { emit: false });
   }
   
-  function closeTimePickers(exceptPicker = null) {
-    document.querySelectorAll(".time-picker.open").forEach((picker) => {
-      if (picker !== exceptPicker) picker.classList.remove("open");
-    });
-  }
+  function closeTimePickers(exceptPicker = null) {
+    document.querySelectorAll(".time-picker.open").forEach((picker) => {
+      if (picker !== exceptPicker) picker.classList.remove("open");
+    });
+  }
   
   function syncTimePickerView(inputId) {
     const input = el(inputId);
@@ -91,10 +91,10 @@ export function createEmailScheduleController(ctx) {
     const { hour, minute } = parseTimeInputValue(input.value);
     const value = formatTimeInputValue(hour, minute);
     input.value = value;
-    picker.querySelector("[data-time-display]").textContent = value;
-    picker.querySelectorAll("[data-time-hour]").forEach((button) => {
-      button.classList.toggle("active", Number(button.dataset.timeHour) === hour);
-    });
+    picker.querySelector("[data-time-display]").textContent = value;
+    picker.querySelectorAll("[data-time-hour]").forEach((button) => {
+      button.classList.toggle("active", Number(button.dataset.timeHour) === hour);
+    });
     picker.querySelectorAll("[data-time-minute]").forEach((button) => {
       button.classList.toggle("active", Number(button.dataset.timeMinute) === minute);
     });
@@ -822,12 +822,18 @@ export function createEmailScheduleController(ctx) {
     button.disabled = true;
     button.textContent = "Sending...";
   
-    const { data, error } = await supabase.functions.invoke("project-update-summary", {
-      body: { projectId: PROJECT_ID, source: "manual", recipientGroup },
-    });
-  
-    button.disabled = false;
-    button.textContent = idleText;
+    let data = null;
+    let error = null;
+    try {
+      ({ data, error } = await supabase.functions.invoke("project-update-summary", {
+        body: { projectId: PROJECT_ID, source: "manual", recipientGroup },
+      }));
+    } catch (err) {
+      error = err;
+    } finally {
+      button.disabled = false;
+      button.textContent = idleText;
+    }
   
     if (error) {
       await loadEmailRunHistory();

@@ -1,5 +1,6 @@
 export function createProjectDetailsController(ctx) {
   const { supabase, el, PROJECT_ID, showHint } = ctx;
+  let loadedCodePrefix = "";
 
   async function loadProject() {
     const { data, error } = await supabase.from("projects").select("*").eq("id", PROJECT_ID).single();
@@ -11,7 +12,8 @@ export function createProjectDetailsController(ctx) {
     el("projStart").value      = data.start_date   || "";
     el("projEnd").value        = data.end_date     || "";
     el("projStatus").value     = data.status       || "active";
-    el("projCodePrefix").value = data.code_prefix  || "";
+    el("projCodePrefix").value = data.code_prefix  || "";
+    loadedCodePrefix = data.code_prefix || "";
     el("projRelatedInvoiceNumber").value = data.related_invoice_number || "";
   }
   
@@ -27,8 +29,13 @@ export function createProjectDetailsController(ctx) {
   });
   
   el("saveGeneralBtn").addEventListener("click", async () => {
-    const name = el("projName").value.trim();
-    if (!name) { showHint("Project name is required.", true); return; }
+    const name = el("projName").value.trim();
+    const nextCodePrefix = el("projCodePrefix").value.trim();
+    if (!name) { showHint("Project name is required.", true); return; }
+    if (String(nextCodePrefix || "") !== String(loadedCodePrefix || "")) {
+      const ok = confirm("Changing the project code prefix only affects new participants. Existing participant codes will not be regenerated.");
+      if (!ok) return;
+    }
     el("saveGeneralBtn").disabled    = true;
     el("saveGeneralBtn").textContent = "Saving...";
     const { error } = await supabase.from("projects").update({
@@ -37,14 +44,15 @@ export function createProjectDetailsController(ctx) {
       status:       el("projStatus").value,
       start_date:   el("projStart").value || null,
       end_date:     el("projEnd").value   || null,
-      code_prefix:  el("projCodePrefix").value.trim() || null,
+      code_prefix:  nextCodePrefix || null,
       related_invoice_number: el("projRelatedInvoiceNumber").value.trim() || null,
     }).eq("id", PROJECT_ID);
     el("saveGeneralBtn").disabled    = false;
     el("saveGeneralBtn").textContent = "Save Changes";
     if (error) { showHint("Error: " + error.message, true); return; }
     el("pageHeading").textContent = name + " - Settings";
-    showHint("Project info updated.", false);
+    loadedCodePrefix = nextCodePrefix;
+    showHint("Project info updated.", false);
   });
 
   return {

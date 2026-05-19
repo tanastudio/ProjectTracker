@@ -773,6 +773,33 @@ thead th.sticky-th {
     font-size: 13px;
 }
 
+.table-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+    min-height: 34px;
+    color: rgba(15, 23, 42, 0.68);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.table-pager button {
+    border: 1px solid rgba(15, 23, 42, .14);
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    padding: 7px 10px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.table-pager button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
 #grid tbody td {
     padding-top: 2px;
     padding-bottom: 2px;

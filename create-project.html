@@ -556,6 +556,7 @@
 import { supabase } from "./supabaseClient.js";
 import { SUPABASE_URL } from "./js/config.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
+import { isBlankCsvRow, normalizeCsvHeader, parseCsvRows } from "./lib/csv-utils.js";
 import { showToast } from "./lib/toast-notifications.js";
 
 const el = (id) => document.getElementById(id);
@@ -1021,10 +1022,10 @@ function handleCsvFile(file) {
 }
 
 function parseCsv(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) { showHint("CSV must have a header row and at least one data row.", true); return; }
+  const rows = parseCsvRows(text).filter(row => !isBlankCsvRow(row));
+  if (rows.length < 2) { showHint("CSV must have a header row and at least one data row.", true); return; }
 
-  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
+  const headers = rows[0].map(normalizeCsvHeader);
   const nameIdx = headers.indexOf("name");
   const emailIdx = headers.indexOf("email");
 
@@ -1035,15 +1036,15 @@ function parseCsv(text) {
 
   csvRows = [];
   const errors = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i].map(c => String(c ?? "").trim());
     const name = cols[nameIdx] || "";
     const email = (cols[emailIdx] || "").toLowerCase();
     if (!name || !email) { errors.push(i + 1); }
     csvRows.push({ name, email, hasError: !name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) });
   }
 
-  renderCsvPreview(headers, lines, nameIdx, emailIdx);
+  renderCsvPreview(headers, rows, nameIdx, emailIdx);
   clearHint();
   if (errors.length) showHint(`${errors.length} rows have missing name/email (rows: ${errors.slice(0,5).join(", ")}${errors.length > 5 ? "..." : ""})`, true);
 }

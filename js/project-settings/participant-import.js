@@ -1,3 +1,5 @@
+import { isBlankCsvRow, normalizeCsvHeader, parseCsvRows } from "../../lib/csv-utils.js";
+
 export function createParticipantImportController(ctx) {
   const { supabase, SUPABASE_URL, el, PROJECT_ID, showHint, clearHint, escapeHtml } = ctx;
   const session = ctx.session;
@@ -207,10 +209,10 @@ export function createParticipantImportController(ctx) {
 
   /* CSV handling */
   function parseCsv(text) {
-    const lines = text.split(/\r?\n/).filter(l => l.trim());
-    if (lines.length < 2) { showHint("CSV must have a header row and at least one data row.", true); return; }
+    const rows = parseCsvRows(text).filter(row => !isBlankCsvRow(row));
+    if (rows.length < 2) { showHint("CSV must have a header row and at least one data row.", true); return; }
   
-    const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
+    const headers = rows[0].map(normalizeCsvHeader);
     const nameIdx  = headers.indexOf("name");
     const emailIdx = headers.indexOf("email");
   
@@ -220,8 +222,8 @@ export function createParticipantImportController(ctx) {
     }
   
     csvRows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols  = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+    for (let i = 1; i < rows.length; i++) {
+      const cols  = rows[i].map(c => String(c ?? "").trim());
       const name  = cols[nameIdx]  || "";
       const email = (cols[emailIdx] || "").toLowerCase();
       csvRows.push({ name, email, hasError: !name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) });

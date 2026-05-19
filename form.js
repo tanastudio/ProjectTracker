@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient.js";
+import { SUPABASE_URL } from "./js/config.js";
 import { STEP_STATUS, normalizeStatus, computeOverall } from "./lib/form-utils.js";
 import { getFormAccessDecision } from "./lib/access-control-utils.js";
 import { attachTicketNavBadge } from "./lib/ticket-nav-badge.js";
@@ -26,6 +27,7 @@ async function resolveUserNames(userIds) {
 const DEFAULT_PROJECT_NAME  = "Project ABC";
 // STEP_STATUS, normalizeStatus, computeOverall imported from ./lib/form-utils.js
 const TABLE_SAVE_DEBOUNCE_MS = 900;
+const FORM_PAGE_SIZE = 100;
 
 /* ---------- UI refs ---------- */
 const el = (id) => document.getElementById(id);
@@ -52,6 +54,7 @@ const addCandEmail = el("addCandEmail");
 const addCandError = el("addCandError");
 
 const tbody           = el("tbody");
+const formPager       = el("formPager");
 const tableWrap       = el("tableWrap");
 const grid            = el("grid");
 const hscrollTop      = el("hscrollTop");
@@ -225,6 +228,9 @@ async function resolveProjectForUser(userId) {
         const hit = mem.find(m => String(m.project_id) === wantedId);
         if (hit) {
             sessionStorage.setItem("selected_project_id", String(hit.project_id));
+            if (String(projectParam || "") !== String(hit.project_id)) {
+                history.replaceState(null, "", `?project=${encodeURIComponent(hit.project_id)}`);
+            }
             return {
                 project_id:   hit.project_id,
                 project_name: hit.projects?.name || DEFAULT_PROJECT_NAME,
@@ -234,6 +240,8 @@ async function resolveProjectForUser(userId) {
     }
 
     const preferred = mem[0];
+    sessionStorage.setItem("selected_project_id", String(preferred.project_id));
+    history.replaceState(null, "", `?project=${encodeURIComponent(preferred.project_id)}`);
     return {
         project_id:   preferred.project_id,
         project_name: preferred.projects?.name || DEFAULT_PROJECT_NAME,
@@ -245,7 +253,7 @@ const PROJECT_CTX = await resolveProjectForUser(SESSION.user.id);
 const ticketNavBadge = attachTicketNavBadge({
     supabase,
     navElement: document.getElementById("navTickets"),
-    getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
+    getProjectId: () => PROJECT_CTX?.project_id || "",
     userId: SESSION.user.id,
     displayMode: "unread_only",
 });
@@ -308,6 +316,8 @@ let UID_SEQ          = 1;
 let LAST_ADDED_UID   = null;
 let TOP_FORM_LOCK    = false;
 let ROW_ELEMENTS     = new Map();
+let FORM_PAGE        = 1;
+let FORM_RENDERED_ROWS = [];
 
 /* ============================================================
    FETCH
@@ -457,6 +467,21 @@ function buildModel(records, recordValues, bookingsByRecordField = new Map()) {
    ============================================================ */
 function markDirty(row, key, value) { row._dirty[key] = value; }
 
+function hasUnsavedChanges() {
+    if (GLOBAL_IN_FLIGHT > 0) return true;
+    return MODEL.some((row) =>
+        row?._saving ||
+        row?._needsResave ||
+        Object.keys(row?._dirty || {}).length > 0
+    );
+}
+
+window.addEventListener("beforeunload", (event) => {
+    if (!hasUnsavedChanges()) return;
+    event.preventDefault();
+    event.returnValue = "";
+});
+
 function setGlobalSaveState() {
     if (GLOBAL_IN_FLIGHT > 0) { setSavePill("save-saving", "Saving..."); return; }
     setSavePill(LAST_SAVE_OK ? "save-saved" : "save-failed",
@@ -493,13 +518,18 @@ async function syncBookedStepStatuses(rows) {
     if (jobs.length) await Promise.all(jobs);
 }
 
-async function updateRecordBase(row) {
+async function updateRecordBase(row, snapshot = {}) {
     const userId = currentUserId();
     if (!userId) throw new Error("Missing session user id");
 
+    const patch = { updated_by: userId, updated_at: new Date().toISOString() };
+    if (Object.prototype.hasOwnProperty.call(snapshot, "name")) {
+        patch.title = row.name;
+    }
+
     const { error } = await supabase
         .from("records")
-        .update({ title: row.name, updated_by: userId, updated_at: new Date().toISOString() })
+        .update(patch)
         .eq("id", row.id);
     if (error) throw error;
 }
@@ -513,7 +543,10 @@ async function saveRowNow(row) {
     if ((row._failCount || 0) >= 3) return;
 
     const snapshot = { ...row._dirty };
-    if (snapshot.email !== undefined && !validateEmail(snapshot.email)) delete snapshot.email;
+    if (snapshot.email !== undefined && !validateEmail(snapshot.email)) {
+        delete snapshot.email;
+        delete row._dirty.email;
+    }
 
     row._saving = true;
     GLOBAL_IN_FLIGHT++;
@@ -521,7 +554,7 @@ async function saveRowNow(row) {
 
     try {
         const baseKeys = ["name"]; // "email" is stored in record_values via upsertRecordValue
-        await updateRecordBase(row); // always captures updated_by + updated_at
+        await updateRecordBase(row, snapshot);
         row.updatedBy = currentUserName();
 
         for (const k of Object.keys(snapshot).filter(k => !baseKeys.includes(k))) {
@@ -681,6 +714,7 @@ function bindTopFormStepEvents() {
             }
             validateRequiredFields(SELECTED);
             renderTable();
+            scheduleRowSave(SELECTED);
         });
     }
 }
@@ -746,7 +780,7 @@ function bindTopFormEvents() {
 
     if (candCode) { candCode.readOnly = true; candCode.disabled = true; }
 
-    const updateLocal = (key, getFn) => () => {
+    const updateLocal = (key, getFn, { autosave = false } = {}) => () => {
         if (TOP_FORM_LOCK || !SELECTED) return;
         const v = getFn();
         if (key === "name")      SELECTED.name      = v;
@@ -756,10 +790,11 @@ function bindTopFormEvents() {
         markDirty(SELECTED, key, v);
         renderTable();
         buildParticipantPicker();
+        if (autosave) scheduleRowSave(SELECTED);
     };
 
-    candIssue?.addEventListener("blur",    updateLocal("issue",    () => candIssue.value));
-    candDecision?.addEventListener("blur", updateLocal("decision", () => candDecision.value));
+    candIssue?.addEventListener("input", updateLocal("issue", () => candIssue.value, { autosave: true }));
+    candDecision?.addEventListener("input", updateLocal("decision", () => candDecision.value, { autosave: true }));
 }
 
 /* ============================================================
@@ -933,7 +968,7 @@ function bindSortButtons() {
             if (SORT_STATE.key !== key) SORT_STATE = { key, dir: 1 };
             else SORT_STATE.dir = SORT_STATE.dir === 0 ? 1 : SORT_STATE.dir === 1 ? -1 : 0;
             setSortIcon(SORT_STATE.key, SORT_STATE.dir);
-            renderTable();
+            renderTable({ resetPage: true });
         });
     });
     setSortIcon(SORT_STATE.key, SORT_STATE.dir);
@@ -1251,17 +1286,47 @@ function updateRowCells(tr, r) {
     }
 }
 
-function renderTable() {
+function getFormPageCount() {
+    return Math.max(1, Math.ceil(FORM_RENDERED_ROWS.length / FORM_PAGE_SIZE));
+}
+
+function renderFormPager() {
+    if (!formPager) return;
+    const totalRows = FORM_RENDERED_ROWS.length;
+    if (totalRows <= FORM_PAGE_SIZE) {
+        formPager.innerHTML = totalRows ? `<span>${totalRows} row${totalRows === 1 ? "" : "s"}</span>` : "";
+        return;
+    }
+    const totalPages = getFormPageCount();
+    const start = (FORM_PAGE - 1) * FORM_PAGE_SIZE + 1;
+    const end = Math.min(totalRows, FORM_PAGE * FORM_PAGE_SIZE);
+    formPager.innerHTML = `
+        <button type="button" data-form-page="prev" ${FORM_PAGE <= 1 ? "disabled" : ""}>Previous</button>
+        <span>${start}-${end} of ${totalRows} rows | Page ${FORM_PAGE} of ${totalPages}</span>
+        <button type="button" data-form-page="next" ${FORM_PAGE >= totalPages ? "disabled" : ""}>Next</button>
+    `;
+}
+
+function renderTable({ resetPage = false } = {}) {
     const rows = currentFilteredModel();
     if (!tbody) return;
+    FORM_RENDERED_ROWS = rows;
+    if (resetPage) FORM_PAGE = 1;
+    if (LAST_ADDED_UID) {
+        const addedIndex = rows.findIndex((row) => row._uid === LAST_ADDED_UID);
+        if (addedIndex >= 0) FORM_PAGE = Math.floor(addedIndex / FORM_PAGE_SIZE) + 1;
+    }
+    FORM_PAGE = Math.min(Math.max(1, FORM_PAGE), getFormPageCount());
+    const pageStart = (FORM_PAGE - 1) * FORM_PAGE_SIZE;
+    const pageRows = rows.slice(pageStart, pageStart + FORM_PAGE_SIZE);
 
-    const newUidSet = new Set(rows.map(r => r._uid));
+    const newUidSet = new Set(pageRows.map(r => r._uid));
     for (const [uid, tr] of ROW_ELEMENTS) {
         if (!newUidSet.has(uid)) { tr.remove(); ROW_ELEMENTS.delete(uid); }
     }
 
-    for (let i = 0; i < rows.length; i++) {
-        const r  = rows[i];
+    for (let i = 0; i < pageRows.length; i++) {
+        const r  = pageRows[i];
         let   tr = ROW_ELEMENTS.get(r._uid);
         if (tr) {
             updateRowCells(tr, r);
@@ -1273,6 +1338,7 @@ function renderTable() {
     }
 
     if (lastSync) lastSync.textContent = nowStamp();
+    renderFormPager();
     if (LAST_ADDED_UID) {
         const uid = LAST_ADDED_UID;
         LAST_ADDED_UID = null;
@@ -1319,18 +1385,47 @@ async function createNewParticipant(seed = {}) {
         const nextName = String(seed.name || "").trim();
         const nextEmail = String(seed.email || "").trim();
 
-        const { data, error } = await supabase
-            .from("records")
-            .insert({
-                project_id: PROJECT_CTX.project_id,
-                code: nextCode,
-                title: nextName,
-                active: true,
-                updated_by: currentUserId()
-            })
-            .select("id, code, title, active, updated_by, created_at, updated_at")
-            .single();
-        if (error) throw error;
+        let data = null;
+        if (nextEmail) {
+            const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-create-user`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${SESSION.access_token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    project_id: PROJECT_CTX.project_id,
+                    code: nextCode,
+                    display_name: nextName,
+                    email: nextEmail,
+                }),
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok || body?.ok === false) {
+                throw new Error(body?.error || `admin-create-user failed (${response.status})`);
+            }
+            const { data: recordData, error: recordError } = await supabase
+                .from("records")
+                .select("id, code, title, active, updated_by, created_at, updated_at")
+                .eq("id", body.record_id)
+                .single();
+            if (recordError) throw recordError;
+            data = recordData;
+        } else {
+            const { data: recordData, error } = await supabase
+                .from("records")
+                .insert({
+                    project_id: PROJECT_CTX.project_id,
+                    code: nextCode,
+                    title: nextName,
+                    active: true,
+                    updated_by: currentUserId()
+                })
+                .select("id, code, title, active, updated_by, created_at, updated_at")
+                .single();
+            if (error) throw error;
+            data = recordData;
+        }
 
         const defOpt = getDefaultOption(null);
         const row    = {
@@ -1395,18 +1490,29 @@ async function submitAddParticipantModal() {
 
     if (!code) return fail("Code is required.");
     if (!name) return fail("Participant name is required.");
+    if (!email) return fail("Email is required so the participant can log in.");
     if (email && !validateEmail(email)) return fail("Email format is invalid.");
 
     const dup = MODEL.some(r => String(r.code || "").trim().toLowerCase() === code.toLowerCase());
     if (dup) return fail("This code already exists.");
 
     try {
+        if (addParticipantSubmitBtn) {
+            addParticipantSubmitBtn.disabled = true;
+            addParticipantSubmitBtn.textContent = "Creating...";
+        }
         await createNewParticipant({ code, name, email });
+        if (addParticipantSubmitBtn) addParticipantSubmitBtn.textContent = "Create Participant";
         closeAddParticipantModal();
     } catch (e) {
         const msg = String(e?.message || e || "");
         if (msg.toLowerCase().includes("duplicate")) fail("This code already exists.");
-        else fail("Create failed. Please check code uniqueness and try again.");
+        else if (/already exists|already registered|partial|timeout|network|failed to fetch|record/i.test(msg)) {
+            fail("Create may be partially completed. Click Retry / Sync Participant to link the existing user to this project.");
+            if (addParticipantSubmitBtn) addParticipantSubmitBtn.textContent = "Retry / Sync Participant";
+        } else fail("Create failed. Please check code uniqueness and try again.");
+    } finally {
+        if (addParticipantSubmitBtn) addParticipantSubmitBtn.disabled = false;
     }
 }
 
@@ -1488,11 +1594,21 @@ async function reloadAll() {
 function wireEvents() {
     searchInput?.addEventListener("input", () => {
         buildParticipantPickerFiltered(String(searchInput.value || "").trim().toLowerCase());
-        renderTable();
+        renderTable({ resetPage: true });
     });
     showInactive?.addEventListener("change", () => reloadAll());
-    filterColumn?.addEventListener("change", () => { rebuildStatusOptions(); renderTable(); });
-    filterStatus?.addEventListener("change", renderTable);
+    filterColumn?.addEventListener("change", () => { rebuildStatusOptions(); renderTable({ resetPage: true }); });
+    filterStatus?.addEventListener("change", () => renderTable({ resetPage: true }));
+    formPager?.addEventListener("click", (event) => {
+        const button = event.target?.closest?.("[data-form-page]");
+        if (!button) return;
+        const direction = button.getAttribute("data-form-page");
+        const totalPages = getFormPageCount();
+        if (direction === "prev") FORM_PAGE = Math.max(1, FORM_PAGE - 1);
+        if (direction === "next") FORM_PAGE = Math.min(totalPages, FORM_PAGE + 1);
+        renderTable();
+        tableWrap?.scrollTo?.({ top: 0, behavior: "smooth" });
+    });
     reloadBtn?.addEventListener("click",      () => reloadAll());
     addRowBtn?.addEventListener("click",      () => openAddParticipantModal());
     newParticipantBtn?.addEventListener("click",() => openAddParticipantModal());
