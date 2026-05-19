@@ -104,6 +104,12 @@ serve(async (req) => {
   });
   if (updateError) return json({ error: updateError.message }, 500);
 
+  const { error: forceResetError } = await adminClient
+    .from("profiles")
+    .update({ force_password_reset: true })
+    .eq("id", userId);
+  if (forceResetError) return json({ error: `Password updated, but force reset flag failed: ${forceResetError.message}` }, 500);
+
   await writeAuditLog(adminClient, {
     actor_user_id: caller.id,
     actor_email: callerProfile?.email || caller.email || null,
@@ -119,6 +125,7 @@ serve(async (req) => {
       target_email: targetProfile?.email || null,
       target_display_name: targetProfile?.display_name || null,
       target_role: targetProfile?.role || null,
+      force_password_reset: true,
     },
   });
 

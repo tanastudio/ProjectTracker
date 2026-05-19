@@ -834,6 +834,41 @@
             };
         }
 
+        function updateTicketEditState() {
+            CAN_EDIT = PROFILE_ROLE === "admin" || String(PROJECT_CTX?.member_role || "").toLowerCase() === "editor";
+            if (CAN_EDIT) {
+                editModeNote.textContent = "Edit mode enabled for admin/editor.";
+            } else if (IS_CLIENT) {
+                editModeNote.textContent = "You can update priority and reply to tickets.";
+            } else {
+                editModeNote.textContent = "View only mode. Only admin/editor can update tickets.";
+            }
+        }
+
+        async function refreshTicketEditAccess() {
+            if (PROFILE_ROLE === "admin") {
+                PROJECT_CTX.member_role = "admin";
+                updateTicketEditState();
+                return CAN_EDIT;
+            }
+            const { data, error } = await supabase
+                .from("project_members")
+                .select("role")
+                .eq("project_id", PROJECT_CTX.project_id)
+                .eq("user_id", SESSION_USER_ID)
+                .maybeSingle();
+            if (error) throw error;
+            PROJECT_CTX.member_role = data?.role || "viewer";
+            updateTicketEditState();
+            return CAN_EDIT;
+        }
+
+        async function ensureTicketWriteAccess({ allowClient = false } = {}) {
+            if (allowClient && IS_CLIENT) return true;
+            if (await refreshTicketEditAccess()) return true;
+            throw new Error("Your project access is now view-only. Reload the page or contact an admin.");
+        }
+
         async function loadDisplayNameMap(userIds) {
             const ids = Array.from(new Set((userIds || []).filter(Boolean).map(String)));
 
@@ -960,6 +995,7 @@
             submitBtn.disabled = true;
             submitBtn.textContent = "Sending...";
             try {
+                await ensureTicketWriteAccess({ allowClient: true });
                 const { data: reply, error } = await supabase
                     .from("ticket_replies")
                     .insert({
@@ -1244,6 +1280,7 @@
                     btn.textContent = "Saving...";
 
                     try {
+                        await ensureTicketWriteAccess({ allowClient: true });
                         const idx = ALL_ITEMS.findIndex((x) => String(x.id) === requestId);
                         const oldItem     = idx >= 0 ? ALL_ITEMS[idx] : null;
                         const oldStatus   = oldItem ? normalizeStatus(oldItem.status) : null;
@@ -1450,14 +1487,14 @@
         ticketNavBadge = attachTicketNavBadge({
             supabase,
             navElement: document.getElementById("navTickets"),
-            getProjectId: () => PROJECT_CTX?.project_id || sessionStorage.getItem("selected_project_id") || "",
+            getProjectId: () => PROJECT_CTX?.project_id || "",
             userId: SESSION_USER_ID,
             displayMode: "unread_only",
         });
         await ticketNavBadge.refresh();
 
-        CAN_EDIT   = PROFILE_ROLE === "admin" || String(PROJECT_CTX.member_role || "").toLowerCase() === "editor";
         IS_CLIENT  = PROFILE_ROLE === "client";
+        updateTicketEditState();
 
         // Hide Owner column for client role
         const thOwner = el("thOwner");
@@ -1466,14 +1503,6 @@
         el("projectName").textContent = `${PROJECT_CTX.project_name} (${PROJECT_CTX.member_role})`;
         document.title = `Tickets - ${PROJECT_CTX.project_name}`;
 
-
-        if (CAN_EDIT) {
-            editModeNote.textContent = "Edit mode enabled for admin/editor.";
-        } else if (IS_CLIENT) {
-            editModeNote.textContent = "You can update priority and reply to tickets.";
-        } else {
-            editModeNote.textContent = "View only mode. Only admin/editor can update tickets.";
-        }
 
         OWNER_OPTIONS = await loadOwnerOptions(PROJECT_CTX.project_id);
 

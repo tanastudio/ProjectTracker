@@ -318,6 +318,8 @@ let TOP_FORM_LOCK    = false;
 let ROW_ELEMENTS     = new Map();
 let FORM_PAGE        = 1;
 let FORM_RENDERED_ROWS = [];
+let PROJECT_MEMBER_ROLE = String(PROJECT_CTX?.member_role || "").trim().toLowerCase();
+let PROJECT_WRITE_ALLOWED = false;
 
 /* ============================================================
    FETCH
@@ -467,6 +469,60 @@ function buildModel(records, recordValues, bookingsByRecordField = new Map()) {
    ============================================================ */
 function markDirty(row, key, value) { row._dirty[key] = value; }
 
+function canWriteProject(role = PROJECT_MEMBER_ROLE) {
+    if (PROFILE_ROLE === "admin") return true;
+    return ["admin", "editor"].includes(String(role || "").trim().toLowerCase());
+}
+
+function updateProjectWriteAccessUi() {
+    PROJECT_WRITE_ALLOWED = canWriteProject();
+    document.documentElement.setAttribute("data-project-write-access", PROJECT_WRITE_ALLOWED ? "write" : "read");
+    const canSeeAdmin = PROFILE_ROLE === "admin";
+    const navUpdate = document.getElementById("navUpdateStatus");
+    const navSettings = document.getElementById("navProjectSettings");
+    const navAdmin = document.getElementById("navAdmin");
+    if (navUpdate) navUpdate.style.display = PROJECT_WRITE_ALLOWED ? "" : "none";
+    if (navSettings) navSettings.style.display = PROJECT_WRITE_ALLOWED ? "" : "none";
+    if (navAdmin) navAdmin.style.display = canSeeAdmin ? "" : "none";
+    [saveTopBtn, newParticipantBtn, addRowBtn, addParticipantSubmitBtn].forEach((button) => {
+        if (button) button.disabled = !PROJECT_WRITE_ALLOWED;
+    });
+    if (candIssue) candIssue.disabled = !PROJECT_WRITE_ALLOWED;
+    if (candDecision) candDecision.disabled = !PROJECT_WRITE_ALLOWED;
+    for (const { select, field } of STEP_SELECTS) {
+        const hasBooking = SELECTED?.bookings?.[field.key];
+        select.disabled = !PROJECT_WRITE_ALLOWED || !!hasBooking;
+    }
+}
+
+async function refreshProjectWriteAccess() {
+    if (PROFILE_ROLE === "admin") {
+        PROJECT_MEMBER_ROLE = "admin";
+        updateProjectWriteAccessUi();
+        return PROJECT_WRITE_ALLOWED;
+    }
+    const { data, error } = await supabase
+        .from("project_members")
+        .select("role")
+        .eq("project_id", PROJECT_CTX.project_id)
+        .eq("user_id", SESSION.user.id)
+        .maybeSingle();
+    if (error) throw error;
+    PROJECT_MEMBER_ROLE = String(data?.role || "").trim().toLowerCase();
+    updateProjectWriteAccessUi();
+    return PROJECT_WRITE_ALLOWED;
+}
+
+async function ensureProjectWriteAccess() {
+    const allowed = await refreshProjectWriteAccess();
+    if (allowed) return true;
+    const err = new Error("Your project access is now view-only. Reload the page or contact an admin.");
+    err.code = "PROJECT_WRITE_ACCESS_REVOKED";
+    throw err;
+}
+
+updateProjectWriteAccessUi();
+
 function hasUnsavedChanges() {
     if (GLOBAL_IN_FLIGHT > 0) return true;
     return MODEL.some((row) =>
@@ -552,7 +608,9 @@ async function saveRowNow(row) {
     GLOBAL_IN_FLIGHT++;
     setGlobalSaveState();
 
+    let permissionRevoked = false;
     try {
+        await ensureProjectWriteAccess();
         const baseKeys = ["name"]; // "email" is stored in record_values via upsertRecordValue
         await updateRecordBase(row, snapshot);
         row.updatedBy = currentUserName();
@@ -567,17 +625,21 @@ async function saveRowNow(row) {
         const tr = ROW_ELEMENTS.get(row._uid);
         if (tr) updateRowCells(tr, row);
     } catch (e) {
+        permissionRevoked = e?.code === "PROJECT_WRITE_ACCESS_REVOKED";
         row._failCount = (row._failCount || 0) + 1;
         console.error("Save failed (attempt", row._failCount, "):", e?.message || e?.code || e);
         LAST_SAVE_OK = false;
-        setSavePill("save-failed", row._failCount >= 3
+        setSavePill("save-failed", permissionRevoked
+            ? e.message
+            : row._failCount >= 3
             ? "Save failed - reload page to retry"
             : "Failed (check RLS/policies/schema)");
     } finally {
         GLOBAL_IN_FLIGHT = Math.max(0, GLOBAL_IN_FLIGHT - 1);
         row._saving = false;
         setGlobalSaveState();
-        if (row._needsResave || Object.keys(row._dirty).length) {
+        if (permissionRevoked) setSavePill("save-failed", "Your project access is now view-only. Reload the page or contact an admin.");
+        if (!permissionRevoked && (row._needsResave || Object.keys(row._dirty).length)) {
             row._needsResave = false;
             saveRowNow(row).catch(() => { });
         }
@@ -700,6 +762,10 @@ function bindTopFormStepEvents() {
     for (const { field, select } of STEP_SELECTS) {
         select.addEventListener("change", () => {
             if (TOP_FORM_LOCK || !SELECTED) return;
+            if (!PROJECT_WRITE_ALLOWED) {
+                updateTopFormFromRow(SELECTED);
+                return;
+            }
             if (SELECTED.bookings?.[field.key]) {
                 select.value = "Completed";
                 return;
@@ -740,7 +806,7 @@ function updateTopFormFromRow(row) {
             select.appendChild(completed);
         }
         select.value = hasBooking ? "Completed" : (row.steps[field.key] ?? getDefaultOption(field));
-        select.disabled = hasBooking;
+        select.disabled = !PROJECT_WRITE_ALLOWED || hasBooking;
         select.classList.toggle("booking-locked", hasBooking);
         if (bookingDateDisplay) {
             bookingDateDisplay.textContent = hasBooking ? `Booked: ${row.bookingDates?.[field.key] || "-"}` : "";
@@ -757,6 +823,8 @@ function updateTopFormFromRow(row) {
     if (candCode)  { candCode.readOnly  = true; candCode.disabled  = true; }
     if (candName)  { candName.readOnly  = true; }
     if (candEmail) { candEmail.readOnly = true; }
+    if (candIssue) candIssue.disabled = !PROJECT_WRITE_ALLOWED;
+    if (candDecision) candDecision.disabled = !PROJECT_WRITE_ALLOWED;
 
     setIssueHint(false);
     setDecisionHint(false);
@@ -782,6 +850,10 @@ function bindTopFormEvents() {
 
     const updateLocal = (key, getFn, { autosave = false } = {}) => () => {
         if (TOP_FORM_LOCK || !SELECTED) return;
+        if (!PROJECT_WRITE_ALLOWED) {
+            updateTopFormFromRow(SELECTED);
+            return;
+        }
         const v = getFn();
         if (key === "name")      SELECTED.name      = v;
         if (key === "email")     SELECTED.email     = v;
@@ -1090,6 +1162,10 @@ function buildRow(r) {
         const td  = document.createElement("td");
         const hasBooking = !!r.bookings?.[f.key];
         const sel = makeSelect(f, r.steps[f.key], () => {
+            if (!PROJECT_WRITE_ALLOWED) {
+                sel.value = r.steps[f.key] ?? getDefaultOption(f);
+                return;
+            }
             if (r.bookings?.[f.key]) {
                 sel.value = "Completed";
                 return;
@@ -1102,10 +1178,12 @@ function buildRow(r) {
             scheduleRowSave(r);
         });
         sel.classList.add(statusClassSuffix(r.steps[f.key]));
-        if (hasBooking) {
+        if (!PROJECT_WRITE_ALLOWED || hasBooking) {
             sel.disabled = true;
-            sel.classList.add("booking-locked");
-            sel.title = "Booking date exists; status is completed.";
+            if (hasBooking) {
+                sel.classList.add("booking-locked");
+                sel.title = "Booking date exists; status is completed.";
+            }
         }
         sel.dataset.cellKey = f.key;
         td.appendChild(sel);
@@ -1142,10 +1220,12 @@ function buildRow(r) {
     // Issue
     const tdIssue  = document.createElement("td");
     const inpIssue  = makeInput(r.issue || "", () => {
+        if (!PROJECT_WRITE_ALLOWED) return;
         r.issue = inpIssue.value;
         markDirty(r, "issue", r.issue);
         scheduleRowSave(r);
     });
+    inpIssue.disabled = !PROJECT_WRITE_ALLOWED;
     inpIssue.dataset.cellKey = "issue";
     tdIssue.appendChild(inpIssue);
     tr.appendChild(tdIssue);
@@ -1153,10 +1233,12 @@ function buildRow(r) {
     // Decision
     const tdDecision  = document.createElement("td");
     const inpDecision  = makeInput(r.decision || "", () => {
+        if (!PROJECT_WRITE_ALLOWED) return;
         r.decision = inpDecision.value;
         markDirty(r, "decision", r.decision);
         scheduleRowSave(r);
     });
+    inpDecision.disabled = !PROJECT_WRITE_ALLOWED;
     inpDecision.dataset.cellKey = "decision";
     tdDecision.appendChild(inpDecision);
     tr.appendChild(tdDecision);
@@ -1181,12 +1263,14 @@ function buildRow(r) {
     const btnToggle       = document.createElement("button");
     btnToggle.className   = "mini-btn " + (r.active ? "mini-btn-danger" : "mini-btn-ok");
     btnToggle.textContent = r.active ? "Deactivate" : "Reactivate";
+    btnToggle.disabled    = !PROJECT_WRITE_ALLOWED;
 
     btnToggle.addEventListener("click", async () => {
         const prev = r.active;
-        r.active   = !r.active;
 
         try {
+            await ensureProjectWriteAccess();
+            r.active = !r.active;
             GLOBAL_IN_FLIGHT++;
             setGlobalSaveState();
             const { error } = await supabase
@@ -1199,7 +1283,7 @@ function buildRow(r) {
         } catch (e) {
             console.error(e);
             LAST_SAVE_OK = false;
-            setSavePill("save-failed", "Failed (check RLS/policies)");
+            setSavePill("save-failed", e?.code === "PROJECT_WRITE_ACCESS_REVOKED" ? e.message : "Failed (check RLS/policies)");
             r.active = prev;
         } finally {
             GLOBAL_IN_FLIGHT = Math.max(0, GLOBAL_IN_FLIGHT - 1);
@@ -1268,12 +1352,13 @@ function updateRowCells(tr, r) {
             cell.classList.remove("status-not-started", "status-in-progress", "status-completed", "status-issue");
             cell.classList.add(statusClassSuffix(cell.value));
             const hasBooking = !!r.bookings?.[key];
-            cell.disabled = hasBooking;
+            cell.disabled = !PROJECT_WRITE_ALLOWED || hasBooking;
             cell.classList.toggle("booking-locked", hasBooking);
             continue;
         }
         if (cell.tagName === "INPUT" || cell.tagName === "TEXTAREA") {
             if (newVal !== undefined && cell.value !== String(newVal)) cell.value = newVal;
+            cell.disabled = !PROJECT_WRITE_ALLOWED;
             continue;
         }
         if (newVal !== undefined) cell.textContent = String(newVal);
@@ -1380,6 +1465,7 @@ function bindHorizontalScrollSync() {
    ============================================================ */
 async function createNewParticipant(seed = {}) {
     try {
+        await ensureProjectWriteAccess();
         setSavePill("save-saving", "Creating new participant...");
         const nextCode = String(seed.code || "").trim();
         const nextName = String(seed.name || "").trim();
@@ -1458,6 +1544,10 @@ async function createNewParticipant(seed = {}) {
 
 function openAddParticipantModal() {
     if (!addParticipantModal) return;
+    if (!PROJECT_WRITE_ALLOWED) {
+        setSavePill("save-failed", "Project access is view-only.");
+        return;
+    }
     if (addCandCode) addCandCode.value = "";
     if (addCandName) addCandName.value = "";
     if (addCandEmail) addCandEmail.value = "";
@@ -1524,6 +1614,7 @@ async function reloadAll() {
     setLoadHintVisible(false);
 
     try {
+        await refreshProjectWriteAccess();
         FIELDS = await loadFields(PROJECT_CTX.project_id);
 
         // Derive dynamic field lists from what DB returns
@@ -1627,6 +1718,12 @@ function wireEvents() {
 
     saveTopBtn?.addEventListener("click", async () => {
         if (!SELECTED) return;
+        try {
+            await ensureProjectWriteAccess();
+        } catch (e) {
+            setSavePill("save-failed", e.message || "Project access is view-only.");
+            return;
+        }
 
         // Validate email
         if (!validateEmail(candEmail?.value ?? "")) {

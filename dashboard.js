@@ -136,11 +136,13 @@ function goProjectPage(page, projectId) {
     window.location.href = `./${page}?project=${encodeURIComponent(pid)}`;
 }
 
-function setSidebarAccess(role) {
+function setSidebarAccess(role, memberRole = "") {
     const r = String(role || "").trim().toLowerCase();
+    const projectRole = String(memberRole || "").trim().toLowerCase();
+    const canEditProject = r === "admin" || ["admin", "editor"].includes(projectRole);
 
-    const canSeeUpdate = r === "admin" || r === "internal";
-    const canSeeProjectSettings = r === "admin" || r === "internal";
+    const canSeeUpdate = canEditProject;
+    const canSeeProjectSettings = canEditProject;
     const canSeeAdmin = r === "admin";
 
     if (navUpdateStatus) {
@@ -254,6 +256,7 @@ async function resolveProjectForUser(userId) {
 
 const PROJECT_CTX = await resolveProjectForUser(__session.user.id);
 if (!PROJECT_CTX) throw new Error("Redirecting...");
+setSidebarAccess(USER_ROLE, PROJECT_CTX.member_role);
 const ticketNavBadge = attachTicketNavBadge({
     supabase,
     navElement: navTickets,

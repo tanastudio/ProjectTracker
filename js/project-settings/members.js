@@ -136,7 +136,7 @@ export function createMembersController(ctx) {
   
     const successTarget = selectedResetMember.email || selectedResetMember.name || "selected member";
     closeSetPasswordModal();
-    showHint(`Password updated for ${successTarget}.`, false);
+    showHint(`Password updated for ${successTarget}. They will be asked to change it after signing in.`, false);
   }
   
   function renderResetPasswordList() {

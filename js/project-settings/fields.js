@@ -5,6 +5,35 @@ export function createFieldsController(ctx) {
 
   const FIXED_ROLES = new Set(["email", "issue", "decision", "overall_status"]);
   const DASHBOARD_TOGGLE_ALLOWED_ROLES = new Set(["email"]);
+  const RESERVED_FIELD_KEYS = new Set([
+    "id",
+    "uuid",
+    "project_id",
+    "record_id",
+    "field_id",
+    "user_id",
+    "created_by",
+    "updated_by",
+    "created_at",
+    "updated_at",
+    "deleted_at",
+    "code",
+    "title",
+    "active",
+    "role",
+    "email",
+    "issue",
+    "decision",
+    "overall_status",
+    "value",
+    "value_text",
+    "value_select",
+    "constructor",
+    "prototype",
+    "__proto__",
+    "to_string",
+    "has_own_property",
+  ]);
   const DEFAULT_SELECT_OPTIONS = ["Not Started", "In Progress", "Completed", "Issue"];
   let supportsVisibilityChannels = true;
   let fieldLibrary = [];
@@ -253,6 +282,10 @@ export function createFieldsController(ctx) {
     return fields.some((field) => String(field.key || "").trim().toLowerCase() === String(key || "").trim().toLowerCase());
   }
 
+  function isReservedFieldKey(key) {
+    return RESERVED_FIELD_KEYS.has(String(key || "").trim().toLowerCase());
+  }
+
   function normalizeLibraryField(field) {
     const type = String(field?.type || "select").trim().toLowerCase();
     const fieldRole = type === "select" && String(field?.field_role || "").trim().toLowerCase() === "booking" ? "booking" : "step";
@@ -329,7 +362,7 @@ export function createFieldsController(ctx) {
 
     const byKey = new Map();
     (data || []).map(normalizeLibraryField).forEach((field) => {
-      if (!field.key || !field.label || FIXED_ROLES.has(field.field_role)) return;
+      if (!field.key || !field.label || FIXED_ROLES.has(field.field_role) || isReservedFieldKey(field.key)) return;
       if (!byKey.has(field.key)) byKey.set(field.key, field);
     });
     fieldLibrary = [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
@@ -384,6 +417,10 @@ export function createFieldsController(ctx) {
       renderFieldLibrary();
       return;
     }
+    if (isReservedFieldKey(field.key)) {
+      showHint(`Key "${field.key}" is reserved and cannot be added as a custom field.`, true);
+      return;
+    }
     if (!await confirmAddFieldWithExistingRecords(field.label)) return;
 
     const item = [...(el("fieldLibraryList")?.querySelectorAll("[data-lib-key]") || [])]
@@ -435,6 +472,8 @@ export function createFieldsController(ctx) {
     if (!label) { showHint("Label is required.", true); return; }
     if (!key)   { showHint("Key is required.", true); return; }
     if (!/^[a-z][a-z0-9_]*$/.test(key)) { showHint("Key must start with a letter and contain only lowercase letters, numbers, and underscores.", true); return; }
+    if (isReservedFieldKey(key)) { showHint(`Key "${key}" is reserved. Use a project-specific key instead.`, true); return; }
+
     if (isFieldInProject(key)) { showHint(`Key "${key}" is already used by another field.`, true); return; }
   
     let options = null;

@@ -479,6 +479,15 @@
             </a>
           </div>
 
+          <div class="form-group" style="max-width:260px;">
+            <label>CSV Encoding</label>
+            <select class="form-select" id="csvEncoding">
+              <option value="utf-8">UTF-8</option>
+              <option value="windows-874">Windows-874 (Thai Excel)</option>
+              <option value="windows-1252">Windows-1252</option>
+            </select>
+          </div>
+
           <div class="upload-zone" id="uploadZone">
             <div class="upload-icon">📄</div>
             <div style="font-size:14px;font-weight:700;margin-bottom:4px;">Drop CSV file here or click to browse</div>
@@ -655,6 +664,40 @@ function slugify(str) {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 40);
+}
+
+const RESERVED_FIELD_KEYS = new Set([
+  "id",
+  "uuid",
+  "project_id",
+  "record_id",
+  "field_id",
+  "user_id",
+  "created_by",
+  "updated_by",
+  "created_at",
+  "updated_at",
+  "deleted_at",
+  "code",
+  "title",
+  "active",
+  "role",
+  "email",
+  "issue",
+  "decision",
+  "overall_status",
+  "value",
+  "value_text",
+  "value_select",
+  "constructor",
+  "prototype",
+  "__proto__",
+  "to_string",
+  "has_own_property",
+]);
+
+function isReservedFieldKey(key) {
+  return RESERVED_FIELD_KEYS.has(String(key || "").trim().toLowerCase());
 }
 
 function escapeHtml(s) {
@@ -896,6 +939,7 @@ async function loadFieldLibrary() {
   // Keep existing library entries (newly created this session) first
   for (const f of fieldLibrary) seen.add(f.key);
   for (const f of (data || [])) {
+    if (isReservedFieldKey(f.key)) continue;
     if (!seen.has(f.key)) {
       seen.add(f.key);
       fieldLibrary.push({ key: f.key, label: f.label, type: f.type, field_role: f.field_role === "booking" ? "booking" : "step" });
@@ -911,6 +955,7 @@ el("addFieldBtn").addEventListener("click", () => {
   const type = el("newFieldType").value;
   if (!label) { showHint("Enter a field label.", true); return; }
   const key = slugify(label);
+  if (isReservedFieldKey(key)) { showHint(`"${key}" is reserved. Use a project-specific field name.`, true); return; }
   if (!key) { showHint("Invalid label — can't generate a key.", true); return; }
   if (isInCustom(key)) { showHint(`"${key}" is already in the project fields.`, true); return; }
   const fieldRole = type === "select" && el("newFieldBooking").checked ? "booking" : "step";
@@ -1017,8 +1062,18 @@ let csvRows = []; // [{name, email}]
 function handleCsvFile(file) {
   if (!file || !file.name.endsWith(".csv")) { showHint("Please upload a .csv file.", true); return; }
   const reader = new FileReader();
-  reader.onload = (e) => parseCsv(e.target.result);
-  reader.readAsText(file);
+  reader.onload = (e) => {
+    const encoding = String(el("csvEncoding")?.value || "utf-8").trim() || "utf-8";
+    try {
+      const decoder = new TextDecoder(encoding, { fatal: false });
+      parseCsv(decoder.decode(e.target.result));
+    } catch (err) {
+      console.warn("CSV decode failed, falling back to UTF-8:", err);
+      const decoder = new TextDecoder("utf-8", { fatal: false });
+      parseCsv(decoder.decode(e.target.result));
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function parseCsv(text) {
@@ -1111,6 +1166,11 @@ el("createBtn").addEventListener("click", async () => {
   }
 
   clearHint();
+  const reservedField = customFields.find((field) => isReservedFieldKey(field.key));
+  if (reservedField) {
+    showHint(`"${reservedField.key}" is reserved. Remove or rename that custom field before creating the project.`, true);
+    return;
+  }
   el("createBtn").disabled = true;
   el("createProgress").style.display = "block";
   let createdProjectId = null;

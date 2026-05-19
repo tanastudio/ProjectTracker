@@ -250,8 +250,18 @@ export function createParticipantImportController(ctx) {
   function handleCsvFile(file) {
     if (!file || !file.name.endsWith(".csv")) { showHint("Please upload a .csv file.", true); return; }
     const reader = new FileReader();
-    reader.onload = e => parseCsv(e.target.result);
-    reader.readAsText(file);
+    reader.onload = e => {
+      const encoding = String(el("csvEncoding")?.value || "utf-8").trim() || "utf-8";
+      try {
+        const decoder = new TextDecoder(encoding, { fatal: false });
+        parseCsv(decoder.decode(e.target.result));
+      } catch (err) {
+        console.warn("CSV decode failed, falling back to UTF-8:", err);
+        const decoder = new TextDecoder("utf-8", { fatal: false });
+        parseCsv(decoder.decode(e.target.result));
+      }
+    };
+    reader.readAsArrayBuffer(file);
   }
   
   const uploadZone = el("uploadZone");

@@ -656,6 +656,21 @@
             return `./projects.html?v=${Date.now()}`;
         }
 
+        async function loadRedirectProfile(userId) {
+            const primary = await supabase
+                .from("profiles")
+                .select("role, force_password_reset")
+                .eq("id", userId)
+                .maybeSingle();
+            if (!primary.error) return primary;
+            if (!String(primary.error.message || "").includes("force_password_reset")) return primary;
+            return supabase
+                .from("profiles")
+                .select("role")
+                .eq("id", userId)
+                .maybeSingle();
+        }
+
         function renderEyeIcon(visible) {
             togglePasswordBtn.innerHTML = visible
                 ? `
@@ -685,13 +700,14 @@
         async function redirectLoggedInUser(session) {
             if (!session?.user?.id) return false;
 
-            const { data: profile, error } = await supabase
-                .from("profiles")
-                .select("role")
-                .eq("id", session.user.id)
-                .maybeSingle();
+            const { data: profile, error } = await loadRedirectProfile(session.user.id);
 
             if (error) return false;
+
+            if (profile?.force_password_reset === true) {
+                window.location.replace("./update-password.html?mode=forced");
+                return true;
+            }
 
             if (profile?.role === "participant") {
                 window.location.replace("./participant-status.html");
